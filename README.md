@@ -2,9 +2,10 @@
 
 > **Hi, I'm PocketPaw! The AI agent that lives on YOUR laptop, not some corporate datacenter.**
 
+[![PyPI version](https://img.shields.io/pypi/v/pocketpaw.svg)](https://pypi.org/project/pocketpaw/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
-[![UV](https://img.shields.io/badge/uv-package%20manager-blueviolet)](https://docs.astral.sh/uv/)
+[![Downloads](https://img.shields.io/pypi/dm/pocketpaw.svg)](https://pypi.org/project/pocketpaw/)
 
 I'm your self-hosted, cross-platform personal AI agent. You talk to me through **Telegram**, and I do the work on your computer. Unlike those fancy cloud AIs, I run on _your_ machine, respect _your_ privacy, and I'm always here - even on that dusty laptop in your closet.
 
@@ -45,38 +46,38 @@ Me:  "Found it! You have 47GB of node_modules. Want me to clean them up?"
 
 ---
 
-## 🚀 Quick Start
+## 🚀 One-Command Install
 
-### 1. Install UV (if you don't have it)
-
+### Option 1: pip (Recommended)
 ```bash
-# macOS/Linux
-curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# Windows
-powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+pip install pocketpaw
+pocketpaw
 ```
 
-### 2. Run Me!
-
+### Option 2: pipx (Isolated Install)
 ```bash
-# Clone and run
+pipx install pocketpaw
+pocketpaw
+```
+
+### Option 3: uvx (Run Without Installing)
+```bash
+uvx pocketpaw
+```
+
+### Option 4: From Source
+```bash
 git clone https://github.com/pocketpaw/pocketpaw.git
 cd pocketpaw
 uv run pocketpaw
 ```
 
-That's it! I'll:
-1. Set up my environment automatically
-2. Open your browser for quick setup
-3. Help you connect your Telegram bot
-4. Be ready to help!
+**That's it!** No Docker. No config files. No YAML. No dependency hell.
 
-### One-liner (coming soon)
-
-```bash
-uvx pocketpaw
-```
+I'll automatically:
+1. Set up everything I need
+2. Open your browser for quick Telegram setup
+3. Be ready to help in 30 seconds!
 
 ---
 

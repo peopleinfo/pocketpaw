@@ -1,24 +1,36 @@
 [project]
 name = "pocketpaw"
-version = "0.1.0"
-description = "The AI agent that runs on your laptop, not a datacenter"
+version = "0.2.0"
+description = "The AI agent that runs on your laptop, not a datacenter. OpenClaw alternative with one-command install."
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.11"
-keywords = ["ai", "agent", "telegram", "assistant", "automation"]
+keywords = [
+    "ai", "agent", "telegram", "assistant", "automation",
+    "browser", "llm", "ollama", "openai", "anthropic",
+    "self-hosted", "local-first", "privacy"
+]
 authors = [
-    { name = "PocketPaw Team" }
+    { name = "PocketPaw Team", email = "hello@pocketpaw.ai" }
 ]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Environment :: Console",
     "Intended Audience :: End Users/Desktop",
+    "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
+    "Operating System :: MacOS",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Topic :: Home Automation",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Internet :: WWW/HTTP :: Browsers",
+    "Typing :: Typed",
 ]
 
 dependencies = [
@@ -38,8 +50,7 @@ dependencies = [
     "anthropic>=0.18.0",
     # Agent Backends
     "open-interpreter>=0.2.0",
-    "claude-agent-sdk>=0.1.0",
-    # Browser Automation
+    # Browser Automation (auto-installs Chromium on first use)
     "playwright>=1.40.0",
     # Config
     "pydantic>=2.5.0",
@@ -48,9 +59,8 @@ dependencies = [
     # Scheduling
     "apscheduler>=3.10.0",
     "python-dateutil>=2.8.0",
-    # Logging
+    # Logging & CLI
     "rich>=13.0.0",
-    "pytest-asyncio>=1.3.0",
 ]
 
 [project.optional-dependencies]
@@ -65,9 +75,11 @@ dev = [
 pocketpaw = "pocketclaw.__main__:main"
 
 [project.urls]
-Homepage = "https://github.com/pocketclaw/pocketclaw"
-Repository = "https://github.com/pocketclaw/pocketclaw"
-Issues = "https://github.com/pocketclaw/pocketclaw/issues"
+Homepage = "https://github.com/pocketpaw/pocketpaw"
+Repository = "https://github.com/pocketpaw/pocketpaw"
+Issues = "https://github.com/pocketpaw/pocketpaw/issues"
+Documentation = "https://github.com/pocketpaw/pocketpaw#readme"
+Twitter = "https://twitter.com/PocketPawAI"
 
 [build-system]
 requires = ["hatchling"]
