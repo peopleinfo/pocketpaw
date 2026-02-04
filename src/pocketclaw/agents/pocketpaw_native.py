@@ -15,6 +15,7 @@ Changes:
                 Example: "What's on my calendar?" → returns actual events as text
   - 2026-02-02: SPEED FIX - Shell commands now use direct subprocess (10x faster).
                 'computer' tool uses OI for complex multi-step tasks only.
+  - 2026-02-05: Added 'remember' and 'recall' tools for long-term memory.
 """
 
 import logging
@@ -154,11 +155,27 @@ When using 'computer', be SPECIFIC about what you want:
 ❌ BAD: "check my email"
 ✅ GOOD: "Use AppleScript to query Mail.app for unread emails from the last 24 hours. Return sender, subject, and preview for each email."
 
+## Memory Tools
+
+You have access to long-term memory:
+- Use 'remember' to save important facts about the user (preferences, projects, personal info)
+- Use 'recall' to search your memories when relevant context is needed
+
+**When to remember:**
+- User explicitly asks you to remember something: "Remember that I prefer dark mode"
+- Important facts are mentioned: "My name is...", "I work at...", "My project is..."
+- User preferences: "I like...", "I prefer...", "Always do X when..."
+
+**When to recall:**
+- User asks about something you might know: "What's my name?", "What project am I working on?"
+- Before starting a task, recall relevant context about the user's preferences
+
 ## Guidelines
 - Be concise and helpful
 - ALWAYS return actual data/information, not just open apps
 - Prefer 'computer' over 'shell' when in doubt
-- Report results clearly in a human-readable format"""
+- Report results clearly in a human-readable format
+- Use 'remember' to learn about the user over time"""
 
 # Tool definitions for Claude
 TOOLS = [
@@ -251,6 +268,43 @@ ALWAYS instruct it to RETURN data as text, not open GUI apps.""",
                 }
             },
             "required": ["path"]
+        }
+    },
+    {
+        "name": "remember",
+        "description": "Save important information to long-term memory. Use this to remember facts about the user, their preferences, project details, or anything they want you to remember for future conversations.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "content": {
+                    "type": "string",
+                    "description": "The information to remember (be specific and clear)"
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Optional tags to categorize the memory (e.g., 'preference', 'project', 'personal')"
+                }
+            },
+            "required": ["content"]
+        }
+    },
+    {
+        "name": "recall",
+        "description": "Search long-term memories for previously saved information about the user, their preferences, or project details.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "What to search for in memories"
+                },
+                "limit": {
+                    "type": "integer",
+                    "description": "Maximum number of memories to return (default: 5)"
+                }
+            },
+            "required": ["query"]
         }
     }
 ]
@@ -502,6 +556,41 @@ class PocketPawOrchestrator:
                 else:
                     import os
                     return "\n".join(os.listdir(Path(path).expanduser()))
+
+            elif tool_name == "remember":
+                from pocketclaw.memory.manager import get_memory_manager
+                content = tool_input.get("content", "")
+                tags = tool_input.get("tags", [])
+
+                if not content:
+                    return "Error: No content provided to remember"
+
+                manager = get_memory_manager()
+                await manager.remember(content, tags=tags)
+
+                tags_str = f" with tags: {', '.join(tags)}" if tags else ""
+                return f"✅ Remembered{tags_str}: {content[:100]}{'...' if len(content) > 100 else ''}"
+
+            elif tool_name == "recall":
+                from pocketclaw.memory.manager import get_memory_manager
+                query = tool_input.get("query", "")
+                limit = tool_input.get("limit", 5)
+
+                if not query:
+                    return "Error: No query provided for recall"
+
+                manager = get_memory_manager()
+                results = await manager.search(query, limit=limit)
+
+                if not results:
+                    return f"No memories found matching: {query}"
+
+                lines = [f"Found {len(results)} memories:\n"]
+                for i, entry in enumerate(results, 1):
+                    tags_str = f" [{', '.join(entry.tags)}]" if entry.tags else ""
+                    lines.append(f"{i}. {entry.content[:200]}{tags_str}")
+
+                return "\n".join(lines)
 
             else:
                 return f"Unknown tool: {tool_name}"
