@@ -3,6 +3,7 @@
 Lightweight FastAPI server that serves the frontend and handles WebSocket communication.
 
 Changes:
+  - 2026-02-06: WebSocket auth via first message instead of URL query param; accept wss://.
   - 2026-02-06: Channel config REST API (GET /api/channels/status, POST save/toggle).
   - 2026-02-06: Refactored adapter storage to _channel_adapters dict; auto-start all configured.
   - 2026-02-06: Auto-start Discord/WhatsApp adapters alongside dashboard; WhatsApp webhook routes.
@@ -732,22 +733,36 @@ async def get_telegram_pairing_status():
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket, token: str | None = Query(None)):
-    """WebSocket endpoint for real-time communication."""
-    # Verify Token
+    """WebSocket endpoint for real-time communication.
+
+    Auth: accepts token via query param (legacy) OR first message (preferred).
+    Localhost connections bypass auth entirely.
+    """
     expected_token = get_access_token()
 
-    # Allow localhost bypass for WebSocket too
+    # Allow localhost bypass for WebSocket
     client_host = websocket.client.host
-    is_localhost = client_host == "127.0.0.1" or client_host == "localhost"
+    is_localhost = client_host in ("127.0.0.1", "localhost")
 
-    if token != expected_token and not is_localhost:
-        # Try waiting for an initial message with token?
-        # Standard usage: ws://host/ws?token=XYZ
-        # If missing/invalid, close.
-        await websocket.close(code=4003, reason="Unauthorized")
-        return
-
-    await websocket.accept()
+    # Accept connection first — token can arrive via first message
+    if token == expected_token or is_localhost:
+        await websocket.accept()
+    else:
+        # Accept temporarily, wait for auth message
+        await websocket.accept()
+        try:
+            first_msg = await asyncio.wait_for(websocket.receive_json(), timeout=5.0)
+            if (
+                first_msg.get("action") == "authenticate"
+                and first_msg.get("token") == expected_token
+            ):
+                pass  # Authenticated
+            else:
+                await websocket.close(code=4003, reason="Unauthorized")
+                return
+        except (TimeoutError, Exception):
+            await websocket.close(code=4003, reason="Unauthorized")
+            return
 
     # Track connection
     active_connections.append(websocket)

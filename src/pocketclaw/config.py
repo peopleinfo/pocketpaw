@@ -1,23 +1,37 @@
 """Configuration management for PocketPaw.
 
 Changes:
+  - 2026-02-06: Secrets stored encrypted via CredentialStore; auto-migrate plaintext keys.
+  - 2026-02-06: Harden file/directory permissions (700 dir, 600 files).
   - 2026-02-02: Added claude_agent_sdk to agent_backend options.
   - 2026-02-02: Simplified backends - removed 2-layer mode.
   - 2026-02-02: claude_agent_sdk is now RECOMMENDED (uses official SDK).
 """
 
 import json
+import logging
 from functools import lru_cache
 from pathlib import Path
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+logger = logging.getLogger(__name__)
+
+
+def _chmod_safe(path: Path, mode: int) -> None:
+    """Set file permissions, ignoring errors on Windows."""
+    try:
+        path.chmod(mode)
+    except OSError:
+        pass
+
 
 def get_config_dir() -> Path:
     """Get the config directory, creating if needed."""
     config_dir = Path.home() / ".pocketclaw"
     config_dir.mkdir(exist_ok=True)
+    _chmod_safe(config_dir, 0o700)
     return config_dir
 
 
@@ -140,11 +154,14 @@ class Settings(BaseSettings):
     def save(self) -> None:
         """Save settings to config file.
 
-        Merges with existing config to preserve API keys if not set in current instance.
+        Non-secret fields go to config.json. Secret fields (API keys, tokens)
+        go to the encrypted credential store.
         """
+        from pocketclaw.credentials import SECRET_FIELDS, get_credential_store
+
         config_path = get_config_path()
 
-        # Load existing config to preserve API keys if not set
+        # Load existing config to preserve non-secret values if not set
         existing = {}
         if config_path.exists():
             try:
@@ -152,7 +169,8 @@ class Settings(BaseSettings):
             except (json.JSONDecodeError, Exception):
                 pass
 
-        data = {
+        # Build full settings dict
+        all_fields = {
             "telegram_bot_token": self.telegram_bot_token or existing.get("telegram_bot_token"),
             "allowed_user_id": self.allowed_user_id or existing.get("allowed_user_id"),
             "agent_backend": self.agent_backend,
@@ -187,17 +205,47 @@ class Settings(BaseSettings):
             ),
             "whatsapp_allowed_phone_numbers": self.whatsapp_allowed_phone_numbers,
         }
-        config_path.write_text(json.dumps(data, indent=2))
+
+        # Separate secrets from non-secrets
+        store = get_credential_store()
+        config_data = {}
+        for key, value in all_fields.items():
+            if key in SECRET_FIELDS:
+                if value:
+                    store.set(key, value)
+            else:
+                config_data[key] = value
+
+        config_path.write_text(json.dumps(config_data, indent=2))
+        _chmod_safe(config_path, 0o600)
 
     @classmethod
     def load(cls) -> "Settings":
-        """Load settings from config file, falling back to env/defaults."""
+        """Load settings from config file + encrypted credential store."""
+        from pocketclaw.credentials import SECRET_FIELDS, get_credential_store
+
+        # Run one-time migration from plaintext config
+        _migrate_plaintext_keys()
+
         config_path = get_config_path()
+        data: dict = {}
         if config_path.exists():
             try:
                 data = json.loads(config_path.read_text())
-                return cls(**data)
             except (json.JSONDecodeError, Exception):
+                pass
+
+        # Overlay secrets from encrypted store
+        store = get_credential_store()
+        secrets = store.get_all()
+        for field in SECRET_FIELDS:
+            if field in secrets and secrets[field]:
+                data[field] = secrets[field]
+
+        if data:
+            try:
+                return cls(**data)
+            except Exception:
                 pass
         return cls()
 
@@ -234,4 +282,52 @@ def regenerate_token() -> str:
     token = str(uuid.uuid4())
     token_path = get_token_path()
     token_path.write_text(token)
+    _chmod_safe(token_path, 0o600)
     return token
+
+
+# Flag file to avoid re-running migration on every load
+_MIGRATION_DONE_PATH: Path | None = None
+
+
+def _migrate_plaintext_keys() -> None:
+    """One-time migration: move plaintext API keys from config.json to encrypted store."""
+    from pocketclaw.credentials import SECRET_FIELDS, get_credential_store
+
+    global _MIGRATION_DONE_PATH  # noqa: PLW0603
+    if _MIGRATION_DONE_PATH is None:
+        _MIGRATION_DONE_PATH = get_config_dir() / ".secrets_migrated"
+
+    if _MIGRATION_DONE_PATH.exists():
+        return
+
+    config_path = get_config_path()
+    if not config_path.exists():
+        # No config yet — nothing to migrate
+        _MIGRATION_DONE_PATH.write_text("1")
+        return
+
+    try:
+        data = json.loads(config_path.read_text())
+    except (json.JSONDecodeError, Exception):
+        return
+
+    store = get_credential_store()
+    migrated_count = 0
+
+    for field in SECRET_FIELDS:
+        value = data.get(field)
+        if value and isinstance(value, str):
+            store.set(field, value)
+            data[field] = None  # Remove plaintext secret
+            migrated_count += 1
+
+    if migrated_count:
+        config_path.write_text(json.dumps(data, indent=2))
+        _chmod_safe(config_path, 0o600)
+        logger.info(
+            "Migrated %d secret(s) from plaintext config to encrypted store.", migrated_count
+        )
+
+    _MIGRATION_DONE_PATH.write_text("1")
+    _chmod_safe(_MIGRATION_DONE_PATH, 0o600)
