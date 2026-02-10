@@ -16,7 +16,7 @@
 </p>
 
 <p align="center">
-  Self-hosted, multi-agent AI platform. Talk through <strong>Telegram</strong>, work happens on your machine.<br>
+  Self-hosted, multi-agent AI platform. Web dashboard + <strong>Discord</strong>, <strong>Slack</strong>, <strong>WhatsApp</strong>, <strong>Telegram</strong>, and more.<br>
   No subscription. No cloud lock-in. Just you and your Paw.
 </p>
 
@@ -34,6 +34,9 @@ I'm your self-hosted, cross-platform personal AI agent. The **web dashboard** op
 
 **No subscription. No cloud lock-in. Just you and me.**
 
+<details>
+<summary>More install options</summary>
+
 ```bash
 # Isolated install
 pipx install pocketpaw && pocketpaw
@@ -49,7 +52,7 @@ uv run pocketpaw
 
 </details>
 
-PocketPaw will open your browser, walk you through Telegram bot setup, and be ready to go.
+PocketPaw will open the web dashboard in your browser and be ready to go.
 No Docker. No config files. No YAML. No dependency hell.
 
 ---
@@ -58,25 +61,32 @@ No Docker. No config files. No YAML. No dependency hell.
 
 | Feature | Description |
 |---------|-------------|
-| 🖥️ **Web Dashboard** | Browser-based control panel — the default mode, no setup needed |
-| 💬 **Multi-Channel** | Discord, Slack, WhatsApp (Personal + Business), Telegram — run any combo |
-| 🤖 **Claude Agent SDK** | Default backend — official Claude SDK with built-in tools (Bash, Read, Write) |
-| 🧠 **Smart Model Router** | Auto-selects Haiku / Sonnet / Opus based on task complexity |
-| 🔧 **Tool Policy** | Fine-grained allow/deny control over which tools the agent can use |
-| 📋 **Plan Mode** | Require approval before the agent runs shell commands or edits files |
-| 🌐 **Browser Control** | Browse the web, fill forms, click buttons via accessibility tree |
-| 📧 **Gmail Integration** | Search, read, and send emails via OAuth (no app passwords) |
-| 📅 **Calendar Integration** | List events, create meetings, meeting prep briefings |
-| 🔍 **Web Search & Research** | Tavily/Brave search + multi-step research with source synthesis |
-| 🎨 **Image Generation** | Google Gemini image generation, saved locally |
-| 🔊 **Voice / TTS** | Text-to-speech via OpenAI or ElevenLabs |
-| 🧠 **Memory & Compaction** | Long-term facts + session history with smart compaction |
-| ⏰ **Cron Scheduler** | Recurring reminders with natural language time parsing |
-| 🛡️ **Security Suite** | Injection scanner, audit CLI, Guardian AI, self-audit daemon |
-| 🔒 **Local-First** | Runs on YOUR machine — your data never leaves your computer |
-| 🖥️ **Cross-Platform** | macOS, Windows, Linux |
-| 🧩 **Skill System** | Create reusable agent skills at runtime |
-| 🤝 **Task Delegation** | Delegate complex sub-tasks to Claude Code CLI |
+| **Web Dashboard** | Browser-based control panel — the default mode, no setup needed |
+| **Multi-Channel** | Discord, Slack, WhatsApp (Personal + Business), Signal, Matrix, Teams, Google Chat, Telegram |
+| **Claude Agent SDK** | Default backend — official Claude SDK with built-in tools (Bash, Read, Write) |
+| **Smart Model Router** | Auto-selects Haiku / Sonnet / Opus based on task complexity |
+| **Tool Policy** | Fine-grained allow/deny control over which tools the agent can use |
+| **Plan Mode** | Require approval before the agent runs shell commands or edits files |
+| **Browser Control** | Browse the web, fill forms, click buttons via accessibility tree |
+| **Gmail Integration** | Search, read, and send emails via OAuth (no app passwords) |
+| **Calendar Integration** | List events, create meetings, meeting prep briefings |
+| **Google Drive & Docs** | List, download, upload, share files; read and create documents |
+| **Web Search & Research** | Tavily/Brave search + multi-step research with source synthesis |
+| **Image Generation** | Google Gemini image generation, saved locally |
+| **Voice / TTS / STT** | Text-to-speech via OpenAI or ElevenLabs, speech-to-text via Whisper |
+| **Spotify** | Search tracks, playback control, playlist management |
+| **Reddit** | Search posts, read threads, browse trending topics |
+| **OCR** | Extract text from images via GPT-4o vision or pytesseract |
+| **Memory & Compaction** | Long-term facts + session history with smart compaction + Mem0 semantic search |
+| **MCP Support** | Connect Model Context Protocol servers (stdio + HTTP) |
+| **Cron Scheduler** | Recurring reminders with natural language time parsing |
+| **Security Suite** | Injection scanner, audit CLI, Guardian AI, self-audit daemon |
+| **Local-First** | Runs on YOUR machine — your data never leaves your computer |
+| **Cross-Platform** | macOS, Windows, Linux |
+| **Skill System** | Create reusable agent skills at runtime |
+| **Task Delegation** | Delegate complex sub-tasks to Claude Code CLI |
+
+### Examples
 
 ```
 You:  "Every Sunday evening, remind me which recycling bins to put out"
@@ -91,53 +101,14 @@ Paw:  "All clean. Here's what I did: [summary]"
 ### Research & Browsing
 
 ```
-You:  *drops a link in Telegram*
+You:  *drops a link*
 Paw:  *opens browser, reads the page, researches related topics*
 Paw:  "Here's a summary with 3 key takeaways. Want me to save this to memory?"
-
-**That's it!** No Docker. No config files. No YAML. No dependency hell.
-
-I'll automatically:
-1. Set up everything I need
-2. Open the web dashboard in your browser
-3. Be ready to help in 30 seconds!
+```
 
 ### Coding & DevOps
 
-## 🖥️ Web Dashboard
-
-The browser-based dashboard is the default mode — just run `pocketpaw` and it opens at `http://localhost:8888`.
-
-**What you get:**
-- Real-time streaming chat via WebSocket
-- Activity panel showing tool calls, thinking, and system events
-- Settings panel for LLM, backend, and tool policy configuration
-- **Channel management** — configure, start, and stop Discord/Slack/WhatsApp/Telegram from the sidebar
-- Plan Mode approval modal for reviewing tool calls before execution
-
-### Channel Management
-
-All configured channel adapters auto-start on launch. Use the sidebar "Channels" button to:
-- Configure tokens and credentials per channel
-- Start/stop adapters dynamically
-- See running status at a glance
-
-Headless mode is also available for running without the dashboard:
-
-```bash
-uv run pocketpaw --discord              # Discord only
-uv run pocketpaw --slack                # Slack only
-uv run pocketpaw --whatsapp             # WhatsApp only
-uv run pocketpaw --discord --slack      # Multiple channels
-uv run pocketpaw --telegram             # Legacy Telegram mode
 ```
-
-See [Channel Adapters documentation](documentation/features/channels.md) for full setup guides.
-
----
-
-## 🌐 Browser Superpowers
-
 You:  "Find that memory leak — the app crashes after 2 hours"
 Paw:  *reads logs, profiles code, identifies the issue*
 Paw:  "Found it. The WebSocket handler never closes connections. Here's the fix."
@@ -153,6 +124,45 @@ Paw:  "3 agents working on it. Agent A is scraping competitor sites,
        I'll ping you when it's ready."
 ```
 
+---
+
+## Web Dashboard
+
+The browser-based dashboard is the default mode — just run `pocketpaw` and it opens at `http://localhost:8888`.
+
+**What you get:**
+- Real-time streaming chat via WebSocket
+- Session management — create, switch, search, and resume conversations
+- Activity panel showing tool calls, thinking, and system events
+- Settings panel for LLM, backend, and tool policy configuration
+- **Channel management** — configure, start, and stop adapters from the sidebar
+- **MCP server management** — add, configure, and monitor MCP servers
+- Plan Mode approval modal for reviewing tool calls before execution
+- Cross-channel inbox for unified message view
+
+### Channel Management
+
+All configured channel adapters auto-start on launch. Use the sidebar "Channels" button to:
+- Configure tokens and credentials per channel
+- Start/stop adapters dynamically
+- See running status at a glance
+
+Headless mode is also available for running without the dashboard:
+
+```bash
+pocketpaw --discord              # Discord only
+pocketpaw --slack                # Slack only
+pocketpaw --whatsapp             # WhatsApp only
+pocketpaw --discord --slack      # Multiple channels
+pocketpaw --telegram             # Legacy Telegram mode
+```
+
+See [Channel Adapters documentation](documentation/features/channels.md) for full setup guides.
+
+---
+
+## Browser Superpowers
+
 I use your existing Chrome if you have it — no extra downloads. If you don't have Chrome, I'll download a small browser automatically on first use.
 
 ---
@@ -162,10 +172,10 @@ I use your existing Chrome if you have it — no extra downloads. If you don't h
 ```mermaid
 graph TD
     %% Node Definitions
-    User(["👤 YOU <br/>(Telegram / Web)"])
-    
+    User(["YOU <br/>(Web / Discord / Slack / WhatsApp / Telegram)"])
+
     subgraph Channels ["Channel Adapters"]
-        Adapters["Telegram Bot  •  WebSocket Dashboard"]
+        Adapters["WebSocket Dashboard  •  Discord  •  Slack<br/>WhatsApp  •  Telegram  •  Signal  •  Matrix<br/>Teams  •  Google Chat"]
     end
 
     subgraph Messaging ["Internal Transport"]
@@ -184,12 +194,12 @@ graph TD
         subgraph MissionControl ["Mission Control"]
             Orch["Multi-agent Orchestration<br/>Task Assignment & Lifecycle<br/>Heartbeat Daemon (15 min)"]
             Stream["Live Execution Streaming<br/>Document Management<br/>Agent Status Tracking"]
-            Status["Status: INBOX ➔ ASSIGNED ➔<br/>IN_PROGRESS ➔ REVIEW ➔ DONE"]
+            Status["Status: INBOX -> ASSIGNED -><br/>IN_PROGRESS -> REVIEW -> DONE"]
         end
     end
 
     subgraph Tools ["Tool Registry"]
-        Registry["Shell • Filesystem • Browser • Desktop • Memory • HTTP Fetch"]
+        Registry["Shell • Filesystem • Browser • Desktop • Memory • HTTP Fetch<br/>Gmail • Calendar • Drive • Docs • Spotify • Reddit • OCR<br/>Web Search • Research • Voice • Image Gen • MCP"]
     end
 
     subgraph Support ["Security & Routing"]
@@ -219,7 +229,7 @@ graph TD
     classDef highlight fill:#f9f,stroke:#333,stroke-width:2px;
     classDef coreBox fill:#f5f7ff,stroke:#4a90e2,stroke-width:2px;
     classDef securityBox fill:#fff5f5,stroke:#e53e3e,stroke-width:1px;
-    
+
     class AgentLoop,MissionControl coreBox;
     class Security securityBox;
 ```
@@ -237,34 +247,6 @@ Custom orchestrator: Anthropic SDK for reasoning + Open Interpreter for code exe
 Standalone Open Interpreter supporting Ollama, OpenAI, or Anthropic as the LLM provider. Good for fully local setups with Ollama.
 
 Switch anytime in settings or config!
-
-| Feature | Description |
-|---------|-------------|
-| **Multi-Agent Orchestration** | Mission Control coordinates multiple agents on complex tasks with heartbeats, live streaming, and document management |
-| **3 Agent Backends** | Claude Agent SDK (recommended), Open Interpreter, or PocketPaw Native — switch anytime |
-| **Multi-LLM Support** | Anthropic, OpenAI, or Ollama (100% local). Auto-detection with fallback chain |
-| **Telegram-First** | Control from anywhere. QR code pairing, no port forwarding needed |
-| **Web Dashboard** | Real-time WebSocket UI with chat, mission control, file browser, and system monitoring |
-
-### Intelligence
-
-| Feature | Description |
-|---------|-------------|
-| **Persistent Memory** | Dual backend — file-based markdown + Mem0 semantic vector search. Remembers across sessions |
-| **Persona System** | Identity, Soul, and Style files shape personality. Injected into every conversation |
-| **Skills System** | YAML-based repeatable workflows. Hot-reload, argument substitution, agent-executed |
-| **Browser Automation** | Playwright-powered. Navigates, clicks, types, screenshots. Accessibility tree for semantic page understanding |
-| **Scheduling** | APScheduler-based reminders and recurring tasks with natural language time parsing |
-
-### Security
-
-| Feature | Description |
-|---------|-------------|
-| **Guardian AI** | Secondary LLM analyzes every shell command before execution. Blocks dangerous patterns |
-| **Audit Logging** | Append-only log of every tool use, permission check, and security event |
-| **File Jail** | Agents stay within allowed directories |
-| **Panic Button** | Instant kill switch from Telegram or web dashboard |
-| **Single User Lock** | Only your Telegram user ID can control the agent |
 
 ---
 
@@ -339,9 +321,9 @@ See the [full configuration reference](documentation/features/) for all availabl
 
 ---
 
-## 🔐 Security
+## Security
 
-I take your safety seriously:
+PocketPaw takes your safety seriously:
 
 - **Guardian AI** — Secondary LLM safety check before running dangerous commands
 - **Injection Scanner** — Two-tier detection (regex heuristics + optional LLM deep scan) blocks prompt injection attacks
@@ -385,12 +367,17 @@ pip install pocketpaw[discord]             # Discord support
 pip install pocketpaw[slack]               # Slack support
 pip install pocketpaw[whatsapp-personal]   # WhatsApp Personal (QR scan)
 pip install pocketpaw[image]               # Image generation (Google Gemini)
-pip install pocketpaw[memory]              # Mem0 semantic memory
+pip install pocketpaw[memory]             # Mem0 semantic memory
+pip install pocketpaw[matrix]              # Matrix support
+pip install pocketpaw[teams]               # Microsoft Teams support
+pip install pocketpaw[gchat]               # Google Chat support
+pip install pocketpaw[mcp]                 # MCP server support
+pip install pocketpaw[all]                 # Everything
 ```
 
 ---
 
-## 📖 Documentation
+## Documentation
 
 Full documentation lives in [`documentation/`](documentation/README.md):
 
@@ -400,25 +387,10 @@ Full documentation lives in [`documentation/`](documentation/README.md):
 - [Security](documentation/features/security.md) — Injection scanner, audit CLI, audit logging
 - [Model Router](documentation/features/model-router.md) — Smart complexity-based model selection
 - [Plan Mode](documentation/features/plan-mode.md) — Approval workflow for tool execution
-- [Integrations](documentation/features/integrations.md) — OAuth, Gmail, Calendar
+- [Integrations](documentation/features/integrations.md) — OAuth, Gmail, Calendar, Drive, Docs, Spotify
 - [Tools](documentation/features/tools.md) — Web search, research, image gen, voice, delegation, skills
-- [Memory](documentation/features/memory.md) — Session compaction, USER.md profile
+- [Memory](documentation/features/memory.md) — Session compaction, USER.md profile, Mem0
 - [Scheduler](documentation/features/scheduler.md) — Cron scheduler, self-audit daemon
-
----
-
-## 🤝 Join the Pack
-
-See [Feature Audit vs OpenClaw](docs/FEATURE_AUDIT_VS_OPENCLAW.md) for a detailed gap analysis.
-
-**Next up:**
-- [ ] Web search tool (Brave/Tavily)
-- [ ] Self-generating skills via conversation
-- [ ] Smart model routing (Opus for coding, Haiku for chat)
-- [ ] Telegram group topics for parallel conversations
-- [ ] OAuth framework + Gmail, Calendar, Slack integrations
-- [ ] Plan mode — agent proposes before executing
-- [ ] Image generation & voice/TTS
 
 ---
 
