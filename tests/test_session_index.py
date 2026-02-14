@@ -12,8 +12,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from pocketclaw.memory.file_store import FileMemoryStore
-from pocketclaw.memory.protocol import MemoryEntry, MemoryType
+from pocketpaw.memory.file_store import FileMemoryStore
+from pocketpaw.memory.protocol import MemoryEntry, MemoryType
 
 # =========================================================================
 # A1: FileMemoryStore session index
@@ -294,7 +294,7 @@ _TEST_TOKEN = "test-session-token-12345"
 @pytest.fixture
 def _mock_auth():
     """Mock auth for dashboard API requests."""
-    with patch("pocketclaw.dashboard.get_access_token", return_value=_TEST_TOKEN):
+    with patch("pocketpaw.dashboard.get_access_token", return_value=_TEST_TOKEN):
         yield
 
 
@@ -309,7 +309,7 @@ class TestSessionsRESTEndpoints:
     def client(self, _mock_auth):
         from fastapi.testclient import TestClient
 
-        from pocketclaw.dashboard import app
+        from pocketpaw.dashboard import app
 
         return TestClient(app, raise_server_exceptions=False)
 
@@ -363,7 +363,7 @@ class TestWebSocketSessionSwitching:
     def client(self, _mock_auth):
         from fastapi.testclient import TestClient
 
-        from pocketclaw.dashboard import app
+        from pocketpaw.dashboard import app
 
         return TestClient(app, raise_server_exceptions=False)
 
@@ -399,7 +399,7 @@ class TestWebSocketSessionSwitching:
     def test_websocket_resume_session(self, client):
         """Test resume_session query parameter."""
         # Create a session file
-        sessions_dir = Path.home() / ".pocketclaw" / "memory" / "sessions"
+        sessions_dir = Path.home() / ".pocketpaw" / "memory" / "sessions"
         sessions_dir.mkdir(parents=True, exist_ok=True)
         test_id = str(uuid.uuid4())
         safe_key = f"websocket_{test_id}"

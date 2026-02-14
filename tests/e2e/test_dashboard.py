@@ -1,4 +1,4 @@
-# E2E Tests for PocketClaw Dashboard
+# E2E Tests for pocketpaw Dashboard
 # Created: 2026-02-05
 #
 # End-to-end tests using Playwright to verify the dashboard UI works correctly.

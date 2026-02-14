@@ -8,10 +8,10 @@ import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch, AsyncMock
 
-from pocketclaw.tools.builtin.memory import RememberTool, RecallTool
-from pocketclaw.memory.manager import MemoryManager, get_memory_manager
-from pocketclaw.memory.protocol import MemoryType, MemoryEntry
-from pocketclaw.memory.file_store import FileMemoryStore
+from pocketpaw.tools.builtin.memory import RememberTool, RecallTool
+from pocketpaw.memory.manager import MemoryManager, get_memory_manager
+from pocketpaw.memory.protocol import MemoryType, MemoryEntry
+from pocketpaw.memory.file_store import FileMemoryStore
 
 
 @pytest.fixture
@@ -31,7 +31,7 @@ def memory_manager(temp_memory_path):
 def mock_memory_manager(temp_memory_path):
     """Mock get_memory_manager to return our test manager."""
     manager = MemoryManager(base_path=temp_memory_path)
-    with patch("pocketclaw.tools.builtin.memory.get_memory_manager", return_value=manager):
+    with patch("pocketpaw.tools.builtin.memory.get_memory_manager", return_value=manager):
         yield manager
 
 
@@ -200,14 +200,14 @@ class TestMemoryToolsIntegration:
 
         # Remember something
         remember_result = await remember_tool.execute(
-            content="The user's project is called PocketClaw", tags=["project", "name"]
+            content="The user's project is called pocketpaw", tags=["project", "name"]
         )
         assert "Remembered" in remember_result
 
         # Recall it
-        recall_result = await recall_tool.execute(query="PocketClaw")
+        recall_result = await recall_tool.execute(query="pocketpaw")
         assert "Found" in recall_result
-        assert "PocketClaw" in recall_result
+        assert "pocketpaw" in recall_result
 
     @pytest.mark.asyncio
     async def test_multiple_memories_recall(self, mock_memory_manager):
@@ -239,7 +239,7 @@ class TestPocketPawNativeMemoryExecution:
     @pytest.fixture
     def mock_settings(self, temp_memory_path):
         """Create mock settings."""
-        from pocketclaw.config import Settings
+        from pocketpaw.config import Settings
 
         return Settings(
             anthropic_api_key="test-key",
@@ -249,11 +249,11 @@ class TestPocketPawNativeMemoryExecution:
     @pytest.mark.asyncio
     async def test_remember_tool_execution(self, mock_settings, temp_memory_path):
         """Test remember tool execution through orchestrator._execute_tool."""
-        from pocketclaw.agents.pocketpaw_native import PocketPawOrchestrator
+        from pocketpaw.agents.pocketpaw_native import PocketPawOrchestrator
 
         # Patch memory manager at the import location (local import in _execute_tool)
         manager = MemoryManager(base_path=temp_memory_path)
-        with patch("pocketclaw.memory.manager.get_memory_manager", return_value=manager):
+        with patch("pocketpaw.memory.manager.get_memory_manager", return_value=manager):
             orchestrator = PocketPawOrchestrator(mock_settings)
 
             # Execute remember tool
@@ -268,11 +268,11 @@ class TestPocketPawNativeMemoryExecution:
     @pytest.mark.asyncio
     async def test_recall_tool_execution(self, mock_settings, temp_memory_path):
         """Test recall tool execution through orchestrator._execute_tool."""
-        from pocketclaw.agents.pocketpaw_native import PocketPawOrchestrator
+        from pocketpaw.agents.pocketpaw_native import PocketPawOrchestrator
 
         # Patch memory manager at the import location
         manager = MemoryManager(base_path=temp_memory_path)
-        with patch("pocketclaw.memory.manager.get_memory_manager", return_value=manager):
+        with patch("pocketpaw.memory.manager.get_memory_manager", return_value=manager):
             orchestrator = PocketPawOrchestrator(mock_settings)
 
             # First remember something
@@ -286,10 +286,10 @@ class TestPocketPawNativeMemoryExecution:
     @pytest.mark.asyncio
     async def test_remember_empty_content_error(self, mock_settings, temp_memory_path):
         """Test error when remembering empty content."""
-        from pocketclaw.agents.pocketpaw_native import PocketPawOrchestrator
+        from pocketpaw.agents.pocketpaw_native import PocketPawOrchestrator
 
         manager = MemoryManager(base_path=temp_memory_path)
-        with patch("pocketclaw.memory.manager.get_memory_manager", return_value=manager):
+        with patch("pocketpaw.memory.manager.get_memory_manager", return_value=manager):
             orchestrator = PocketPawOrchestrator(mock_settings)
 
             result = await orchestrator._execute_tool("remember", {"content": ""})
@@ -299,10 +299,10 @@ class TestPocketPawNativeMemoryExecution:
     @pytest.mark.asyncio
     async def test_recall_empty_query_error(self, mock_settings, temp_memory_path):
         """Test error when recalling with empty query."""
-        from pocketclaw.agents.pocketpaw_native import PocketPawOrchestrator
+        from pocketpaw.agents.pocketpaw_native import PocketPawOrchestrator
 
         manager = MemoryManager(base_path=temp_memory_path)
-        with patch("pocketclaw.memory.manager.get_memory_manager", return_value=manager):
+        with patch("pocketpaw.memory.manager.get_memory_manager", return_value=manager):
             orchestrator = PocketPawOrchestrator(mock_settings)
 
             result = await orchestrator._execute_tool("recall", {"query": ""})
@@ -445,22 +445,22 @@ class TestMemoryToolRegistration:
 
     def test_tools_importable(self):
         """Test that memory tools can be imported from builtin package."""
-        from pocketclaw.tools.builtin import RememberTool, RecallTool
+        from pocketpaw.tools.builtin import RememberTool, RecallTool
 
         assert RememberTool is not None
         assert RecallTool is not None
 
     def test_tools_in_all_exports(self):
         """Test that memory tools are in __all__ exports."""
-        from pocketclaw.tools import builtin
+        from pocketpaw.tools import builtin
 
         assert "RememberTool" in builtin.__all__
         assert "RecallTool" in builtin.__all__
 
     def test_tools_work_with_registry(self, mock_memory_manager):
         """Test that tools work with ToolRegistry."""
-        from pocketclaw.tools.registry import ToolRegistry
-        from pocketclaw.tools.builtin.memory import RememberTool, RecallTool
+        from pocketpaw.tools.registry import ToolRegistry
+        from pocketpaw.tools.builtin.memory import RememberTool, RecallTool
 
         registry = ToolRegistry()
         registry.register(RememberTool())

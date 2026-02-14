@@ -23,7 +23,7 @@ PocketPaw includes a built-in OAuth 2.0 framework that handles authentication wi
 1. **First use**: When a tool requires OAuth (e.g., Gmail), PocketPaw checks for stored tokens
 2. **No token**: Opens a browser for the OAuth consent flow
 3. **Authorization**: User grants permissions
-4. **Token storage**: Tokens are saved to `~/.pocketclaw/tokens/`
+4. **Token storage**: Tokens are saved to `~/.pocketpaw/tokens/`
 5. **Refresh**: Expired tokens are automatically refreshed
 
 ## Configuration
@@ -31,8 +31,8 @@ PocketPaw includes a built-in OAuth 2.0 framework that handles authentication wi
 ### Google OAuth
 
 ```bash
-export POCKETCLAW_GOOGLE_CLIENT_ID="your-client-id.apps.googleusercontent.com"
-export POCKETCLAW_GOOGLE_CLIENT_SECRET="your-client-secret"
+export POCKETPAW_GOOGLE_CLIENT_ID="your-client-id.apps.googleusercontent.com"
+export POCKETPAW_GOOGLE_CLIENT_SECRET="your-client-secret"
 ```
 
 Create OAuth credentials at [console.cloud.google.com](https://console.cloud.google.com):
@@ -44,8 +44,8 @@ Create OAuth credentials at [console.cloud.google.com](https://console.cloud.goo
 ### Spotify OAuth
 
 ```bash
-export POCKETCLAW_SPOTIFY_CLIENT_ID="your-spotify-client-id"
-export POCKETCLAW_SPOTIFY_CLIENT_SECRET="your-spotify-secret"
+export POCKETPAW_SPOTIFY_CLIENT_ID="your-spotify-client-id"
+export POCKETPAW_SPOTIFY_CLIENT_SECRET="your-spotify-secret"
 ```
 
 Create an app at [developer.spotify.com](https://developer.spotify.com/dashboard):
@@ -55,10 +55,10 @@ Create an app at [developer.spotify.com](https://developer.spotify.com/dashboard
 
 ## Token Storage
 
-Tokens are stored in `~/.pocketclaw/tokens/`:
+Tokens are stored in `~/.pocketpaw/tokens/`:
 
 ```
-~/.pocketclaw/tokens/
+~/.pocketpaw/tokens/
 ├── google_token.json
 └── spotify_token.json
 ```

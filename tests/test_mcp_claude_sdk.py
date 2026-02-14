@@ -5,9 +5,9 @@ All SDK imports are mocked.
 
 from unittest.mock import patch
 
-from pocketclaw.agents.claude_sdk import ClaudeAgentSDK
-from pocketclaw.config import Settings
-from pocketclaw.mcp.config import MCPServerConfig
+from pocketpaw.agents.claude_sdk import ClaudeAgentSDK
+from pocketpaw.config import Settings
+from pocketpaw.mcp.config import MCPServerConfig
 
 
 class TestClaudeSDKMCPServers:
@@ -27,7 +27,7 @@ class TestClaudeSDKMCPServers:
 
     def test_no_mcp_configs(self):
         sdk = self._make_sdk()
-        with patch("pocketclaw.mcp.config.load_mcp_config", return_value=[]):
+        with patch("pocketpaw.mcp.config.load_mcp_config", return_value=[]):
             result = sdk._get_mcp_servers()
         assert result == {}
 
@@ -36,7 +36,7 @@ class TestClaudeSDKMCPServers:
         cfgs = [
             MCPServerConfig(name="fs", transport="stdio", command="npx", args=["server"]),
         ]
-        with patch("pocketclaw.mcp.config.load_mcp_config", return_value=cfgs):
+        with patch("pocketpaw.mcp.config.load_mcp_config", return_value=cfgs):
             result = sdk._get_mcp_servers()
         assert len(result) == 1
         assert "fs" in result
@@ -49,7 +49,7 @@ class TestClaudeSDKMCPServers:
         cfgs = [
             MCPServerConfig(name="fs", transport="stdio", command="npx", enabled=False),
         ]
-        with patch("pocketclaw.mcp.config.load_mcp_config", return_value=cfgs):
+        with patch("pocketpaw.mcp.config.load_mcp_config", return_value=cfgs):
             result = sdk._get_mcp_servers()
         assert result == {}
 
@@ -59,7 +59,7 @@ class TestClaudeSDKMCPServers:
         cfgs = [
             MCPServerConfig(name="remote", transport="http", url="http://localhost:9000"),
         ]
-        with patch("pocketclaw.mcp.config.load_mcp_config", return_value=cfgs):
+        with patch("pocketpaw.mcp.config.load_mcp_config", return_value=cfgs):
             result = sdk._get_mcp_servers()
         assert "remote" in result
         assert result["remote"]["type"] == "http"
@@ -71,7 +71,7 @@ class TestClaudeSDKMCPServers:
         cfgs = [
             MCPServerConfig(name="bad", transport="http", url=""),
         ]
-        with patch("pocketclaw.mcp.config.load_mcp_config", return_value=cfgs):
+        with patch("pocketpaw.mcp.config.load_mcp_config", return_value=cfgs):
             result = sdk._get_mcp_servers()
         assert result == {}
 
@@ -81,7 +81,7 @@ class TestClaudeSDKMCPServers:
         cfgs = [
             MCPServerConfig(name="notion", transport="sse", url="https://mcp.notion.com/sse"),
         ]
-        with patch("pocketclaw.mcp.config.load_mcp_config", return_value=cfgs):
+        with patch("pocketpaw.mcp.config.load_mcp_config", return_value=cfgs):
             result = sdk._get_mcp_servers()
         assert "notion" in result
         assert result["notion"]["type"] == "sse"
@@ -91,7 +91,7 @@ class TestClaudeSDKMCPServers:
         cfgs = [
             MCPServerConfig(name="fs", transport="stdio", command="npx"),
         ]
-        with patch("pocketclaw.mcp.config.load_mcp_config", return_value=cfgs):
+        with patch("pocketpaw.mcp.config.load_mcp_config", return_value=cfgs):
             result = sdk._get_mcp_servers()
         assert result == {}
 
@@ -100,7 +100,7 @@ class TestClaudeSDKMCPServers:
         cfgs = [
             MCPServerConfig(name="fs", transport="stdio", command="npx"),
         ]
-        with patch("pocketclaw.mcp.config.load_mcp_config", return_value=cfgs):
+        with patch("pocketpaw.mcp.config.load_mcp_config", return_value=cfgs):
             result = sdk._get_mcp_servers()
         assert result == {}
 
@@ -115,7 +115,7 @@ class TestClaudeSDKMCPServers:
                 env={"GITHUB_TOKEN": "abc"},
             ),
         ]
-        with patch("pocketclaw.mcp.config.load_mcp_config", return_value=cfgs):
+        with patch("pocketpaw.mcp.config.load_mcp_config", return_value=cfgs):
             result = sdk._get_mcp_servers()
         assert result["gh"]["env"] == {"GITHUB_TOKEN": "abc"}
 
@@ -126,7 +126,7 @@ class TestClaudeSDKMCPServers:
             MCPServerConfig(name="off", transport="stdio", command="npx", enabled=False),
             MCPServerConfig(name="web", transport="http", url="http://x"),
         ]
-        with patch("pocketclaw.mcp.config.load_mcp_config", return_value=cfgs):
+        with patch("pocketpaw.mcp.config.load_mcp_config", return_value=cfgs):
             result = sdk._get_mcp_servers()
         assert len(result) == 2
         assert "fs" in result
@@ -140,7 +140,7 @@ class TestClaudeSDKMCPServers:
         original_import = builtins.__import__
 
         def mock_import(name, *args, **kwargs):
-            if "pocketclaw.mcp" in name:
+            if "pocketpaw.mcp" in name:
                 raise ImportError("no mcp")
             return original_import(name, *args, **kwargs)
 
@@ -154,7 +154,7 @@ class TestClaudeSDKMCPServers:
         cfgs = [
             MCPServerConfig(name="mem", transport="stdio", command="npx", args=[], env={}),
         ]
-        with patch("pocketclaw.mcp.config.load_mcp_config", return_value=cfgs):
+        with patch("pocketpaw.mcp.config.load_mcp_config", return_value=cfgs):
             result = sdk._get_mcp_servers()
         assert "mem" in result
         assert "env" not in result["mem"]

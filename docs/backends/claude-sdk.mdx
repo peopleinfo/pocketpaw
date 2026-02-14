@@ -23,8 +23,8 @@ This backend leverages the `claude-agent-sdk` package, which provides:
 ## Configuration
 
 ```bash
-export POCKETCLAW_AGENT_BACKEND="claude_agent_sdk"
-export POCKETCLAW_ANTHROPIC_API_KEY="sk-ant-..."
+export POCKETPAW_AGENT_BACKEND="claude_agent_sdk"
+export POCKETPAW_ANTHROPIC_API_KEY="sk-ant-..."
 ```
 
 ### Using with Ollama
@@ -32,9 +32,9 @@ export POCKETCLAW_ANTHROPIC_API_KEY="sk-ant-..."
 The Claude Agent SDK also works with local models via Ollama:
 
 ```bash
-export POCKETCLAW_AGENT_BACKEND="claude_agent_sdk"
-export POCKETCLAW_LLM_PROVIDER="ollama"
-export POCKETCLAW_OLLAMA_MODEL="qwen2.5:7b"
+export POCKETPAW_AGENT_BACKEND="claude_agent_sdk"
+export POCKETPAW_LLM_PROVIDER="ollama"
+export POCKETPAW_OLLAMA_MODEL="qwen2.5:7b"
 ```
 
 See [Ollama (Local LLMs)](/backends/ollama) for full setup instructions.
@@ -81,7 +81,7 @@ async def pre_tool_use(tool_name, tool_input):
 The Claude Agent SDK has native MCP support. PocketPaw's `_get_mcp_servers()` function translates MCP server configurations into the SDK's expected format:
 
 ```python
-# MCP servers are loaded from ~/.pocketclaw/mcp.json
+# MCP servers are loaded from ~/.pocketpaw/mcp.json
 # and passed to the SDK during initialization
 servers = _get_mcp_servers()
 ```
@@ -90,10 +90,10 @@ MCP tools are subject to the tool policy system. Use `mcp:<server>:*` patterns i
 
 ```bash
 # Allow all tools from a specific MCP server
-export POCKETCLAW_TOOLS_ALLOW="mcp:filesystem:*"
+export POCKETPAW_TOOLS_ALLOW="mcp:filesystem:*"
 
 # Deny all MCP tools
-export POCKETCLAW_TOOLS_DENY="group:mcp"
+export POCKETPAW_TOOLS_DENY="group:mcp"
 ```
 
 ## Custom Tools

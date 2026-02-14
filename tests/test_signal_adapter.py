@@ -2,8 +2,8 @@
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from pocketclaw.bus.adapters.signal_adapter import SignalAdapter
-from pocketclaw.bus.events import Channel, OutboundMessage
+from pocketpaw.bus.adapters.signal_adapter import SignalAdapter
+from pocketpaw.bus.events import Channel, OutboundMessage
 
 
 class TestSignalAdapterInit:

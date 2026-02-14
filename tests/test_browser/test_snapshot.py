@@ -3,7 +3,7 @@
 """Tests for browser accessibility tree snapshot generator."""
 
 import pytest
-from pocketclaw.browser.snapshot import (
+from pocketpaw.browser.snapshot import (
     RefMap,
     SnapshotGenerator,
     AccessibilityNode,

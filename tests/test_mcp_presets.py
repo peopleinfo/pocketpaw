@@ -7,8 +7,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from pocketclaw.mcp.config import MCPServerConfig
-from pocketclaw.mcp.presets import (
+from pocketpaw.mcp.config import MCPServerConfig
+from pocketpaw.mcp.presets import (
     EnvKeySpec,
     MCPPreset,
     get_all_presets,
@@ -183,18 +183,18 @@ def _auth(**extra):
 class TestPresetRoutes:
     @pytest.fixture(autouse=True)
     def _mock_token(self):
-        with patch("pocketclaw.dashboard.get_access_token", return_value=_TEST_TOKEN):
+        with patch("pocketpaw.dashboard.get_access_token", return_value=_TEST_TOKEN):
             yield
 
     @pytest.fixture
     def client(self):
         from fastapi.testclient import TestClient
 
-        from pocketclaw.dashboard import app
+        from pocketpaw.dashboard import app
 
         return TestClient(app, raise_server_exceptions=False)
 
-    @patch("pocketclaw.mcp.config.load_mcp_config")
+    @patch("pocketpaw.mcp.config.load_mcp_config")
     def test_get_presets_returns_list(self, mock_load, client):
         mock_load.return_value = [MCPServerConfig(name="sentry")]
         res = client.get("/api/mcp/presets", headers=_auth())
@@ -218,8 +218,8 @@ class TestPresetRoutes:
         assert github["transport"] == "http"
         assert "url" in github
 
-    @patch("pocketclaw.mcp.manager.get_mcp_manager")
-    @patch("pocketclaw.mcp.presets.get_preset")
+    @patch("pocketpaw.mcp.manager.get_mcp_manager")
+    @patch("pocketpaw.mcp.presets.get_preset")
     def test_install_preset_success(self, mock_get_preset, mock_mgr_fn, client):
         preset = get_preset("github")
         mock_get_preset.return_value = preset
@@ -245,7 +245,7 @@ class TestPresetRoutes:
         mgr.add_server_config.assert_called_once()
         mgr.start_server.assert_called_once()
 
-    @patch("pocketclaw.mcp.presets.get_preset")
+    @patch("pocketpaw.mcp.presets.get_preset")
     def test_install_preset_missing_env(self, mock_get_preset, client):
         preset = get_preset("sentry")  # Has required SENTRY_ACCESS_TOKEN
         mock_get_preset.return_value = preset
@@ -267,8 +267,8 @@ class TestPresetRoutes:
         assert res.status_code == 404
         assert "Unknown preset" in res.json()["error"]
 
-    @patch("pocketclaw.mcp.manager.get_mcp_manager")
-    @patch("pocketclaw.mcp.presets.get_preset")
+    @patch("pocketpaw.mcp.manager.get_mcp_manager")
+    @patch("pocketpaw.mcp.presets.get_preset")
     def test_install_preset_no_required_env(self, mock_get_preset, mock_mgr_fn, client):
         preset = get_preset("fetch")  # No env keys
         mock_get_preset.return_value = preset

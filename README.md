@@ -97,7 +97,7 @@ docker compose up -d
 Dashboard is at `http://localhost:8888`. Log in with the access token:
 
 ```bash
-docker exec pocketpaw cat /home/pocketpaw/.pocketclaw/access_token
+docker exec pocketpaw cat /home/pocketpaw/.pocketpaw/access_token
 ```
 
 <details>
@@ -114,7 +114,7 @@ docker compose --profile qdrant up -d
 docker compose --profile ollama --profile qdrant up -d
 ```
 
-When using Ollama inside Docker, set `POCKETCLAW_OLLAMA_HOST=http://ollama:11434` in your `.env` so PocketPaw reaches the Ollama container by service name.
+When using Ollama inside Docker, set `POCKETPAW_OLLAMA_HOST=http://ollama:11434` in your `.env` so PocketPaw reaches the Ollama container by service name.
 
 </details>
 

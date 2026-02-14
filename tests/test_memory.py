@@ -6,9 +6,9 @@ import pytest
 import tempfile
 from pathlib import Path
 
-from pocketclaw.memory.protocol import MemoryType, MemoryEntry
-from pocketclaw.memory.file_store import FileMemoryStore
-from pocketclaw.memory.manager import MemoryManager
+from pocketpaw.memory.protocol import MemoryType, MemoryEntry
+from pocketpaw.memory.file_store import FileMemoryStore
+from pocketpaw.memory.manager import MemoryManager
 
 
 @pytest.fixture

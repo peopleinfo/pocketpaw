@@ -2,7 +2,7 @@
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from pocketclaw.llm.client import resolve_llm_client
+from pocketpaw.llm.client import resolve_llm_client
 
 # ---------------------------------------------------------------------------
 # PocketPaw Native + Ollama
@@ -15,8 +15,8 @@ class TestNativeOllamaInit:
     @patch("anthropic.AsyncAnthropic")
     def test_ollama_provider_creates_client(self, mock_anthropic):
         """When llm_provider='ollama', client uses ollama_host as base_url."""
-        from pocketclaw.agents.pocketpaw_native import PocketPawOrchestrator
-        from pocketclaw.config import Settings
+        from pocketpaw.agents.pocketpaw_native import PocketPawOrchestrator
+        from pocketpaw.config import Settings
 
         settings = Settings(
             llm_provider="ollama",
@@ -37,8 +37,8 @@ class TestNativeOllamaInit:
     @patch("anthropic.AsyncAnthropic")
     def test_anthropic_provider_creates_client(self, mock_anthropic):
         """When llm_provider='anthropic', client uses anthropic_api_key."""
-        from pocketclaw.agents.pocketpaw_native import PocketPawOrchestrator
-        from pocketclaw.config import Settings
+        from pocketpaw.agents.pocketpaw_native import PocketPawOrchestrator
+        from pocketpaw.config import Settings
 
         settings = Settings(
             llm_provider="anthropic",
@@ -56,8 +56,8 @@ class TestNativeOllamaInit:
     @patch("anthropic.AsyncAnthropic")
     def test_auto_fallback_to_ollama(self, mock_anthropic):
         """When provider='auto' and no API key, falls back to Ollama."""
-        from pocketclaw.agents.pocketpaw_native import PocketPawOrchestrator
-        from pocketclaw.config import Settings
+        from pocketpaw.agents.pocketpaw_native import PocketPawOrchestrator
+        from pocketpaw.config import Settings
 
         settings = Settings(
             llm_provider="auto",
@@ -77,8 +77,8 @@ class TestNativeOllamaInit:
     @patch("anthropic.AsyncAnthropic")
     def test_auto_prefers_anthropic(self, mock_anthropic):
         """When provider='auto' and API key exists, uses Anthropic."""
-        from pocketclaw.agents.pocketpaw_native import PocketPawOrchestrator
-        from pocketclaw.config import Settings
+        from pocketpaw.agents.pocketpaw_native import PocketPawOrchestrator
+        from pocketpaw.config import Settings
 
         settings = Settings(
             llm_provider="auto",
@@ -95,8 +95,8 @@ class TestNativeOllamaInit:
 
     def test_no_provider_available(self):
         """When provider='anthropic' but no key, client stays None."""
-        from pocketclaw.agents.pocketpaw_native import PocketPawOrchestrator
-        from pocketclaw.config import Settings
+        from pocketpaw.agents.pocketpaw_native import PocketPawOrchestrator
+        from pocketpaw.config import Settings
 
         settings = Settings(
             llm_provider="anthropic",
@@ -113,8 +113,8 @@ class TestNativeOllamaModel:
     @patch("anthropic.AsyncAnthropic")
     async def test_ollama_uses_ollama_model(self, mock_anthropic_cls):
         """When provider is Ollama, chat() uses ollama_model."""
-        from pocketclaw.agents.pocketpaw_native import PocketPawOrchestrator
-        from pocketclaw.config import Settings
+        from pocketpaw.agents.pocketpaw_native import PocketPawOrchestrator
+        from pocketpaw.config import Settings
 
         settings = Settings(
             llm_provider="ollama",
@@ -149,8 +149,8 @@ class TestNativeOllamaSmartRouting:
     @patch("anthropic.AsyncAnthropic")
     async def test_smart_routing_skipped_for_ollama(self, mock_anthropic_cls):
         """When provider is Ollama, smart routing is not invoked."""
-        from pocketclaw.agents.pocketpaw_native import PocketPawOrchestrator
-        from pocketclaw.config import Settings
+        from pocketpaw.agents.pocketpaw_native import PocketPawOrchestrator
+        from pocketpaw.config import Settings
 
         settings = Settings(
             llm_provider="ollama",
@@ -167,7 +167,7 @@ class TestNativeOllamaSmartRouting:
 
         orch = PocketPawOrchestrator(settings)
 
-        with patch("pocketclaw.agents.model_router.ModelRouter") as mock_router_cls:
+        with patch("pocketpaw.agents.model_router.ModelRouter") as mock_router_cls:
             events = []
             async for event in orch.chat("Hi"):
                 events.append(event)
@@ -189,7 +189,7 @@ class TestClaudeSDKOllamaLogic:
 
     def test_ollama_provider_detection(self):
         """Verify Ollama is resolved."""
-        from pocketclaw.config import Settings
+        from pocketpaw.config import Settings
 
         settings = Settings(
             llm_provider="ollama",
@@ -201,7 +201,7 @@ class TestClaudeSDKOllamaLogic:
 
     def test_auto_without_key_detects_ollama(self):
         """When provider='auto' and no API key, Ollama is detected."""
-        from pocketclaw.config import Settings
+        from pocketpaw.config import Settings
 
         settings = Settings(
             llm_provider="auto",
@@ -214,7 +214,7 @@ class TestClaudeSDKOllamaLogic:
 
     def test_auto_with_key_uses_anthropic(self):
         """When provider='auto' and API key exists, Anthropic is used."""
-        from pocketclaw.config import Settings
+        from pocketpaw.config import Settings
 
         settings = Settings(
             llm_provider="auto",
@@ -225,7 +225,7 @@ class TestClaudeSDKOllamaLogic:
 
     def test_ollama_env_vars_construction(self):
         """Verify the env dict that would be passed to ClaudeAgentOptions."""
-        from pocketclaw.config import Settings
+        from pocketpaw.config import Settings
 
         settings = Settings(
             llm_provider="ollama",
@@ -243,7 +243,7 @@ class TestClaudeSDKOllamaLogic:
 
     def test_anthropic_env_vars_construction(self):
         """Verify the env dict for Anthropic provider."""
-        from pocketclaw.config import Settings
+        from pocketpaw.config import Settings
 
         settings = Settings(
             llm_provider="anthropic",
@@ -258,7 +258,7 @@ class TestClaudeSDKOllamaLogic:
 
     def test_smart_routing_skipped_for_ollama(self):
         """Verify smart routing skip condition for Ollama."""
-        from pocketclaw.config import Settings
+        from pocketpaw.config import Settings
 
         settings = Settings(
             llm_provider="ollama",
@@ -270,7 +270,7 @@ class TestClaudeSDKOllamaLogic:
 
     def test_smart_routing_enabled_for_anthropic(self):
         """Verify smart routing is not skipped for Anthropic."""
-        from pocketclaw.config import Settings
+        from pocketpaw.config import Settings
 
         settings = Settings(
             llm_provider="anthropic",
@@ -292,7 +292,7 @@ class TestRouterOllamaDetection:
 
     def test_ollama_detection_logged(self):
         """When llm_provider='ollama', router logs a message."""
-        from pocketclaw.config import Settings
+        from pocketpaw.config import Settings
 
         settings = Settings(
             llm_provider="ollama",
@@ -301,11 +301,11 @@ class TestRouterOllamaDetection:
         )
 
         with (
-            patch("pocketclaw.agents.router.logger") as mock_logger,
-            patch("pocketclaw.agents.open_interpreter.OpenInterpreterAgent"),
+            patch("pocketpaw.agents.router.logger") as mock_logger,
+            patch("pocketpaw.agents.open_interpreter.OpenInterpreterAgent"),
         ):
             try:
-                from pocketclaw.agents.router import AgentRouter
+                from pocketpaw.agents.router import AgentRouter
 
                 AgentRouter(settings)
             except Exception:
@@ -317,7 +317,7 @@ class TestRouterOllamaDetection:
 
     def test_auto_detection_with_no_keys(self):
         """When provider='auto' and no API keys, Ollama is detected."""
-        from pocketclaw.config import Settings
+        from pocketpaw.config import Settings
 
         settings = Settings(
             llm_provider="auto",
@@ -328,11 +328,11 @@ class TestRouterOllamaDetection:
         )
 
         with (
-            patch("pocketclaw.agents.router.logger") as mock_logger,
-            patch("pocketclaw.agents.open_interpreter.OpenInterpreterAgent"),
+            patch("pocketpaw.agents.router.logger") as mock_logger,
+            patch("pocketpaw.agents.open_interpreter.OpenInterpreterAgent"),
         ):
             try:
-                from pocketclaw.agents.router import AgentRouter
+                from pocketpaw.agents.router import AgentRouter
 
                 AgentRouter(settings)
             except Exception:
@@ -353,8 +353,8 @@ class TestCheckOllama:
 
     async def test_server_unreachable_returns_1(self):
         """When Ollama server is down, check returns exit code 1."""
-        from pocketclaw.__main__ import check_ollama
-        from pocketclaw.config import Settings
+        from pocketpaw.__main__ import check_ollama
+        from pocketpaw.config import Settings
 
         settings = Settings(
             ollama_host="http://localhost:99999",  # unreachable port
@@ -368,8 +368,8 @@ class TestCheckOllama:
         """When server is up but model not found, warns."""
         import httpx
 
-        from pocketclaw.__main__ import check_ollama
-        from pocketclaw.config import Settings
+        from pocketpaw.__main__ import check_ollama
+        from pocketpaw.config import Settings
 
         # Mock httpx response for /api/tags
         mock_response = MagicMock()
@@ -391,7 +391,7 @@ class TestCheckOllama:
         with (
             patch.object(httpx, "AsyncClient", return_value=mock_client),
             patch(
-                "pocketclaw.llm.client.LLMClient.create_anthropic_client",
+                "pocketpaw.llm.client.LLMClient.create_anthropic_client",
             ) as mock_create,
         ):
             mock_ac = MagicMock()

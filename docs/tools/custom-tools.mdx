@@ -3,7 +3,8 @@ title: Custom Tools
 description: "Build custom tools for PocketPaw using the ToolProtocol interface. Define tool schemas compatible with both Anthropic and OpenAI APIs, register them in the ToolRegistry, and use them immediately."
 section: Tools
 ogType: article
-keywords: ["custom tools", "tool protocol", "tool development", "plugin", "extensible"]
+keywords:
+  ["custom tools", "tool protocol", "tool development", "plugin", "extensible"]
 tags: ["tools", "development"]
 ---
 
@@ -14,7 +15,7 @@ PocketPaw's tool system is extensible. You can create custom tools by implementi
 ## ToolProtocol Interface
 
 ```python
-from pocketclaw.tools.registry import ToolProtocol, ToolDefinition
+from pocketpaw.tools.registry import ToolProtocol, ToolDefinition
 
 class MyCustomTool:
     @property
@@ -53,7 +54,7 @@ class MyCustomTool:
 Register your tool with the `ToolRegistry`:
 
 ```python
-from pocketclaw.tools.registry import ToolRegistry
+from pocketpaw.tools.registry import ToolRegistry
 
 registry = ToolRegistry()
 registry.register(MyCustomTool())

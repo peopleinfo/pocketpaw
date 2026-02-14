@@ -9,10 +9,10 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from pocketclaw.bus.events import Channel, OutboundMessage
-from pocketclaw.deep_work.human_tasks import HumanTaskRouter
-from pocketclaw.deep_work.models import Project
-from pocketclaw.mission_control.models import Task, TaskPriority, TaskStatus
+from pocketpaw.bus.events import Channel, OutboundMessage
+from pocketpaw.deep_work.human_tasks import HumanTaskRouter
+from pocketpaw.deep_work.models import Project
+from pocketpaw.mission_control.models import Task, TaskPriority, TaskStatus
 
 
 @pytest.fixture
@@ -57,7 +57,7 @@ def _make_mock_bus():
 async def test_notify_human_task_publishes_outbound(router, sample_task):
     """notify_human_task should broadcast an OutboundMessage with correct content and metadata."""
     mock_bus = _make_mock_bus()
-    with patch("pocketclaw.bus.get_message_bus", return_value=mock_bus):
+    with patch("pocketpaw.bus.get_message_bus", return_value=mock_bus):
         await router.notify_human_task(sample_task)
 
     mock_bus.broadcast_outbound.assert_called_once()
@@ -74,7 +74,7 @@ async def test_notify_human_task_no_project_id(router):
     """notify_human_task should default project_id to empty string when None."""
     task = Task(id="task-002", title="Do something", project_id=None)
     mock_bus = _make_mock_bus()
-    with patch("pocketclaw.bus.get_message_bus", return_value=mock_bus):
+    with patch("pocketpaw.bus.get_message_bus", return_value=mock_bus):
         await router.notify_human_task(task)
 
     msg = mock_bus.broadcast_outbound.call_args[0][0]
@@ -89,7 +89,7 @@ async def test_notify_human_task_no_project_id(router):
 async def test_notify_review_task_publishes_correct_message(router, sample_task):
     """notify_review_task should broadcast a review notification."""
     mock_bus = _make_mock_bus()
-    with patch("pocketclaw.bus.get_message_bus", return_value=mock_bus):
+    with patch("pocketpaw.bus.get_message_bus", return_value=mock_bus):
         await router.notify_review_task(sample_task)
 
     mock_bus.broadcast_outbound.assert_called_once()
@@ -109,7 +109,7 @@ async def test_notify_review_task_publishes_correct_message(router, sample_task)
 async def test_notify_plan_ready_includes_project_and_counts(router, sample_project):
     """notify_plan_ready should include project title, task count, and estimate."""
     mock_bus = _make_mock_bus()
-    with patch("pocketclaw.bus.get_message_bus", return_value=mock_bus):
+    with patch("pocketpaw.bus.get_message_bus", return_value=mock_bus):
         await router.notify_plan_ready(sample_project, task_count=5, estimated_minutes=120)
 
     msg = mock_bus.broadcast_outbound.call_args[0][0]
@@ -123,7 +123,7 @@ async def test_notify_plan_ready_includes_project_and_counts(router, sample_proj
 async def test_notify_plan_ready_defaults(router, sample_project):
     """notify_plan_ready should work with default task_count and estimated_minutes."""
     mock_bus = _make_mock_bus()
-    with patch("pocketclaw.bus.get_message_bus", return_value=mock_bus):
+    with patch("pocketpaw.bus.get_message_bus", return_value=mock_bus):
         await router.notify_plan_ready(sample_project)
 
     msg = mock_bus.broadcast_outbound.call_args[0][0]
@@ -144,7 +144,7 @@ async def test_notify_project_completed_includes_counts(router, sample_project):
         Task(id="t3", title="C", status=TaskStatus.IN_PROGRESS),
     ]
     mock_bus = _make_mock_bus()
-    with patch("pocketclaw.bus.get_message_bus", return_value=mock_bus):
+    with patch("pocketpaw.bus.get_message_bus", return_value=mock_bus):
         await router.notify_project_completed(sample_project, tasks=tasks)
 
     msg = mock_bus.broadcast_outbound.call_args[0][0]
@@ -157,7 +157,7 @@ async def test_notify_project_completed_includes_counts(router, sample_project):
 async def test_notify_project_completed_no_tasks(router, sample_project):
     """notify_project_completed should handle None tasks gracefully."""
     mock_bus = _make_mock_bus()
-    with patch("pocketclaw.bus.get_message_bus", return_value=mock_bus):
+    with patch("pocketpaw.bus.get_message_bus", return_value=mock_bus):
         await router.notify_project_completed(sample_project, tasks=None)
 
     msg = mock_bus.broadcast_outbound.call_args[0][0]
@@ -218,7 +218,7 @@ async def test_format_task_notification_no_tags(router):
 async def test_publish_outbound_handles_missing_bus(router):
     """_publish_outbound should not crash if get_message_bus raises."""
     with patch(
-        "pocketclaw.bus.get_message_bus",
+        "pocketpaw.bus.get_message_bus",
         side_effect=RuntimeError("No event loop"),
     ):
         # Should not raise
@@ -229,7 +229,7 @@ async def test_publish_outbound_handles_broadcast_failure(router):
     """_publish_outbound should not crash if broadcast_outbound raises."""
     mock_bus = AsyncMock()
     mock_bus.broadcast_outbound = AsyncMock(side_effect=Exception("Network down"))
-    with patch("pocketclaw.bus.get_message_bus", return_value=mock_bus):
+    with patch("pocketpaw.bus.get_message_bus", return_value=mock_bus):
         # Should not raise
         await router._publish_outbound("test", {"type": "test"})
 
@@ -237,7 +237,7 @@ async def test_publish_outbound_handles_broadcast_failure(router):
 async def test_publish_outbound_uses_system_channel_and_broadcast_chat_id(router):
     """_publish_outbound should use Channel.SYSTEM and chat_id='broadcast'."""
     mock_bus = _make_mock_bus()
-    with patch("pocketclaw.bus.get_message_bus", return_value=mock_bus):
+    with patch("pocketpaw.bus.get_message_bus", return_value=mock_bus):
         await router._publish_outbound("hello", {"type": "test"})
 
     msg = mock_bus.broadcast_outbound.call_args[0][0]

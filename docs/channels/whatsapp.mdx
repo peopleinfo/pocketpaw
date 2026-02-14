@@ -26,7 +26,7 @@ Personal mode uses the `neonize` library to connect via WhatsApp Web's multi-dev
   </Step>
   <Step title="Configure mode">
     ```bash
-    export POCKETCLAW_WHATSAPP_MODE="personal"
+    export POCKETPAW_WHATSAPP_MODE="personal"
     ```
   </Step>
   <Step title="Start and scan QR">
@@ -62,10 +62,10 @@ Business mode uses the WhatsApp Business Cloud API via Meta.
   </Step>
   <Step title="Configure">
     ```bash
-    export POCKETCLAW_WHATSAPP_MODE="business"
-    export POCKETCLAW_WHATSAPP_ACCESS_TOKEN="your-token"
-    export POCKETCLAW_WHATSAPP_PHONE_NUMBER_ID="123456"
-    export POCKETCLAW_WHATSAPP_VERIFY_TOKEN="your-verify-token"
+    export POCKETPAW_WHATSAPP_MODE="business"
+    export POCKETPAW_WHATSAPP_ACCESS_TOKEN="your-token"
+    export POCKETPAW_WHATSAPP_PHONE_NUMBER_ID="123456"
+    export POCKETPAW_WHATSAPP_VERIFY_TOKEN="your-verify-token"
     ```
   </Step>
   <Step title="Set up webhook">
@@ -77,11 +77,11 @@ Business mode uses the WhatsApp Business Cloud API via Meta.
 
 | Setting | Env Variable | Description |
 |---------|-------------|-------------|
-| Mode | `POCKETCLAW_WHATSAPP_MODE` | `personal` or `business` |
-| Access token | `POCKETCLAW_WHATSAPP_ACCESS_TOKEN` | Business API token |
-| Phone number ID | `POCKETCLAW_WHATSAPP_PHONE_NUMBER_ID` | Business phone number ID |
-| Verify token | `POCKETCLAW_WHATSAPP_VERIFY_TOKEN` | Webhook verification token |
-| Allowed numbers | `POCKETCLAW_WHATSAPP_ALLOWED_PHONE_NUMBERS` | Comma-separated phone numbers |
+| Mode | `POCKETPAW_WHATSAPP_MODE` | `personal` or `business` |
+| Access token | `POCKETPAW_WHATSAPP_ACCESS_TOKEN` | Business API token |
+| Phone number ID | `POCKETPAW_WHATSAPP_PHONE_NUMBER_ID` | Business phone number ID |
+| Verify token | `POCKETPAW_WHATSAPP_VERIFY_TOKEN` | Webhook verification token |
+| Allowed numbers | `POCKETPAW_WHATSAPP_ALLOWED_PHONE_NUMBERS` | Comma-separated phone numbers |
 
 ## Features
 
@@ -92,7 +92,7 @@ WhatsApp doesn't support message editing, so responses are accumulated and sent 
 ### Access Control
 
 ```bash
-export POCKETCLAW_WHATSAPP_ALLOWED_PHONE_NUMBERS="+1234567890,+0987654321"
+export POCKETPAW_WHATSAPP_ALLOWED_PHONE_NUMBERS="+1234567890,+0987654321"
 ```
 
 ### Session Keys

@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from pocketclaw.mission_control import (
+from pocketpaw.mission_control import (
     Activity,
     ActivityType,
     AgentLevel,

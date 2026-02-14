@@ -6,9 +6,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from pocketclaw.memory.file_store import FileMemoryStore
-from pocketclaw.memory.manager import MemoryManager, create_memory_store
-from pocketclaw.memory.protocol import MemoryEntry, MemoryType
+from pocketpaw.memory.file_store import FileMemoryStore
+from pocketpaw.memory.manager import MemoryManager, create_memory_store
+from pocketpaw.memory.protocol import MemoryEntry, MemoryType
 
 # =========================================================================
 # Factory Function Tests (always run — no mem0 needed)
@@ -85,7 +85,7 @@ class TestBuildMem0Config:
     """Test _build_mem0_config helper."""
 
     def test_anthropic_llm_config(self):
-        from pocketclaw.memory.mem0_store import _build_mem0_config
+        from pocketpaw.memory.mem0_store import _build_mem0_config
 
         config = _build_mem0_config(
             llm_provider="anthropic",
@@ -96,14 +96,14 @@ class TestBuildMem0Config:
         assert config["llm"]["config"]["temperature"] == 0
 
     def test_openai_llm_config(self):
-        from pocketclaw.memory.mem0_store import _build_mem0_config
+        from pocketpaw.memory.mem0_store import _build_mem0_config
 
         config = _build_mem0_config(llm_provider="openai", llm_model="gpt-4o")
         assert config["llm"]["provider"] == "openai"
         assert config["llm"]["config"]["model"] == "gpt-4o"
 
     def test_ollama_llm_config(self):
-        from pocketclaw.memory.mem0_store import _build_mem0_config
+        from pocketpaw.memory.mem0_store import _build_mem0_config
 
         config = _build_mem0_config(
             llm_provider="ollama",
@@ -115,7 +115,7 @@ class TestBuildMem0Config:
         assert config["llm"]["config"]["ollama_base_url"] == "http://localhost:11434"
 
     def test_openai_embedder_config(self):
-        from pocketclaw.memory.mem0_store import _build_mem0_config
+        from pocketpaw.memory.mem0_store import _build_mem0_config
 
         config = _build_mem0_config(
             embedder_provider="openai",
@@ -125,7 +125,7 @@ class TestBuildMem0Config:
         assert config["embedder"]["config"]["model"] == "text-embedding-3-small"
 
     def test_ollama_embedder_config(self):
-        from pocketclaw.memory.mem0_store import _build_mem0_config
+        from pocketpaw.memory.mem0_store import _build_mem0_config
 
         config = _build_mem0_config(
             embedder_provider="ollama",
@@ -137,7 +137,7 @@ class TestBuildMem0Config:
         assert config["embedder"]["config"]["ollama_base_url"] == "http://localhost:11434"
 
     def test_qdrant_vector_store_config(self, tmp_path):
-        from pocketclaw.memory.mem0_store import _build_mem0_config
+        from pocketpaw.memory.mem0_store import _build_mem0_config
 
         config = _build_mem0_config(
             vector_store="qdrant",
@@ -150,7 +150,7 @@ class TestBuildMem0Config:
         assert str(tmp_path / "qdrant") in config["vector_store"]["config"]["path"]
 
     def test_chroma_vector_store_config(self, tmp_path):
-        from pocketclaw.memory.mem0_store import _build_mem0_config
+        from pocketpaw.memory.mem0_store import _build_mem0_config
 
         config = _build_mem0_config(vector_store="chroma", data_path=tmp_path)
         assert config["vector_store"]["provider"] == "chroma"
@@ -158,7 +158,7 @@ class TestBuildMem0Config:
         assert str(tmp_path / "chroma") in config["vector_store"]["config"]["path"]
 
     def test_embedding_dims_by_model(self):
-        from pocketclaw.memory.mem0_store import _build_mem0_config
+        from pocketpaw.memory.mem0_store import _build_mem0_config
 
         config_small = _build_mem0_config(
             vector_store="qdrant", embedder_model="text-embedding-3-small"
@@ -174,46 +174,46 @@ class TestBuildMem0Config:
         assert config_nomic["vector_store"]["config"]["embedding_model_dims"] == 768
 
     def test_unknown_embedder_defaults_to_1536(self):
-        from pocketclaw.memory.mem0_store import _build_mem0_config
+        from pocketpaw.memory.mem0_store import _build_mem0_config
 
         config = _build_mem0_config(vector_store="qdrant", embedder_model="custom-model")
         assert config["vector_store"]["config"]["embedding_model_dims"] == 1536
 
     def test_config_has_version(self):
-        from pocketclaw.memory.mem0_store import _build_mem0_config
+        from pocketpaw.memory.mem0_store import _build_mem0_config
 
         config = _build_mem0_config()
         assert config["version"] == "v1.1"
 
     def test_anthropic_api_key_passed(self):
-        from pocketclaw.memory.mem0_store import _build_mem0_config
+        from pocketpaw.memory.mem0_store import _build_mem0_config
 
         config = _build_mem0_config(llm_provider="anthropic", anthropic_api_key="sk-test-key")
         assert config["llm"]["config"]["api_key"] == "sk-test-key"
 
     def test_openai_api_key_passed_to_llm(self):
-        from pocketclaw.memory.mem0_store import _build_mem0_config
+        from pocketpaw.memory.mem0_store import _build_mem0_config
 
         config = _build_mem0_config(llm_provider="openai", openai_api_key="sk-openai-key")
         assert config["llm"]["config"]["api_key"] == "sk-openai-key"
 
     def test_openai_api_key_passed_to_embedder(self):
-        from pocketclaw.memory.mem0_store import _build_mem0_config
+        from pocketpaw.memory.mem0_store import _build_mem0_config
 
         config = _build_mem0_config(embedder_provider="openai", openai_api_key="sk-openai-key")
         assert config["embedder"]["config"]["api_key"] == "sk-openai-key"
 
     def test_no_api_key_when_none(self):
-        from pocketclaw.memory.mem0_store import _build_mem0_config
+        from pocketpaw.memory.mem0_store import _build_mem0_config
 
         config = _build_mem0_config(llm_provider="anthropic")
         assert "api_key" not in config["llm"]["config"]
 
     def test_ollama_dims_auto_detection(self):
-        from pocketclaw.memory.mem0_store import _build_mem0_config
+        from pocketpaw.memory.mem0_store import _build_mem0_config
 
         # Unknown model with ollama provider — triggers auto-detection
-        with patch("pocketclaw.memory.mem0_store._get_ollama_embedding_dims", return_value=512):
+        with patch("pocketpaw.memory.mem0_store._get_ollama_embedding_dims", return_value=512):
             config = _build_mem0_config(
                 embedder_provider="ollama",
                 embedder_model="custom-ollama-embed",
@@ -222,7 +222,7 @@ class TestBuildMem0Config:
         assert config["vector_store"]["config"]["embedding_model_dims"] == 512
 
     def test_qwen3_embedding_dims_known(self):
-        from pocketclaw.memory.mem0_store import _build_mem0_config
+        from pocketpaw.memory.mem0_store import _build_mem0_config
 
         config = _build_mem0_config(embedder_model="qwen3-embedding:0.6b", vector_store="qdrant")
         assert config["vector_store"]["config"]["embedding_model_dims"] == 1024
@@ -285,7 +285,7 @@ class TestMem0MemoryStore:
     @pytest.fixture
     def mem0_store(self, mock_mem0_memory, tmp_path):
         """Create a Mem0MemoryStore with mocked Memory."""
-        from pocketclaw.memory.mem0_store import Mem0MemoryStore
+        from pocketpaw.memory.mem0_store import Mem0MemoryStore
 
         store = Mem0MemoryStore(
             user_id="test-user",
@@ -457,7 +457,7 @@ class TestMem0MemoryStore:
     # --- Config tests ---
 
     def test_store_stores_provider_config(self, tmp_path):
-        from pocketclaw.memory.mem0_store import Mem0MemoryStore
+        from pocketpaw.memory.mem0_store import Mem0MemoryStore
 
         store = Mem0MemoryStore(
             user_id="test",
@@ -487,7 +487,7 @@ class TestMemoryEntryConversion:
     """Test conversion between Mem0 format and MemoryEntry."""
 
     def test_mem0_to_entry_conversion(self):
-        from pocketclaw.memory.mem0_store import Mem0MemoryStore
+        from pocketpaw.memory.mem0_store import Mem0MemoryStore
 
         store = Mem0MemoryStore.__new__(Mem0MemoryStore)
         mem0_item = {
@@ -508,7 +508,7 @@ class TestMemoryEntryConversion:
         assert "custom_field" in entry.metadata
 
     def test_mem0_to_entry_handles_missing_type(self):
-        from pocketclaw.memory.mem0_store import Mem0MemoryStore
+        from pocketpaw.memory.mem0_store import Mem0MemoryStore
 
         store = Mem0MemoryStore.__new__(Mem0MemoryStore)
         mem0_item = {"id": "test-id", "memory": "Test content", "metadata": {}}
@@ -516,7 +516,7 @@ class TestMemoryEntryConversion:
         assert entry.type == MemoryType.LONG_TERM
 
     def test_mem0_to_entry_handles_session_type(self):
-        from pocketclaw.memory.mem0_store import Mem0MemoryStore
+        from pocketpaw.memory.mem0_store import Mem0MemoryStore
 
         store = Mem0MemoryStore.__new__(Mem0MemoryStore)
         mem0_item = {
@@ -534,7 +534,7 @@ class TestMemoryEntryConversion:
         assert entry.session_key == "telegram:123"
 
     def test_mem0_to_entry_handles_invalid_timestamp(self):
-        from pocketclaw.memory.mem0_store import Mem0MemoryStore
+        from pocketpaw.memory.mem0_store import Mem0MemoryStore
 
         store = Mem0MemoryStore.__new__(Mem0MemoryStore)
         mem0_item = {
@@ -611,7 +611,7 @@ class TestMemorySettings:
     """Test memory-related settings in config."""
 
     def test_default_memory_settings(self):
-        from pocketclaw.config import Settings
+        from pocketpaw.config import Settings
 
         settings = Settings()
         assert settings.memory_backend == "file"
@@ -628,7 +628,7 @@ class TestMemorySettings:
         """Memory settings should be included in save()."""
         import json
 
-        from pocketclaw.config import Settings
+        from pocketpaw.config import Settings
 
         settings = Settings()
         settings.memory_backend = "mem0"
@@ -639,7 +639,7 @@ class TestMemorySettings:
         config_path = tmp_path / "config.json"
         config_path.write_text("{}")
 
-        with patch("pocketclaw.config.get_config_path", return_value=config_path):
+        with patch("pocketpaw.config.get_config_path", return_value=config_path):
             settings.save()
 
         saved = json.loads(config_path.read_text())
@@ -663,7 +663,7 @@ class TestContextBuilderWithMem0:
 
     async def test_build_prompt_with_user_query(self):
         """Context builder should pass user_query for semantic search."""
-        from pocketclaw.bootstrap.context_builder import AgentContextBuilder
+        from pocketpaw.bootstrap.context_builder import AgentContextBuilder
 
         mock_memory = MagicMock()
         mock_memory.get_semantic_context = AsyncMock(
@@ -689,7 +689,7 @@ class TestContextBuilderWithMem0:
 
     async def test_build_prompt_without_user_query(self):
         """Without user_query, should use standard context."""
-        from pocketclaw.bootstrap.context_builder import AgentContextBuilder
+        from pocketpaw.bootstrap.context_builder import AgentContextBuilder
 
         mock_memory = MagicMock()
         mock_memory.get_context_for_agent = AsyncMock(return_value="some context")

@@ -313,7 +313,7 @@ cat ~/.pocketpaw/.dev-mode
 # Should show: branch=dev
 
 # Verify pocketpaw is installed
-~/.pocketpaw/venv/bin/python -c "import pocketclaw; print(pocketclaw.__version__)"
+~/.pocketpaw/venv/bin/python -c "import pocketpaw; print(pocketpaw.__version__)"
 ```
 
 ### Windows (PowerShell)
@@ -329,7 +329,7 @@ Get-Content $env:USERPROFILE\.pocketpaw\.dev-mode
 # Should show: branch=dev
 
 # Verify pocketpaw is installed
-& "$env:USERPROFILE\.pocketpaw\venv\Scripts\python.exe" -c "import pocketclaw; print(pocketclaw.__version__)"
+& "$env:USERPROFILE\.pocketpaw\venv\Scripts\python.exe" -c "import pocketpaw; print(pocketpaw.__version__)"
 ```
 
 ### Test local editable install
@@ -355,6 +355,7 @@ ls ~/.pocketpaw/.dev-mode 2>&1
 ```
 
 **What to verify:**
+
 - [ ] `--dev` installs from git, not PyPI
 - [ ] `~/.pocketpaw/.dev-mode` marker file is created
 - [ ] `--reset` without `--dev` removes the marker and installs from PyPI
@@ -437,28 +438,28 @@ gh workflow run "Build Desktop Launcher" -f version=test-0.0.1
 
 ## Quick Checklist
 
-| # | Test | macOS | Windows | Linux |
-|---|------|:-----:|:-------:|:-----:|
-| 1 | `make_icons.py` produces `.ico` + `.icns` | [ ] | [ ] | [ ] |
-| 2 | `build.py --version X` succeeds | [ ] | [ ] | N/A |
-| 3 | DMG mounts, shows app + Applications alias | [ ] | N/A | N/A |
-| 4 | Installer wizard works, shortcuts created | N/A | [ ] | N/A |
-| 5 | Launcher starts from source (`--no-browser`) | [ ] | [ ] | [ ] |
-| 6 | Tray menu shows all items with version | [ ] | [ ] | [ ] |
-| 7 | Tooltip updates dynamically | [ ] | [ ] | [ ] |
-| 8 | `--autostart` creates platform entry | [ ] | [ ] | [ ] |
-| 9 | `--no-autostart` removes it | [ ] | [ ] | [ ] |
-| 10 | Tray "Start on Login" toggles correctly | [ ] | [ ] | [ ] |
-| 11 | `--uninstall` interactive mode works | [ ] | [ ] | [ ] |
-| 12 | Tray "Uninstall..." removes safe components | [ ] | [ ] | [ ] |
-| 13 | "View Logs..." opens log file | [ ] | [ ] | [ ] |
-| 14 | `--dev` installs from git branch | [ ] | [ ] | [ ] |
-| 15 | `--branch X` installs from custom branch | [ ] | [ ] | [ ] |
-| 16 | `--local /path` does editable install | [ ] | [ ] | [ ] |
-| 17 | `--reset` without `--dev` switches back to PyPI | [ ] | [ ] | [ ] |
-| 18 | Dev mode updater re-pulls from branch | [ ] | [ ] | [ ] |
-| 19 | `install.ps1` bootstraps correctly | N/A | [ ] | N/A |
-| 20 | `install.sh` redirects Windows users to PS1 | N/A | [ ] | N/A |
-| 21 | CI workflow produces all 3 artifacts | [ ] | [ ] | N/A |
-| 22 | Checksums are generated alongside artifacts | [ ] | [ ] | N/A |
-| 23 | Automated tests pass (62 tests) | [ ] | [ ] | [ ] |
+| #   | Test                                            | macOS | Windows | Linux |
+| --- | ----------------------------------------------- | :---: | :-----: | :---: |
+| 1   | `make_icons.py` produces `.ico` + `.icns`       |  [ ]  |   [ ]   |  [ ]  |
+| 2   | `build.py --version X` succeeds                 |  [ ]  |   [ ]   |  N/A  |
+| 3   | DMG mounts, shows app + Applications alias      |  [ ]  |   N/A   |  N/A  |
+| 4   | Installer wizard works, shortcuts created       |  N/A  |   [ ]   |  N/A  |
+| 5   | Launcher starts from source (`--no-browser`)    |  [ ]  |   [ ]   |  [ ]  |
+| 6   | Tray menu shows all items with version          |  [ ]  |   [ ]   |  [ ]  |
+| 7   | Tooltip updates dynamically                     |  [ ]  |   [ ]   |  [ ]  |
+| 8   | `--autostart` creates platform entry            |  [ ]  |   [ ]   |  [ ]  |
+| 9   | `--no-autostart` removes it                     |  [ ]  |   [ ]   |  [ ]  |
+| 10  | Tray "Start on Login" toggles correctly         |  [ ]  |   [ ]   |  [ ]  |
+| 11  | `--uninstall` interactive mode works            |  [ ]  |   [ ]   |  [ ]  |
+| 12  | Tray "Uninstall..." removes safe components     |  [ ]  |   [ ]   |  [ ]  |
+| 13  | "View Logs..." opens log file                   |  [ ]  |   [ ]   |  [ ]  |
+| 14  | `--dev` installs from git branch                |  [ ]  |   [ ]   |  [ ]  |
+| 15  | `--branch X` installs from custom branch        |  [ ]  |   [ ]   |  [ ]  |
+| 16  | `--local /path` does editable install           |  [ ]  |   [ ]   |  [ ]  |
+| 17  | `--reset` without `--dev` switches back to PyPI |  [ ]  |   [ ]   |  [ ]  |
+| 18  | Dev mode updater re-pulls from branch           |  [ ]  |   [ ]   |  [ ]  |
+| 19  | `install.ps1` bootstraps correctly              |  N/A  |   [ ]   |  N/A  |
+| 20  | `install.sh` redirects Windows users to PS1     |  N/A  |   [ ]   |  N/A  |
+| 21  | CI workflow produces all 3 artifacts            |  [ ]  |   [ ]   |  N/A  |
+| 22  | Checksums are generated alongside artifacts     |  [ ]  |   [ ]   |  N/A  |
+| 23  | Automated tests pass (62 tests)                 |  [ ]  |   [ ]   |  [ ]  |

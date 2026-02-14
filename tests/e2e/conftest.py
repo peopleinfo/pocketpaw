@@ -30,7 +30,7 @@ def run_dashboard(port: int):
     """Run the dashboard server in a subprocess."""
     import uvicorn
 
-    from pocketclaw.dashboard import app
+    from pocketpaw.dashboard import app
 
     uvicorn.run(app, host="127.0.0.1", port=port, log_level="warning")
 
@@ -62,7 +62,7 @@ def dashboard_server(dashboard_port: int):
     Yields the base URL for the dashboard.
     """
     # Set test environment
-    os.environ["POCKETCLAW_TEST_MODE"] = "1"
+    os.environ["POCKETPAW_TEST_MODE"] = "1"
 
     # Start server in subprocess
     process = Process(target=run_dashboard, args=(dashboard_port,))

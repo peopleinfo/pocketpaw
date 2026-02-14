@@ -21,7 +21,7 @@ from installer.launcher.common import (
     DEV_MODE_MARKER,
     GIT_REPO_URL,
     PACKAGE_NAME,
-    POCKETCLAW_HOME,
+    POCKETPAW_HOME,
     UV_DIR,
     VENV_DIR,
     find_uv,
@@ -30,7 +30,7 @@ from installer.launcher.common import (
 
 logger = logging.getLogger(__name__)
 
-EMBEDDED_PYTHON_DIR = POCKETCLAW_HOME / "python"
+EMBEDDED_PYTHON_DIR = POCKETPAW_HOME / "python"
 MIN_PYTHON = (3, 11)
 
 # Python embeddable package URL template for Windows
@@ -727,7 +727,7 @@ class Bootstrap:
         """Install a package using uv pip install with dependency overrides."""
         # Write overrides file so uv can loosen transitive pins
         # (e.g. open-interpreter pins tiktoken==0.7.0 which has no cp313 wheel)
-        overrides_file = POCKETCLAW_HOME / "uv-overrides.txt"
+        overrides_file = POCKETPAW_HOME / "uv-overrides.txt"
         overrides_file.write_text("\n".join(UV_OVERRIDES) + "\n", encoding="utf-8")
 
         cmd = [uv, "pip", "install"]

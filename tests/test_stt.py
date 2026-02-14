@@ -9,19 +9,19 @@ class TestSpeechToTextToolSchema:
     """Test SpeechToTextTool properties and schema."""
 
     def test_name(self):
-        from pocketclaw.tools.builtin.stt import SpeechToTextTool
+        from pocketpaw.tools.builtin.stt import SpeechToTextTool
 
         tool = SpeechToTextTool()
         assert tool.name == "speech_to_text"
 
     def test_trust_level(self):
-        from pocketclaw.tools.builtin.stt import SpeechToTextTool
+        from pocketpaw.tools.builtin.stt import SpeechToTextTool
 
         tool = SpeechToTextTool()
         assert tool.trust_level == "standard"
 
     def test_parameters(self):
-        from pocketclaw.tools.builtin.stt import SpeechToTextTool
+        from pocketpaw.tools.builtin.stt import SpeechToTextTool
 
         tool = SpeechToTextTool()
         params = tool.parameters
@@ -30,7 +30,7 @@ class TestSpeechToTextToolSchema:
         assert "audio_file" in params["required"]
 
     def test_description(self):
-        from pocketclaw.tools.builtin.stt import SpeechToTextTool
+        from pocketpaw.tools.builtin.stt import SpeechToTextTool
 
         tool = SpeechToTextTool()
         assert "Whisper" in tool.description
@@ -42,24 +42,24 @@ def _mock_settings():
     settings = MagicMock()
     settings.openai_api_key = "test-key"
     settings.stt_model = "whisper-1"
-    with patch("pocketclaw.tools.builtin.stt.get_settings", return_value=settings):
+    with patch("pocketpaw.tools.builtin.stt.get_settings", return_value=settings):
         yield settings
 
 
 async def test_stt_no_api_key():
-    from pocketclaw.tools.builtin.stt import SpeechToTextTool
+    from pocketpaw.tools.builtin.stt import SpeechToTextTool
 
     tool = SpeechToTextTool()
     settings = MagicMock()
     settings.openai_api_key = None
-    with patch("pocketclaw.tools.builtin.stt.get_settings", return_value=settings):
+    with patch("pocketpaw.tools.builtin.stt.get_settings", return_value=settings):
         result = await tool.execute(audio_file="/tmp/test.mp3")
     assert result.startswith("Error:")
     assert "API key" in result
 
 
 async def test_stt_file_not_found(_mock_settings):
-    from pocketclaw.tools.builtin.stt import SpeechToTextTool
+    from pocketpaw.tools.builtin.stt import SpeechToTextTool
 
     tool = SpeechToTextTool()
     result = await tool.execute(audio_file="/nonexistent/audio.mp3")
@@ -68,7 +68,7 @@ async def test_stt_file_not_found(_mock_settings):
 
 
 async def test_stt_file_too_large(_mock_settings, tmp_path):
-    from pocketclaw.tools.builtin.stt import SpeechToTextTool
+    from pocketpaw.tools.builtin.stt import SpeechToTextTool
 
     tool = SpeechToTextTool()
     big_file = tmp_path / "big.mp3"
@@ -79,7 +79,7 @@ async def test_stt_file_too_large(_mock_settings, tmp_path):
 
 
 async def test_stt_success(_mock_settings, tmp_path):
-    from pocketclaw.tools.builtin.stt import SpeechToTextTool
+    from pocketpaw.tools.builtin.stt import SpeechToTextTool
 
     tool = SpeechToTextTool()
     audio_file = tmp_path / "test.mp3"
@@ -97,7 +97,7 @@ async def test_stt_success(_mock_settings, tmp_path):
         mock_client_cls.return_value = mock_client
 
         with patch(
-            "pocketclaw.tools.builtin.stt._get_transcripts_dir",
+            "pocketpaw.tools.builtin.stt._get_transcripts_dir",
             return_value=tmp_path,
         ):
             result = await tool.execute(audio_file=str(audio_file))
@@ -107,7 +107,7 @@ async def test_stt_success(_mock_settings, tmp_path):
 
 
 async def test_stt_with_language(_mock_settings, tmp_path):
-    from pocketclaw.tools.builtin.stt import SpeechToTextTool
+    from pocketpaw.tools.builtin.stt import SpeechToTextTool
 
     tool = SpeechToTextTool()
     audio_file = tmp_path / "test.mp3"
@@ -125,7 +125,7 @@ async def test_stt_with_language(_mock_settings, tmp_path):
         mock_client_cls.return_value = mock_client
 
         with patch(
-            "pocketclaw.tools.builtin.stt._get_transcripts_dir",
+            "pocketpaw.tools.builtin.stt._get_transcripts_dir",
             return_value=tmp_path,
         ):
             result = await tool.execute(audio_file=str(audio_file), language="es")
@@ -137,7 +137,7 @@ async def test_stt_with_language(_mock_settings, tmp_path):
 
 
 async def test_stt_empty_transcript(_mock_settings, tmp_path):
-    from pocketclaw.tools.builtin.stt import SpeechToTextTool
+    from pocketpaw.tools.builtin.stt import SpeechToTextTool
 
     tool = SpeechToTextTool()
     audio_file = tmp_path / "silence.mp3"
@@ -160,7 +160,7 @@ async def test_stt_empty_transcript(_mock_settings, tmp_path):
 
 
 async def test_stt_api_error(_mock_settings, tmp_path):
-    from pocketclaw.tools.builtin.stt import SpeechToTextTool
+    from pocketpaw.tools.builtin.stt import SpeechToTextTool
 
     tool = SpeechToTextTool()
     audio_file = tmp_path / "test.mp3"

@@ -7,8 +7,8 @@ import json
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
-from pocketclaw.mcp.config import MCPServerConfig, load_mcp_config, save_mcp_config
-from pocketclaw.mcp.manager import MCPManager, MCPToolInfo, get_mcp_manager
+from pocketpaw.mcp.config import MCPServerConfig, load_mcp_config, save_mcp_config
+from pocketpaw.mcp.manager import MCPManager, MCPToolInfo, get_mcp_manager
 
 # ======================================================================
 # MCPServerConfig tests
@@ -90,12 +90,12 @@ class TestMCPServerConfig:
 
 class TestMCPConfig:
     def test_load_no_file(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("pocketclaw.mcp.config.get_config_dir", lambda: tmp_path)
+        monkeypatch.setattr("pocketpaw.mcp.config.get_config_dir", lambda: tmp_path)
         result = load_mcp_config()
         assert result == []
 
     def test_save_and_load(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("pocketclaw.mcp.config.get_config_dir", lambda: tmp_path)
+        monkeypatch.setattr("pocketpaw.mcp.config.get_config_dir", lambda: tmp_path)
         configs = [
             MCPServerConfig(name="a", command="cmd-a"),
             MCPServerConfig(name="b", command="cmd-b", enabled=False),
@@ -109,19 +109,19 @@ class TestMCPConfig:
         assert loaded[1].enabled is False
 
     def test_load_corrupt_json(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("pocketclaw.mcp.config.get_config_dir", lambda: tmp_path)
+        monkeypatch.setattr("pocketpaw.mcp.config.get_config_dir", lambda: tmp_path)
         (tmp_path / "mcp_servers.json").write_text("not json")
         result = load_mcp_config()
         assert result == []
 
     def test_load_missing_servers_key(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("pocketclaw.mcp.config.get_config_dir", lambda: tmp_path)
+        monkeypatch.setattr("pocketpaw.mcp.config.get_config_dir", lambda: tmp_path)
         (tmp_path / "mcp_servers.json").write_text(json.dumps({"other": 1}))
         result = load_mcp_config()
         assert result == []
 
     def test_save_creates_file(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("pocketclaw.mcp.config.get_config_dir", lambda: tmp_path)
+        monkeypatch.setattr("pocketpaw.mcp.config.get_config_dir", lambda: tmp_path)
         save_mcp_config([MCPServerConfig(name="x")])
         assert (tmp_path / "mcp_servers.json").exists()
 
@@ -148,7 +148,7 @@ class TestMCPToolInfo:
 class TestMCPManager:
     def test_get_server_status_empty(self):
         mgr = MCPManager()
-        with patch("pocketclaw.mcp.manager.load_mcp_config", return_value=[]):
+        with patch("pocketpaw.mcp.manager.load_mcp_config", return_value=[]):
             assert mgr.get_server_status() == {}
 
     def test_get_server_status_includes_config_servers(self):
@@ -158,7 +158,7 @@ class TestMCPManager:
             MCPServerConfig(name="saved-server", transport="stdio", enabled=True),
             MCPServerConfig(name="disabled-one", transport="http", enabled=False),
         ]
-        with patch("pocketclaw.mcp.manager.load_mcp_config", return_value=configs):
+        with patch("pocketpaw.mcp.manager.load_mcp_config", return_value=configs):
             status = mgr.get_server_status()
         assert "saved-server" in status
         assert status["saved-server"]["connected"] is False
@@ -187,7 +187,7 @@ class TestMCPManager:
         result = await mgr.call_tool("ghost", "read", {})
         assert "not connected" in result
 
-    @patch("pocketclaw.mcp.manager.load_mcp_config")
+    @patch("pocketpaw.mcp.manager.load_mcp_config")
     async def test_start_enabled_servers(self, mock_load):
         mgr = MCPManager()
         cfg_enabled = MCPServerConfig(name="a", enabled=True)
@@ -204,7 +204,7 @@ class TestMCPManager:
         cfg = MCPServerConfig(name="weird", transport="grpc")
         result = await mgr.start_server(cfg)
         assert result is False
-        with patch("pocketclaw.mcp.manager.load_mcp_config", return_value=[]):
+        with patch("pocketpaw.mcp.manager.load_mcp_config", return_value=[]):
             status = mgr.get_server_status()
         assert "grpc" in status["weird"]["error"]
 
@@ -231,7 +231,7 @@ class TestMCPManager:
         mock_ctx.__aenter__ = AsyncMock(return_value=(AsyncMock(), AsyncMock()))
         mock_ctx.__aexit__ = AsyncMock()
 
-        import pocketclaw.mcp.manager as mgr_mod
+        import pocketpaw.mcp.manager as mgr_mod
 
         original_connect = mgr_mod.MCPManager._connect_stdio
 
@@ -245,7 +245,7 @@ class TestMCPManager:
         try:
             result = await mgr.start_server(cfg)
             assert result is True
-            with patch("pocketclaw.mcp.manager.load_mcp_config", return_value=[]):
+            with patch("pocketpaw.mcp.manager.load_mcp_config", return_value=[]):
                 assert mgr.get_server_status()["fs"]["connected"] is True
                 assert mgr.get_server_status()["fs"]["tool_count"] == 1
 
@@ -261,7 +261,7 @@ class TestMCPManager:
     async def test_start_server_already_connected(self):
         """Starting an already-connected server should return True."""
         mgr = MCPManager()
-        from pocketclaw.mcp.manager import _ServerState
+        from pocketpaw.mcp.manager import _ServerState
 
         cfg = MCPServerConfig(name="dup")
         state = _ServerState(config=cfg, connected=True)
@@ -272,7 +272,7 @@ class TestMCPManager:
     async def test_stop_server_running(self):
         """Stop a 'connected' server."""
         mgr = MCPManager()
-        from pocketclaw.mcp.manager import _ServerState
+        from pocketpaw.mcp.manager import _ServerState
 
         cfg = MCPServerConfig(name="fs")
         state = _ServerState(config=cfg, connected=True)
@@ -289,7 +289,7 @@ class TestMCPManager:
     async def test_call_tool_success(self):
         """Test successful tool call."""
         mgr = MCPManager()
-        from pocketclaw.mcp.manager import _ServerState
+        from pocketpaw.mcp.manager import _ServerState
 
         cfg = MCPServerConfig(name="fs")
         mock_session = AsyncMock()
@@ -306,7 +306,7 @@ class TestMCPManager:
     async def test_call_tool_error(self):
         """Test tool call that raises."""
         mgr = MCPManager()
-        from pocketclaw.mcp.manager import _ServerState
+        from pocketpaw.mcp.manager import _ServerState
 
         cfg = MCPServerConfig(name="err")
         mock_session = AsyncMock()
@@ -322,7 +322,7 @@ class TestMCPManager:
     async def test_call_tool_no_text(self):
         """Tool result with no text blocks returns '(no output)'."""
         mgr = MCPManager()
-        from pocketclaw.mcp.manager import _ServerState
+        from pocketpaw.mcp.manager import _ServerState
 
         cfg = MCPServerConfig(name="empty")
         mock_session = AsyncMock()
@@ -343,9 +343,9 @@ class TestMCPManager:
 
 class TestMCPManagerConfigMethods:
     def test_add_server_config(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("pocketclaw.mcp.config.get_config_dir", lambda: tmp_path)
-        monkeypatch.setattr("pocketclaw.mcp.manager.load_mcp_config", load_mcp_config)
-        monkeypatch.setattr("pocketclaw.mcp.manager.save_mcp_config", save_mcp_config)
+        monkeypatch.setattr("pocketpaw.mcp.config.get_config_dir", lambda: tmp_path)
+        monkeypatch.setattr("pocketpaw.mcp.manager.load_mcp_config", load_mcp_config)
+        monkeypatch.setattr("pocketpaw.mcp.manager.save_mcp_config", save_mcp_config)
 
         mgr = MCPManager()
         cfg = MCPServerConfig(name="new-server", command="npx")
@@ -356,9 +356,9 @@ class TestMCPManagerConfigMethods:
         assert loaded[0].name == "new-server"
 
     def test_add_server_config_replaces(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("pocketclaw.mcp.config.get_config_dir", lambda: tmp_path)
-        monkeypatch.setattr("pocketclaw.mcp.manager.load_mcp_config", load_mcp_config)
-        monkeypatch.setattr("pocketclaw.mcp.manager.save_mcp_config", save_mcp_config)
+        monkeypatch.setattr("pocketpaw.mcp.config.get_config_dir", lambda: tmp_path)
+        monkeypatch.setattr("pocketpaw.mcp.manager.load_mcp_config", load_mcp_config)
+        monkeypatch.setattr("pocketpaw.mcp.manager.save_mcp_config", save_mcp_config)
 
         mgr = MCPManager()
         mgr.add_server_config(MCPServerConfig(name="s", command="old"))
@@ -369,9 +369,9 @@ class TestMCPManagerConfigMethods:
         assert loaded[0].command == "new"
 
     def test_remove_server_config(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("pocketclaw.mcp.config.get_config_dir", lambda: tmp_path)
-        monkeypatch.setattr("pocketclaw.mcp.manager.load_mcp_config", load_mcp_config)
-        monkeypatch.setattr("pocketclaw.mcp.manager.save_mcp_config", save_mcp_config)
+        monkeypatch.setattr("pocketpaw.mcp.config.get_config_dir", lambda: tmp_path)
+        monkeypatch.setattr("pocketpaw.mcp.manager.load_mcp_config", load_mcp_config)
+        monkeypatch.setattr("pocketpaw.mcp.manager.save_mcp_config", save_mcp_config)
 
         mgr = MCPManager()
         mgr.add_server_config(MCPServerConfig(name="a"))
@@ -385,9 +385,9 @@ class TestMCPManagerConfigMethods:
         assert loaded[0].name == "b"
 
     def test_toggle_server_config(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("pocketclaw.mcp.config.get_config_dir", lambda: tmp_path)
-        monkeypatch.setattr("pocketclaw.mcp.manager.load_mcp_config", load_mcp_config)
-        monkeypatch.setattr("pocketclaw.mcp.manager.save_mcp_config", save_mcp_config)
+        monkeypatch.setattr("pocketpaw.mcp.config.get_config_dir", lambda: tmp_path)
+        monkeypatch.setattr("pocketpaw.mcp.manager.load_mcp_config", load_mcp_config)
+        monkeypatch.setattr("pocketpaw.mcp.manager.save_mcp_config", save_mcp_config)
 
         mgr = MCPManager()
         mgr.add_server_config(MCPServerConfig(name="t", enabled=True))
@@ -404,7 +404,7 @@ class TestMCPManagerConfigMethods:
 
 class TestGetMCPManager:
     def test_returns_same_instance(self):
-        import pocketclaw.mcp.manager as mod
+        import pocketpaw.mcp.manager as mod
 
         mod._manager = None  # reset
         a = get_mcp_manager()

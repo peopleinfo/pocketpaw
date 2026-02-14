@@ -13,9 +13,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from pocketclaw.deep_work.models import AgentSpec, PlannerResult, TaskSpec
-from pocketclaw.deep_work.planner import PlannerAgent
-from pocketclaw.deep_work.prompts import (
+from pocketpaw.deep_work.models import AgentSpec, PlannerResult, TaskSpec
+from pocketpaw.deep_work.planner import PlannerAgent
+from pocketpaw.deep_work.prompts import (
     PRD_PROMPT,
     RESEARCH_PROMPT,
     TASK_BREAKDOWN_PROMPT,
@@ -347,7 +347,7 @@ class TestBroadcastPhase:
         planner = PlannerAgent(manager)
         # Should not raise even if bus module is not fully initialized
         with patch(
-            "pocketclaw.bus.get_message_bus",
+            "pocketpaw.bus.get_message_bus",
             side_effect=RuntimeError("no bus"),
         ):
             planner._broadcast_phase("proj-1", "research")
@@ -367,7 +367,7 @@ class TestBroadcastPhase:
         mock_bus.publish_system = AsyncMock()
 
         with patch(
-            "pocketclaw.bus.get_message_bus",
+            "pocketpaw.bus.get_message_bus",
             return_value=mock_bus,
         ):
             planner._broadcast_phase("proj-1", "tasks")

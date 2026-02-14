@@ -3,7 +3,7 @@
 # Tests the new Task fields: project_id, task_type, blocks,
 # active_description, estimated_minutes
 
-from pocketclaw.mission_control.models import Task, TaskPriority, TaskStatus
+from pocketpaw.mission_control.models import Task, TaskPriority, TaskStatus
 
 
 class TestTaskDeepWorkFields:

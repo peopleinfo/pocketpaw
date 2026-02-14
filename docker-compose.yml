@@ -5,7 +5,7 @@ services:
     ports:
       - "${POCKETPAW_PORT:-8888}:8888"
     volumes:
-      - pocketpaw-data:/home/pocketpaw/.pocketclaw
+      - pocketpaw-data:/home/pocketpaw/.pocketpaw
     env_file:
       - path: .env
         required: false

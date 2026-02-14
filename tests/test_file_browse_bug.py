@@ -43,7 +43,7 @@ class TestFileBrowseHiddenFileBug:
         self, mock_websocket, mock_settings, tmp_path
     ):
         """BUG REPRODUCER: 55 hidden dirs + 5 visible dirs → should return 5 visible, but returns 0."""
-        from pocketclaw.dashboard import handle_file_browse
+        from pocketpaw.dashboard import handle_file_browse
 
         # Create 55 hidden directories (sorted before any visible dir)
         for i in range(55):
@@ -80,7 +80,7 @@ class TestFileBrowseHiddenFileBug:
         self, mock_websocket, mock_settings, tmp_path
     ):
         """Baseline: with few hidden items, visible files ARE returned correctly."""
-        from pocketclaw.dashboard import handle_file_browse
+        from pocketpaw.dashboard import handle_file_browse
 
         # Create 5 hidden directories
         for i in range(5):
@@ -111,7 +111,7 @@ class TestFileBrowseHiddenFileBug:
     @pytest.mark.asyncio
     async def test_hidden_files_never_included(self, mock_websocket, mock_settings, tmp_path):
         """Verify hidden files are always filtered out of results."""
-        from pocketclaw.dashboard import handle_file_browse
+        from pocketpaw.dashboard import handle_file_browse
 
         (tmp_path / ".gitconfig").write_text("config")
         (tmp_path / ".ssh").mkdir()
@@ -132,7 +132,7 @@ class TestFileBrowseHiddenFileBug:
     @pytest.mark.asyncio
     async def test_limit_applies_to_visible_items(self, mock_websocket, mock_settings, tmp_path):
         """The 50-item limit should apply to VISIBLE items, not all items."""
-        from pocketclaw.dashboard import handle_file_browse
+        from pocketpaw.dashboard import handle_file_browse
 
         # Create 30 hidden dirs + 60 visible dirs
         for i in range(30):

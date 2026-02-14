@@ -50,7 +50,7 @@ PocketPaw uses a two-tier memory system: file-based sessions for conversation hi
 
 ### File Store (Default)
 
-No configuration needed. Sessions are automatically saved to `~/.pocketclaw/memory/`.
+No configuration needed. Sessions are automatically saved to `~/.pocketpaw/memory/`.
 
 ### Mem0 (Optional)
 
@@ -62,9 +62,9 @@ curl -fsSL https://pocketpaw.xyz/install.sh | sh
 # Or add the memory extra manually
 pip install pocketpaw[memory]
 
-export POCKETCLAW_MEM0_AUTO_LEARN=true
-export POCKETCLAW_MEM0_LLM_PROVIDER="ollama"
-export POCKETCLAW_MEM0_LLM_MODEL="llama3.2"
-export POCKETCLAW_MEM0_EMBEDDER_PROVIDER="ollama"
-export POCKETCLAW_MEM0_EMBEDDER_MODEL="nomic-embed-text"
+export POCKETPAW_MEM0_AUTO_LEARN=true
+export POCKETPAW_MEM0_LLM_PROVIDER="ollama"
+export POCKETPAW_MEM0_LLM_MODEL="llama3.2"
+export POCKETPAW_MEM0_EMBEDDER_PROVIDER="ollama"
+export POCKETPAW_MEM0_EMBEDDER_MODEL="nomic-embed-text"
 ```

@@ -48,7 +48,7 @@ See [Tool Policy](/tools/tool-policy) for detailed documentation.
 
 ## Audit Log
 
-Every significant action is recorded in an append-only JSONL log at `~/.pocketclaw/audit.jsonl`:
+Every significant action is recorded in an append-only JSONL log at `~/.pocketpaw/audit.jsonl`:
 
 ```json
 {"timestamp": "2024-01-15T10:30:00Z", "action": "tool_execute", "tool": "shell", "input": "ls -la", "result": "...", "session_id": "abc123"}
@@ -89,7 +89,7 @@ The self-audit daemon runs 12 continuous checks in the background:
 - Audit log rotation
 - And more
 
-Reports are saved as JSON in `~/.pocketclaw/audit/`.
+Reports are saved as JSON in `~/.pocketpaw/audit/`.
 
 ## Dangerous Command Blocking
 

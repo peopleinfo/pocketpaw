@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from pocketclaw.tools.builtin.skill_gen import _VALID_SKILL_NAME, CreateSkillTool
+from pocketpaw.tools.builtin.skill_gen import _VALID_SKILL_NAME, CreateSkillTool
 
 
 @pytest.fixture
@@ -51,11 +51,11 @@ class TestCreateSkillTool:
         assert not _VALID_SKILL_NAME.match("has space")
         assert not _VALID_SKILL_NAME.match("-starts-with-dash")
 
-    @patch("pocketclaw.tools.builtin.skill_gen._get_skills_dir")
+    @patch("pocketpaw.tools.builtin.skill_gen._get_skills_dir")
     async def test_create_skill_success(self, mock_dir, tool, temp_skills_dir):
         mock_dir.return_value = temp_skills_dir
 
-        with patch("pocketclaw.skills.get_skill_loader", side_effect=ImportError):
+        with patch("pocketpaw.skills.get_skill_loader", side_effect=ImportError):
             result = await tool.execute(
                 skill_name="test-skill",
                 description="A test skill",
@@ -73,11 +73,11 @@ class TestCreateSkillTool:
         assert "user-invocable: true" in content
         assert "Do the thing." in content
 
-    @patch("pocketclaw.tools.builtin.skill_gen._get_skills_dir")
+    @patch("pocketpaw.tools.builtin.skill_gen._get_skills_dir")
     async def test_create_skill_with_allowed_tools(self, mock_dir, tool, temp_skills_dir):
         mock_dir.return_value = temp_skills_dir
 
-        with patch("pocketclaw.skills.get_skill_loader", side_effect=ImportError):
+        with patch("pocketpaw.skills.get_skill_loader", side_effect=ImportError):
             result = await tool.execute(
                 skill_name="code-review",
                 description="Review code",
@@ -91,11 +91,11 @@ class TestCreateSkillTool:
         assert "  - read_file" in content
         assert "  - shell" in content
 
-    @patch("pocketclaw.tools.builtin.skill_gen._get_skills_dir")
+    @patch("pocketpaw.tools.builtin.skill_gen._get_skills_dir")
     async def test_create_skill_not_user_invocable(self, mock_dir, tool, temp_skills_dir):
         mock_dir.return_value = temp_skills_dir
 
-        with patch("pocketclaw.skills.get_skill_loader", side_effect=ImportError):
+        with patch("pocketpaw.skills.get_skill_loader", side_effect=ImportError):
             result = await tool.execute(
                 skill_name="internal-skill",
                 description="Internal only",
@@ -116,7 +116,7 @@ class TestCreateSkillTool:
         assert "Error" in result
         assert "Invalid skill name" in result
 
-    @patch("pocketclaw.tools.builtin.skill_gen._get_skills_dir")
+    @patch("pocketpaw.tools.builtin.skill_gen._get_skills_dir")
     async def test_overwrite_protection(self, mock_dir, tool, temp_skills_dir):
         mock_dir.return_value = temp_skills_dir
 
@@ -136,12 +136,12 @@ class TestCreateSkillTool:
         # Original content preserved
         assert (skill_dir / "SKILL.md").read_text() == "existing content"
 
-    @patch("pocketclaw.tools.builtin.skill_gen._get_skills_dir")
+    @patch("pocketpaw.tools.builtin.skill_gen._get_skills_dir")
     async def test_skill_loader_reload_called(self, mock_dir, tool, temp_skills_dir):
         mock_dir.return_value = temp_skills_dir
 
         mock_loader = MagicMock()
-        with patch("pocketclaw.skills.get_skill_loader", return_value=mock_loader):
+        with patch("pocketpaw.skills.get_skill_loader", return_value=mock_loader):
             await tool.execute(
                 skill_name="reloaded-skill",
                 description="Test reload",
@@ -150,11 +150,11 @@ class TestCreateSkillTool:
 
         mock_loader.reload.assert_called_once()
 
-    @patch("pocketclaw.tools.builtin.skill_gen._get_skills_dir")
+    @patch("pocketpaw.tools.builtin.skill_gen._get_skills_dir")
     async def test_yaml_frontmatter_format(self, mock_dir, tool, temp_skills_dir):
         mock_dir.return_value = temp_skills_dir
 
-        with patch("pocketclaw.skills.get_skill_loader", side_effect=ImportError):
+        with patch("pocketpaw.skills.get_skill_loader", side_effect=ImportError):
             await tool.execute(
                 skill_name="fmt-test",
                 description="Format test",

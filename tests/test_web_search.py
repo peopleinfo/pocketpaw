@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import httpx
 import pytest
 
-from pocketclaw.tools.builtin.web_search import WebSearchTool
+from pocketpaw.tools.builtin.web_search import WebSearchTool
 
 
 @pytest.fixture
@@ -29,7 +29,7 @@ class TestWebSearchTool:
         assert "num_results" in params["properties"]
         assert "query" in params["required"]
 
-    @patch("pocketclaw.tools.builtin.web_search.get_settings")
+    @patch("pocketpaw.tools.builtin.web_search.get_settings")
     async def test_tavily_search_success(self, mock_settings, tool):
         mock_settings.return_value = MagicMock(
             web_search_provider="tavily",
@@ -61,7 +61,7 @@ class TestWebSearchTool:
         assert "Python Docs" in result
         assert "https://docs.python.org" in result
 
-    @patch("pocketclaw.tools.builtin.web_search.get_settings")
+    @patch("pocketpaw.tools.builtin.web_search.get_settings")
     async def test_brave_search_success(self, mock_settings, tool):
         mock_settings.return_value = MagicMock(
             web_search_provider="brave",
@@ -95,7 +95,7 @@ class TestWebSearchTool:
         assert "Brave Search" in result
         assert "https://brave.com" in result
 
-    @patch("pocketclaw.tools.builtin.web_search.get_settings")
+    @patch("pocketpaw.tools.builtin.web_search.get_settings")
     async def test_missing_tavily_api_key(self, mock_settings, tool):
         mock_settings.return_value = MagicMock(
             web_search_provider="tavily",
@@ -105,7 +105,7 @@ class TestWebSearchTool:
         assert "Error" in result
         assert "Tavily API key" in result
 
-    @patch("pocketclaw.tools.builtin.web_search.get_settings")
+    @patch("pocketpaw.tools.builtin.web_search.get_settings")
     async def test_missing_brave_api_key(self, mock_settings, tool):
         mock_settings.return_value = MagicMock(
             web_search_provider="brave",
@@ -115,14 +115,14 @@ class TestWebSearchTool:
         assert "Error" in result
         assert "Brave Search API key" in result
 
-    @patch("pocketclaw.tools.builtin.web_search.get_settings")
+    @patch("pocketpaw.tools.builtin.web_search.get_settings")
     async def test_unknown_provider(self, mock_settings, tool):
         mock_settings.return_value = MagicMock(web_search_provider="duckduckgo")
         result = await tool.execute(query="test")
         assert "Error" in result
         assert "Unknown search provider" in result
 
-    @patch("pocketclaw.tools.builtin.web_search.get_settings")
+    @patch("pocketpaw.tools.builtin.web_search.get_settings")
     async def test_no_results(self, mock_settings, tool):
         mock_settings.return_value = MagicMock(
             web_search_provider="tavily",
@@ -144,7 +144,7 @@ class TestWebSearchTool:
 
         assert "No results found" in result
 
-    @patch("pocketclaw.tools.builtin.web_search.get_settings")
+    @patch("pocketpaw.tools.builtin.web_search.get_settings")
     async def test_http_error(self, mock_settings, tool):
         mock_settings.return_value = MagicMock(
             web_search_provider="tavily",
@@ -170,7 +170,7 @@ class TestWebSearchTool:
 
         assert "Error" in result
 
-    @patch("pocketclaw.tools.builtin.web_search.get_settings")
+    @patch("pocketpaw.tools.builtin.web_search.get_settings")
     async def test_parallel_search_success(self, mock_settings, tool):
         mock_settings.return_value = MagicMock(
             web_search_provider="parallel",
@@ -206,7 +206,7 @@ class TestWebSearchTool:
         assert call_kwargs.kwargs["headers"]["x-api-key"] == "test-parallel-key"
         assert "parallel-beta" in call_kwargs.kwargs["headers"]
 
-    @patch("pocketclaw.tools.builtin.web_search.get_settings")
+    @patch("pocketpaw.tools.builtin.web_search.get_settings")
     async def test_parallel_missing_api_key(self, mock_settings, tool):
         mock_settings.return_value = MagicMock(
             web_search_provider="parallel",
@@ -216,7 +216,7 @@ class TestWebSearchTool:
         assert "Error" in result
         assert "Parallel AI API key" in result
 
-    @patch("pocketclaw.tools.builtin.web_search.get_settings")
+    @patch("pocketpaw.tools.builtin.web_search.get_settings")
     async def test_parallel_no_results(self, mock_settings, tool):
         mock_settings.return_value = MagicMock(
             web_search_provider="parallel",
@@ -238,7 +238,7 @@ class TestWebSearchTool:
 
         assert "No results found" in result
 
-    @patch("pocketclaw.tools.builtin.web_search.get_settings")
+    @patch("pocketpaw.tools.builtin.web_search.get_settings")
     async def test_num_results_clamped(self, mock_settings, tool):
         mock_settings.return_value = MagicMock(
             web_search_provider="tavily",

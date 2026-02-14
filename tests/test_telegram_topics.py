@@ -15,7 +15,7 @@ sys.modules["telegram"] = mock_telegram
 sys.modules["telegram.error"] = mock_telegram.error
 sys.modules["telegram.ext"] = MagicMock()
 
-from pocketclaw.bus.adapters.telegram_adapter import TelegramAdapter  # noqa: E402
+from pocketpaw.bus.adapters.telegram_adapter import TelegramAdapter  # noqa: E402
 
 
 @pytest.fixture

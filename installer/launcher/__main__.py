@@ -57,9 +57,9 @@ if __package__ is None or __package__ == "":
         sys.modules["installer.launcher"] = sys.modules["launcher"]
 
 # Set up logging before imports
-from installer.launcher.common import POCKETCLAW_HOME
+from installer.launcher.common import POCKETPAW_HOME
 
-LOG_DIR = POCKETCLAW_HOME / "logs"
+LOG_DIR = POCKETPAW_HOME / "logs"
 LOG_DIR.mkdir(parents=True, exist_ok=True)
 LOG_FILE = LOG_DIR / "launcher.log"
 

@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from pocketclaw.scheduler import ReminderScheduler
+from pocketpaw.scheduler import ReminderScheduler
 
 
 @pytest.fixture
@@ -27,8 +27,8 @@ def temp_reminders_file():
 class TestCronExpressionSupport:
     """Tests for recurring cron reminders in ReminderScheduler."""
 
-    @patch("pocketclaw.scheduler.save_reminders")
-    @patch("pocketclaw.scheduler.load_reminders", return_value=[])
+    @patch("pocketpaw.scheduler.save_reminders")
+    @patch("pocketpaw.scheduler.load_reminders", return_value=[])
     def test_add_recurring_valid_cron(self, mock_load, mock_save, scheduler):
         result = scheduler.add_recurring("Daily standup", "0 9 * * *")
 
@@ -39,8 +39,8 @@ class TestCronExpressionSupport:
         assert "id" in result
         mock_save.assert_called()
 
-    @patch("pocketclaw.scheduler.save_reminders")
-    @patch("pocketclaw.scheduler.load_reminders", return_value=[])
+    @patch("pocketpaw.scheduler.save_reminders")
+    @patch("pocketpaw.scheduler.load_reminders", return_value=[])
     def test_add_recurring_preset(self, mock_load, mock_save, scheduler):
         result = scheduler.add_recurring("Morning check", "every_morning_8am")
 
@@ -48,15 +48,15 @@ class TestCronExpressionSupport:
         assert result["schedule"] == "every_morning_8am"
         assert result["type"] == "recurring"
 
-    @patch("pocketclaw.scheduler.save_reminders")
-    @patch("pocketclaw.scheduler.load_reminders", return_value=[])
+    @patch("pocketpaw.scheduler.save_reminders")
+    @patch("pocketpaw.scheduler.load_reminders", return_value=[])
     def test_add_recurring_invalid_cron(self, mock_load, mock_save, scheduler):
         result = scheduler.add_recurring("Bad schedule", "not a cron")
 
         assert result is None
 
-    @patch("pocketclaw.scheduler.save_reminders")
-    @patch("pocketclaw.scheduler.load_reminders", return_value=[])
+    @patch("pocketpaw.scheduler.save_reminders")
+    @patch("pocketpaw.scheduler.load_reminders", return_value=[])
     def test_add_recurring_appended_to_reminders(self, mock_load, mock_save, scheduler):
         scheduler.add_recurring("Task A", "0 8 * * *")
         scheduler.add_recurring("Task B", "0 12 * * *")
@@ -65,8 +65,8 @@ class TestCronExpressionSupport:
         assert scheduler.reminders[0]["text"] == "Task A"
         assert scheduler.reminders[1]["text"] == "Task B"
 
-    @patch("pocketclaw.scheduler.save_reminders")
-    @patch("pocketclaw.scheduler.load_reminders", return_value=[])
+    @patch("pocketpaw.scheduler.save_reminders")
+    @patch("pocketpaw.scheduler.load_reminders", return_value=[])
     def test_delete_recurring(self, mock_load, mock_save, scheduler):
         reminder = scheduler.add_recurring("To delete", "0 9 * * *")
         assert len(scheduler.reminders) == 1
@@ -75,8 +75,8 @@ class TestCronExpressionSupport:
         assert result is True
         assert len(scheduler.reminders) == 0
 
-    @patch("pocketclaw.scheduler.save_reminders")
-    @patch("pocketclaw.scheduler.load_reminders", return_value=[])
+    @patch("pocketpaw.scheduler.save_reminders")
+    @patch("pocketpaw.scheduler.load_reminders", return_value=[])
     def test_recurring_reminder_has_correct_fields(self, mock_load, mock_save, scheduler):
         result = scheduler.add_recurring("Weekly sync", "0 10 * * 1")
 
@@ -92,8 +92,8 @@ class TestCronExpressionSupport:
         """Recurring reminders should NOT be removed after firing."""
         callback = AsyncMock()
 
-        with patch("pocketclaw.scheduler.save_reminders"):
-            with patch("pocketclaw.scheduler.load_reminders", return_value=[]):
+        with patch("pocketpaw.scheduler.save_reminders"):
+            with patch("pocketpaw.scheduler.load_reminders", return_value=[]):
                 scheduler.callback = callback
                 reminder = scheduler.add_recurring("Keep me", "0 9 * * *")
                 rid = reminder["id"]
@@ -109,8 +109,8 @@ class TestCronExpressionSupport:
         """One-shot reminders should be removed after firing."""
         callback = AsyncMock()
 
-        with patch("pocketclaw.scheduler.save_reminders"):
-            with patch("pocketclaw.scheduler.load_reminders", return_value=[]):
+        with patch("pocketpaw.scheduler.save_reminders"):
+            with patch("pocketpaw.scheduler.load_reminders", return_value=[]):
                 scheduler.callback = callback
 
                 # Add a one-shot reminder manually
@@ -129,7 +129,7 @@ class TestCronExpressionSupport:
                 # Should be removed
                 assert not any(r["id"] == "test-oneshot" for r in scheduler.reminders)
 
-    @patch("pocketclaw.scheduler.save_reminders")
+    @patch("pocketpaw.scheduler.save_reminders")
     async def test_start_reschedules_recurring(self, mock_save):
         """Recurring reminders should be rescheduled on start."""
         recurring_reminder = {
@@ -142,7 +142,7 @@ class TestCronExpressionSupport:
             "created_at": "2026-01-01T00:00:00",
         }
 
-        with patch("pocketclaw.scheduler.load_reminders", return_value=[recurring_reminder]):
+        with patch("pocketpaw.scheduler.load_reminders", return_value=[recurring_reminder]):
             scheduler = ReminderScheduler()
             scheduler.start()
 
@@ -152,7 +152,7 @@ class TestCronExpressionSupport:
 
             scheduler.stop()
 
-    @patch("pocketclaw.scheduler.save_reminders")
+    @patch("pocketpaw.scheduler.save_reminders")
     async def test_start_skips_past_oneshot(self, mock_save):
         """One-shot reminders in the past should be skipped on start."""
         oneshot_reminder = {
@@ -164,7 +164,7 @@ class TestCronExpressionSupport:
             "created_at": "2020-01-01T00:00:00",
         }
 
-        with patch("pocketclaw.scheduler.load_reminders", return_value=[oneshot_reminder]):
+        with patch("pocketpaw.scheduler.load_reminders", return_value=[oneshot_reminder]):
             scheduler = ReminderScheduler()
             scheduler.start()
 

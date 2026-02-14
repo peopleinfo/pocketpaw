@@ -3,8 +3,8 @@
 
 from unittest.mock import AsyncMock, patch
 
-from pocketclaw.agents.delegation import DelegationResult, ExternalAgentDelegate
-from pocketclaw.tools.builtin.delegate import DelegateToClaudeCodeTool
+from pocketpaw.agents.delegation import DelegationResult, ExternalAgentDelegate
+from pocketpaw.tools.builtin.delegate import DelegateToClaudeCodeTool
 
 # ---------------------------------------------------------------------------
 # DelegationResult
@@ -31,11 +31,11 @@ class TestDelegationResult:
 
 class TestExternalAgentDelegate:
     def test_is_available_not_installed(self):
-        with patch("pocketclaw.agents.delegation.shutil.which", return_value=None):
+        with patch("pocketpaw.agents.delegation.shutil.which", return_value=None):
             assert ExternalAgentDelegate.is_available("claude") is False
 
     def test_is_available_installed(self):
-        with patch("pocketclaw.agents.delegation.shutil.which", return_value="/usr/bin/claude"):
+        with patch("pocketpaw.agents.delegation.shutil.which", return_value="/usr/bin/claude"):
             assert ExternalAgentDelegate.is_available("claude") is True
 
     def test_unknown_agent(self):
@@ -47,7 +47,7 @@ class TestExternalAgentDelegate:
         assert "Unknown agent" in result.error
 
     async def test_run_claude_not_installed(self):
-        with patch("pocketclaw.agents.delegation.shutil.which", return_value=None):
+        with patch("pocketpaw.agents.delegation.shutil.which", return_value=None):
             result = await ExternalAgentDelegate.run("claude", "test")
             assert result.exit_code == 1
             assert "not found" in result.error
@@ -75,7 +75,7 @@ class TestDelegateTool:
     async def test_execute_not_installed(self):
         tool = DelegateToClaudeCodeTool()
         with patch(
-            "pocketclaw.agents.delegation.ExternalAgentDelegate.is_available",
+            "pocketpaw.agents.delegation.ExternalAgentDelegate.is_available",
             return_value=False,
         ):
             result = await tool.execute(task="test task")
@@ -89,11 +89,11 @@ class TestDelegateTool:
         )
         with (
             patch(
-                "pocketclaw.agents.delegation.ExternalAgentDelegate.is_available",
+                "pocketpaw.agents.delegation.ExternalAgentDelegate.is_available",
                 return_value=True,
             ),
             patch(
-                "pocketclaw.agents.delegation.ExternalAgentDelegate.run",
+                "pocketpaw.agents.delegation.ExternalAgentDelegate.run",
                 new_callable=AsyncMock,
                 return_value=mock_result,
             ),
@@ -109,11 +109,11 @@ class TestDelegateTool:
         )
         with (
             patch(
-                "pocketclaw.agents.delegation.ExternalAgentDelegate.is_available",
+                "pocketpaw.agents.delegation.ExternalAgentDelegate.is_available",
                 return_value=True,
             ),
             patch(
-                "pocketclaw.agents.delegation.ExternalAgentDelegate.run",
+                "pocketpaw.agents.delegation.ExternalAgentDelegate.run",
                 new_callable=AsyncMock,
                 return_value=mock_result,
             ),

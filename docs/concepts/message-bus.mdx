@@ -3,7 +3,14 @@ title: Message Bus
 description: "The message bus is PocketPaw's communication backbone: async pub/sub for InboundMessage, OutboundMessage, and SystemEvent types flowing between channels and the agent loop."
 section: Core Concepts
 ogType: article
-keywords: ["pub/sub", "async messaging", "event types", "inbound message", "outbound message"]
+keywords:
+  [
+    "pub/sub",
+    "async messaging",
+    "event types",
+    "inbound message",
+    "outbound message",
+  ]
 tags: ["architecture", "messaging"]
 ---
 
@@ -16,8 +23,8 @@ The message bus is the backbone of PocketPaw's architecture. All communication b
 The message bus implements a simple **publish/subscribe** pattern. Publishers emit events, and subscribers receive them asynchronously. This decouples components so they don't need to know about each other.
 
 ```python
-from pocketclaw.bus.message_bus import MessageBus
-from pocketclaw.bus.events import InboundMessage, OutboundMessage
+from pocketpaw.bus.message_bus import MessageBus
+from pocketpaw.bus.events import InboundMessage, OutboundMessage
 
 bus = MessageBus()
 
@@ -39,35 +46,35 @@ await bus.publish(InboundMessage(
 
 Represents user input from any channel:
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `content` | `str` | The message text |
-| `channel` | `str` | Source channel (telegram, discord, slack, etc.) |
-| `session_id` | `str` | Unique session identifier |
-| `metadata` | `dict` | Channel-specific metadata (chat_id, thread_ts, etc.) |
+| Field        | Type   | Description                                          |
+| ------------ | ------ | ---------------------------------------------------- |
+| `content`    | `str`  | The message text                                     |
+| `channel`    | `str`  | Source channel (telegram, discord, slack, etc.)      |
+| `session_id` | `str`  | Unique session identifier                            |
+| `metadata`   | `dict` | Channel-specific metadata (chat_id, thread_ts, etc.) |
 
 ### OutboundMessage
 
 Agent responses sent back to channels:
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `content` | `str` | Response text |
-| `channel` | `str` | Target channel |
-| `session_id` | `str` | Session identifier |
+| Field             | Type   | Description                       |
+| ----------------- | ------ | --------------------------------- |
+| `content`         | `str`  | Response text                     |
+| `channel`         | `str`  | Target channel                    |
+| `session_id`      | `str`  | Session identifier                |
 | `is_stream_chunk` | `bool` | Whether this is a streaming chunk |
-| `is_stream_end` | `bool` | Whether this is the final chunk |
-| `metadata` | `dict` | Channel-specific metadata |
+| `is_stream_end`   | `bool` | Whether this is the final chunk   |
+| `metadata`        | `dict` | Channel-specific metadata         |
 
 ### SystemEvent
 
 Internal events consumed by the web dashboard:
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `event_type` | `str` | Event type (tool_start, tool_result, thinking, error, inbox_update) |
-| `data` | `dict` | Event-specific data |
-| `session_id` | `str` | Session identifier |
+| Field        | Type   | Description                                                         |
+| ------------ | ------ | ------------------------------------------------------------------- |
+| `event_type` | `str`  | Event type (tool_start, tool_result, thinking, error, inbox_update) |
+| `data`       | `dict` | Event-specific data                                                 |
+| `session_id` | `str`  | Session identifier                                                  |
 
 ## Streaming Protocol
 

@@ -13,7 +13,7 @@ import tempfile
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from pocketclaw.bootstrap.default_provider import DefaultBootstrapProvider
+from pocketpaw.bootstrap.default_provider import DefaultBootstrapProvider
 
 
 class TestGetIdentity:
@@ -31,14 +31,14 @@ class TestGetIdentity:
             (base / "USER.md").write_text("Name: Alice")
 
             with (
-                patch("pocketclaw.dashboard.get_config_path") as mock_path,
+                patch("pocketpaw.dashboard.get_config_path") as mock_path,
                 patch(
-                    "pocketclaw.dashboard.DefaultBootstrapProvider",
+                    "pocketpaw.dashboard.DefaultBootstrapProvider",
                     return_value=provider,
                 ),
             ):
                 mock_path.return_value = base / "config.json"
-                from pocketclaw.dashboard import get_identity
+                from pocketpaw.dashboard import get_identity
 
                 result = await get_identity()
 
@@ -54,14 +54,14 @@ class TestGetIdentity:
             provider = DefaultBootstrapProvider(base_path=base)
 
             with (
-                patch("pocketclaw.dashboard.get_config_path") as mock_path,
+                patch("pocketpaw.dashboard.get_config_path") as mock_path,
                 patch(
-                    "pocketclaw.dashboard.DefaultBootstrapProvider",
+                    "pocketpaw.dashboard.DefaultBootstrapProvider",
                     return_value=provider,
                 ),
             ):
                 mock_path.return_value = base / "config.json"
-                from pocketclaw.dashboard import get_identity
+                from pocketpaw.dashboard import get_identity
 
                 result = await get_identity()
 
@@ -89,9 +89,9 @@ class TestSaveIdentity:
                 }
             )
 
-            with patch("pocketclaw.dashboard.get_config_path") as mock_path:
+            with patch("pocketpaw.dashboard.get_config_path") as mock_path:
                 mock_path.return_value = base / "config.json"
-                from pocketclaw.dashboard import save_identity
+                from pocketpaw.dashboard import save_identity
 
                 result = await save_identity(request)
 
@@ -123,9 +123,9 @@ class TestSaveIdentity:
                 }
             )
 
-            with patch("pocketclaw.dashboard.get_config_path") as mock_path:
+            with patch("pocketpaw.dashboard.get_config_path") as mock_path:
                 mock_path.return_value = base / "config.json"
-                from pocketclaw.dashboard import save_identity
+                from pocketpaw.dashboard import save_identity
 
                 result = await save_identity(request)
 
@@ -151,9 +151,9 @@ class TestSaveIdentity:
                 }
             )
 
-            with patch("pocketclaw.dashboard.get_config_path") as mock_path:
+            with patch("pocketpaw.dashboard.get_config_path") as mock_path:
                 mock_path.return_value = base / "config.json"
-                from pocketclaw.dashboard import save_identity
+                from pocketpaw.dashboard import save_identity
 
                 result = await save_identity(request)
 
@@ -170,9 +170,9 @@ class TestSaveIdentity:
                 return_value={"user_file": "Name: New User"}
             )
 
-            with patch("pocketclaw.dashboard.get_config_path") as mock_path:
+            with patch("pocketpaw.dashboard.get_config_path") as mock_path:
                 mock_path.return_value = base / "config.json"
-                from pocketclaw.dashboard import save_identity
+                from pocketpaw.dashboard import save_identity
 
                 result = await save_identity(request)
 
@@ -194,9 +194,9 @@ class TestSaveIdentity:
                 }
             )
 
-            with patch("pocketclaw.dashboard.get_config_path") as mock_path:
+            with patch("pocketpaw.dashboard.get_config_path") as mock_path:
                 mock_path.return_value = base / "config.json"
-                from pocketclaw.dashboard import save_identity
+                from pocketpaw.dashboard import save_identity
 
                 result = await save_identity(request)
 

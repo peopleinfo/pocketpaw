@@ -23,18 +23,18 @@ Open Interpreter provides:
 ## Configuration
 
 ```bash
-export POCKETCLAW_AGENT_BACKEND="open_interpreter"
+export POCKETPAW_AGENT_BACKEND="open_interpreter"
 
 # For Ollama (local)
-export POCKETCLAW_OI_MODEL="ollama/llama3.2"
+export POCKETPAW_OI_MODEL="ollama/llama3.2"
 
 # For OpenAI
-export POCKETCLAW_OI_MODEL="gpt-4o"
-export POCKETCLAW_OPENAI_API_KEY="sk-..."
+export POCKETPAW_OI_MODEL="gpt-4o"
+export POCKETPAW_OPENAI_API_KEY="sk-..."
 
 # For Anthropic
-export POCKETCLAW_OI_MODEL="claude-sonnet-4-5-20250929"
-export POCKETCLAW_ANTHROPIC_API_KEY="sk-ant-..."
+export POCKETPAW_OI_MODEL="claude-sonnet-4-5-20250929"
+export POCKETPAW_ANTHROPIC_API_KEY="sk-ant-..."
 ```
 
 ## Local Operation with Ollama
@@ -54,8 +54,8 @@ For a completely self-contained setup with no external API calls:
   </Step>
   <Step title="Configure PocketPaw">
     ```bash
-    export POCKETCLAW_AGENT_BACKEND="open_interpreter"
-    export POCKETCLAW_OI_MODEL="ollama/llama3.2"
+    export POCKETPAW_AGENT_BACKEND="open_interpreter"
+    export POCKETPAW_OI_MODEL="ollama/llama3.2"
     ```
   </Step>
   <Step title="Start">

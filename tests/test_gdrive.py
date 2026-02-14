@@ -7,14 +7,14 @@ class TestDriveToolSchemas:
     """Test Drive tool properties and schemas."""
 
     def test_drive_list_tool(self):
-        from pocketclaw.tools.builtin.gdrive import DriveListTool
+        from pocketpaw.tools.builtin.gdrive import DriveListTool
 
         tool = DriveListTool()
         assert tool.name == "drive_list"
         assert tool.trust_level == "high"
 
     def test_drive_download_tool(self):
-        from pocketclaw.tools.builtin.gdrive import DriveDownloadTool
+        from pocketpaw.tools.builtin.gdrive import DriveDownloadTool
 
         tool = DriveDownloadTool()
         assert tool.name == "drive_download"
@@ -22,7 +22,7 @@ class TestDriveToolSchemas:
         assert "file_id" in tool.parameters["required"]
 
     def test_drive_upload_tool(self):
-        from pocketclaw.tools.builtin.gdrive import DriveUploadTool
+        from pocketpaw.tools.builtin.gdrive import DriveUploadTool
 
         tool = DriveUploadTool()
         assert tool.name == "drive_upload"
@@ -30,7 +30,7 @@ class TestDriveToolSchemas:
         assert "file_path" in tool.parameters["required"]
 
     def test_drive_share_tool(self):
-        from pocketclaw.tools.builtin.gdrive import DriveShareTool
+        from pocketpaw.tools.builtin.gdrive import DriveShareTool
 
         tool = DriveShareTool()
         assert tool.name == "drive_share"
@@ -40,11 +40,11 @@ class TestDriveToolSchemas:
 
 
 async def test_drive_list_no_auth():
-    from pocketclaw.tools.builtin.gdrive import DriveListTool
+    from pocketpaw.tools.builtin.gdrive import DriveListTool
 
     tool = DriveListTool()
     with patch(
-        "pocketclaw.integrations.gdrive.DriveClient._get_token",
+        "pocketpaw.integrations.gdrive.DriveClient._get_token",
         side_effect=RuntimeError("Not authenticated"),
     ):
         result = await tool.execute()
@@ -53,7 +53,7 @@ async def test_drive_list_no_auth():
 
 
 async def test_drive_list_success():
-    from pocketclaw.tools.builtin.gdrive import DriveListTool
+    from pocketpaw.tools.builtin.gdrive import DriveListTool
 
     tool = DriveListTool()
     mock_files = [
@@ -65,7 +65,7 @@ async def test_drive_list_success():
         }
     ]
     with patch(
-        "pocketclaw.integrations.gdrive.DriveClient._get_token",
+        "pocketpaw.integrations.gdrive.DriveClient._get_token",
         new_callable=AsyncMock,
         return_value="fake-token",
     ):
@@ -86,11 +86,11 @@ async def test_drive_list_success():
 
 
 async def test_drive_list_empty():
-    from pocketclaw.tools.builtin.gdrive import DriveListTool
+    from pocketpaw.tools.builtin.gdrive import DriveListTool
 
     tool = DriveListTool()
     with patch(
-        "pocketclaw.integrations.gdrive.DriveClient._get_token",
+        "pocketpaw.integrations.gdrive.DriveClient._get_token",
         new_callable=AsyncMock,
         return_value="fake-token",
     ):
@@ -110,11 +110,11 @@ async def test_drive_list_empty():
 
 
 async def test_drive_download_no_auth():
-    from pocketclaw.tools.builtin.gdrive import DriveDownloadTool
+    from pocketpaw.tools.builtin.gdrive import DriveDownloadTool
 
     tool = DriveDownloadTool()
     with patch(
-        "pocketclaw.integrations.gdrive.DriveClient._get_token",
+        "pocketpaw.integrations.gdrive.DriveClient._get_token",
         side_effect=RuntimeError("Not authenticated"),
     ):
         result = await tool.execute(file_id="abc123")
@@ -122,11 +122,11 @@ async def test_drive_download_no_auth():
 
 
 async def test_drive_upload_no_auth():
-    from pocketclaw.tools.builtin.gdrive import DriveUploadTool
+    from pocketpaw.tools.builtin.gdrive import DriveUploadTool
 
     tool = DriveUploadTool()
     with patch(
-        "pocketclaw.integrations.gdrive.DriveClient._get_token",
+        "pocketpaw.integrations.gdrive.DriveClient._get_token",
         side_effect=RuntimeError("Not authenticated"),
     ):
         result = await tool.execute(file_path="/tmp/test.txt")
@@ -134,11 +134,11 @@ async def test_drive_upload_no_auth():
 
 
 async def test_drive_upload_file_not_found():
-    from pocketclaw.tools.builtin.gdrive import DriveUploadTool
+    from pocketpaw.tools.builtin.gdrive import DriveUploadTool
 
     tool = DriveUploadTool()
     with patch(
-        "pocketclaw.integrations.gdrive.DriveClient._get_token",
+        "pocketpaw.integrations.gdrive.DriveClient._get_token",
         new_callable=AsyncMock,
         return_value="fake-token",
     ):
@@ -148,7 +148,7 @@ async def test_drive_upload_file_not_found():
 
 
 async def test_drive_share_invalid_role():
-    from pocketclaw.tools.builtin.gdrive import DriveShareTool
+    from pocketpaw.tools.builtin.gdrive import DriveShareTool
 
     tool = DriveShareTool()
     result = await tool.execute(file_id="abc", email="x@y.com", role="admin")
@@ -157,11 +157,11 @@ async def test_drive_share_invalid_role():
 
 
 async def test_drive_share_no_auth():
-    from pocketclaw.tools.builtin.gdrive import DriveShareTool
+    from pocketpaw.tools.builtin.gdrive import DriveShareTool
 
     tool = DriveShareTool()
     with patch(
-        "pocketclaw.integrations.gdrive.DriveClient._get_token",
+        "pocketpaw.integrations.gdrive.DriveClient._get_token",
         side_effect=RuntimeError("Not authenticated"),
     ):
         result = await tool.execute(file_id="abc", email="x@y.com")

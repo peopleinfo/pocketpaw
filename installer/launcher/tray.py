@@ -32,9 +32,9 @@ except ImportError:
     HAS_TRAY = False
     logger.warning("pystray or Pillow not available — tray icon disabled")
 
-from installer.launcher.common import POCKETCLAW_HOME
+from installer.launcher.common import POCKETPAW_HOME
 
-LOG_FILE = POCKETCLAW_HOME / "logs" / "launcher.log"
+LOG_FILE = POCKETPAW_HOME / "logs" / "launcher.log"
 
 
 def _get_version() -> str:

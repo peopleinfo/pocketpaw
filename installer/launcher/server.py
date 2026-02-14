@@ -17,7 +17,7 @@ import urllib.request
 from pathlib import Path
 
 from installer.launcher.common import (
-    POCKETCLAW_HOME,
+    POCKETPAW_HOME,
     VENV_DIR,
     StatusCallback,
     noop_status,
@@ -25,7 +25,7 @@ from installer.launcher.common import (
 
 logger = logging.getLogger(__name__)
 
-PID_FILE = POCKETCLAW_HOME / "launcher.pid"
+PID_FILE = POCKETPAW_HOME / "launcher.pid"
 DEFAULT_PORT = 8888
 
 
@@ -63,16 +63,16 @@ class ServerManager:
             logger.info("Default port busy, using port %d", self.port)
 
         self.on_status(f"Starting PocketPaw on port {self.port}...")
-        logger.info("Starting server: %s -m pocketclaw --port %d", python, self.port)
+        logger.info("Starting server: %s -m pocketpaw --port %d", python, self.port)
 
         try:
             # Start the server process — redirect output to a log file
             # instead of PIPE to avoid OS pipe buffer deadlock (64KB limit)
-            log_file = POCKETCLAW_HOME / "server.log"
+            log_file = POCKETPAW_HOME / "server.log"
             self._log_fh = open(log_file, "a", encoding="utf-8")  # noqa: SIM115
             env = self._build_env()
             self._process = subprocess.Popen(
-                [str(python), "-m", "pocketclaw", "--port", str(self.port)],
+                [str(python), "-m", "pocketpaw", "--port", str(self.port)],
                 env=env,
                 stdout=self._log_fh,
                 stderr=self._log_fh,
@@ -84,7 +84,7 @@ class ServerManager:
             PID_FILE.write_text(str(self._process.pid))
 
             # Wait for the server to become healthy
-            # pocketclaw needs ~25s for startup + internal setup
+            # pocketpaw needs ~25s for startup + internal setup
             if self._wait_for_healthy(timeout=60):
                 self.on_status(f"PocketPaw running on port {self.port}")
                 return True
@@ -180,19 +180,19 @@ class ServerManager:
         else:
             venv_bin = str(VENV_DIR / "bin")
 
-        # Also add the uv directory so pocketclaw's auto_install can find uv
-        uv_dir = str(POCKETCLAW_HOME / "uv")
+        # Also add the uv directory so pocketpaw's auto_install can find uv
+        uv_dir = str(POCKETPAW_HOME / "uv")
         env["PATH"] = venv_bin + os.pathsep + uv_dir + os.pathsep + env.get("PATH", "")
 
         env["VIRTUAL_ENV"] = str(VENV_DIR)
-        # Force UTF-8 so emoji/unicode in pocketclaw output doesn't crash
+        # Force UTF-8 so emoji/unicode in pocketpaw output doesn't crash
         # on Windows (default cp1252 can't encode them)
         env["PYTHONIOENCODING"] = "utf-8"
         env["PYTHONUTF8"] = "1"
 
-        # Set UV_OVERRIDE so any uv invocation (including pocketclaw's
+        # Set UV_OVERRIDE so any uv invocation (including pocketpaw's
         # internal auto_install) uses our tiktoken override
-        overrides_file = POCKETCLAW_HOME / "uv-overrides.txt"
+        overrides_file = POCKETPAW_HOME / "uv-overrides.txt"
         if not overrides_file.exists():
             # Ensure the overrides file exists even if bootstrap was skipped
             try:
@@ -219,7 +219,7 @@ class ServerManager:
                 rc = self._process.returncode
                 log_tail = ""
                 try:
-                    log_file = POCKETCLAW_HOME / "server.log"
+                    log_file = POCKETPAW_HOME / "server.log"
                     if log_file.exists():
                         log_tail = log_file.read_text(encoding="utf-8", errors="replace")[-2000:]
                 except Exception:
@@ -311,7 +311,7 @@ class ServerManager:
 
     def _read_port_from_config(self) -> int | None:
         """Read the web port from the PocketPaw config file."""
-        config_path = POCKETCLAW_HOME / "config.json"
+        config_path = POCKETPAW_HOME / "config.json"
         if config_path.exists():
             try:
                 config = json.loads(config_path.read_text())

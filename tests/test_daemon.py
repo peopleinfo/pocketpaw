@@ -4,7 +4,7 @@ Tests for the Proactive Daemon module.
 
 import pytest
 from datetime import datetime
-from pocketclaw.daemon import (
+from pocketpaw.daemon import (
     IntentionStore,
     get_intention_store,
     TriggerEngine,
@@ -13,7 +13,7 @@ from pocketclaw.daemon import (
     ProactiveDaemon,
     get_daemon,
 )
-from pocketclaw.daemon.triggers import CRON_PRESETS, parse_cron_expression
+from pocketpaw.daemon.triggers import CRON_PRESETS, parse_cron_expression
 
 
 class TestCronParsing:
@@ -65,7 +65,7 @@ class TestIntentionStore:
         # Patch the intentions path
         intentions_file = tmp_path / "intentions.json"
         monkeypatch.setattr(
-            "pocketclaw.daemon.intentions.get_intentions_path",
+            "pocketpaw.daemon.intentions.get_intentions_path",
             lambda: intentions_file,
         )
         return IntentionStore()
@@ -303,13 +303,13 @@ class TestProactiveDaemon:
         """Create daemon with temp storage in async context."""
         intentions_file = tmp_path / "intentions.json"
         monkeypatch.setattr(
-            "pocketclaw.daemon.intentions.get_intentions_path",
+            "pocketpaw.daemon.intentions.get_intentions_path",
             lambda: intentions_file,
         )
 
         # Reset singletons for fresh test
-        import pocketclaw.daemon.intentions as intentions_mod
-        import pocketclaw.daemon.proactive as proactive_mod
+        import pocketpaw.daemon.intentions as intentions_mod
+        import pocketpaw.daemon.proactive as proactive_mod
 
         intentions_mod._intention_store = None
         proactive_mod._daemon = None

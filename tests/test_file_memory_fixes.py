@@ -7,9 +7,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from pocketclaw.memory.file_store import FileMemoryStore, _make_deterministic_id, _tokenize
-from pocketclaw.memory.manager import MemoryManager
-from pocketclaw.memory.protocol import MemoryEntry, MemoryType
+from pocketpaw.memory.file_store import FileMemoryStore, _make_deterministic_id, _tokenize
+from pocketpaw.memory.manager import MemoryManager
+from pocketpaw.memory.protocol import MemoryEntry, MemoryType
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -418,7 +418,7 @@ class TestForgetTool:
 
     def test_forget_tool_definition(self):
         """ForgetTool has correct name and required params."""
-        from pocketclaw.tools.builtin.memory import ForgetTool
+        from pocketpaw.tools.builtin.memory import ForgetTool
 
         tool = ForgetTool()
         assert tool.name == "forget"
@@ -427,7 +427,7 @@ class TestForgetTool:
 
     async def test_forget_removes_matching_memory(self, tmp_path):
         """ForgetTool deletes memories matching the query."""
-        from pocketclaw.tools.builtin.memory import ForgetTool
+        from pocketpaw.tools.builtin.memory import ForgetTool
 
         store = FileMemoryStore(base_path=tmp_path)
         manager = MemoryManager(store=store)
@@ -440,7 +440,7 @@ class TestForgetTool:
         assert len(all_lt) == 2
 
         tool = ForgetTool()
-        with patch("pocketclaw.tools.builtin.memory.get_memory_manager", return_value=manager):
+        with patch("pocketpaw.tools.builtin.memory.get_memory_manager", return_value=manager):
             result = await tool.execute(query="name Rohit")
 
         assert "Forgot" in result
@@ -452,7 +452,7 @@ class TestForgetTool:
 
     def test_forget_in_policy_group(self):
         """'forget' is in the group:memory policy group."""
-        from pocketclaw.tools.policy import TOOL_GROUPS
+        from pocketpaw.tools.policy import TOOL_GROUPS
 
         assert "forget" in TOOL_GROUPS["group:memory"]
 

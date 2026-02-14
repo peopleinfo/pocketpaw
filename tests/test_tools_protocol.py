@@ -8,11 +8,11 @@ import asyncio
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from pocketclaw.tools.protocol import ToolProtocol, BaseTool, ToolDefinition
-from pocketclaw.tools.registry import ToolRegistry
-from pocketclaw.tools.builtin.shell import ShellTool
-from pocketclaw.tools.builtin.filesystem import ReadFileTool, WriteFileTool, ListDirTool
-from pocketclaw.config import Settings
+from pocketpaw.tools.protocol import ToolProtocol, BaseTool, ToolDefinition
+from pocketpaw.tools.registry import ToolRegistry
+from pocketpaw.tools.builtin.shell import ShellTool
+from pocketpaw.tools.builtin.filesystem import ReadFileTool, WriteFileTool, ListDirTool
+from pocketpaw.config import Settings
 
 
 class MockTool(BaseTool):
@@ -115,8 +115,8 @@ def mock_settings(temp_jail):
     """Mock settings with custom file jail."""
     settings = Settings(file_jail_path=temp_jail)
     with (
-        patch("pocketclaw.tools.builtin.filesystem.get_settings", return_value=settings),
-        patch("pocketclaw.tools.builtin.shell.get_settings", return_value=settings),
+        patch("pocketpaw.tools.builtin.filesystem.get_settings", return_value=settings),
+        patch("pocketpaw.tools.builtin.shell.get_settings", return_value=settings),
     ):
         yield settings
 

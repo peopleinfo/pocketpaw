@@ -19,8 +19,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 # Access the private module to inject test store
-import pocketclaw.mission_control.store as store_module
-from pocketclaw.mission_control import (
+import pocketpaw.mission_control.store as store_module
+from pocketpaw.mission_control import (
     AgentProfile,
     AgentStatus,
     FileMissionControlStore,
@@ -31,7 +31,7 @@ from pocketclaw.mission_control import (
     reset_mission_control_manager,
     reset_mission_control_store,
 )
-from pocketclaw.mission_control.executor import (
+from pocketpaw.mission_control.executor import (
     MCTaskExecutor,
     get_mc_task_executor,
     reset_mc_task_executor,
@@ -195,10 +195,10 @@ class TestMCTaskExecutor:
         mock_router = create_mock_router()
 
         with patch(
-            "pocketclaw.mission_control.executor.AgentRouter",
+            "pocketpaw.mission_control.executor.AgentRouter",
             return_value=mock_router,
         ):
-            with patch("pocketclaw.mission_control.executor.get_message_bus") as mock_bus:
+            with patch("pocketpaw.mission_control.executor.get_message_bus") as mock_bus:
                 mock_bus.return_value.publish_system = AsyncMock()
 
                 result = await executor.execute_task(assigned_task.id, agent.id)
@@ -213,10 +213,10 @@ class TestMCTaskExecutor:
         mock_router = create_mock_router()
 
         with patch(
-            "pocketclaw.mission_control.executor.AgentRouter",
+            "pocketpaw.mission_control.executor.AgentRouter",
             return_value=mock_router,
         ):
-            with patch("pocketclaw.mission_control.executor.get_message_bus") as mock_bus:
+            with patch("pocketpaw.mission_control.executor.get_message_bus") as mock_bus:
                 mock_bus.return_value.publish_system = AsyncMock()
 
                 await executor.execute_task(assigned_task.id, agent.id)
@@ -239,10 +239,10 @@ class TestMCTaskExecutor:
         mock_router = create_mock_router(chunks=error_chunks, error=True)
 
         with patch(
-            "pocketclaw.mission_control.executor.AgentRouter",
+            "pocketpaw.mission_control.executor.AgentRouter",
             return_value=mock_router,
         ):
-            with patch("pocketclaw.mission_control.executor.get_message_bus") as mock_bus:
+            with patch("pocketpaw.mission_control.executor.get_message_bus") as mock_bus:
                 mock_bus.return_value.publish_system = AsyncMock()
 
                 result = await executor.execute_task(assigned_task.id, agent.id)
@@ -317,10 +317,10 @@ class TestMCTaskExecutor:
         mock_router.stop = AsyncMock()
 
         with patch(
-            "pocketclaw.mission_control.executor.AgentRouter",
+            "pocketpaw.mission_control.executor.AgentRouter",
             return_value=mock_router,
         ):
-            with patch("pocketclaw.mission_control.executor.get_message_bus") as mock_bus:
+            with patch("pocketpaw.mission_control.executor.get_message_bus") as mock_bus:
                 mock_bus.return_value.publish_system = AsyncMock()
 
                 # Start first execution
@@ -353,10 +353,10 @@ class TestMCTaskExecutor:
         mock_router = create_mock_router()
 
         with patch(
-            "pocketclaw.mission_control.executor.AgentRouter",
+            "pocketpaw.mission_control.executor.AgentRouter",
             return_value=mock_router,
         ):
-            with patch("pocketclaw.mission_control.executor.get_message_bus") as mock_bus:
+            with patch("pocketpaw.mission_control.executor.get_message_bus") as mock_bus:
                 mock_bus.return_value.publish_system = AsyncMock()
 
                 await executor.execute_task_background(assigned_task.id, agent.id)
@@ -384,10 +384,10 @@ class TestMCTaskExecutor:
             broadcast_calls.append(event)
 
         with patch(
-            "pocketclaw.mission_control.executor.AgentRouter",
+            "pocketpaw.mission_control.executor.AgentRouter",
             return_value=mock_router,
         ):
-            with patch("pocketclaw.mission_control.executor.get_message_bus") as mock_bus:
+            with patch("pocketpaw.mission_control.executor.get_message_bus") as mock_bus:
                 mock_bus.return_value.publish_system = capture_broadcast
 
                 await executor.execute_task(assigned_task.id, agent.id)

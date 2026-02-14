@@ -34,7 +34,7 @@ class TestGetComponents:
         assert "pid" in names
 
     def test_component_exists_reflects_filesystem(self, tmp_path):
-        with patch("installer.launcher.uninstall.POCKETCLAW_HOME", tmp_path):
+        with patch("installer.launcher.uninstall.POCKETPAW_HOME", tmp_path):
             # Create some dirs
             (tmp_path / "venv").mkdir()
             (tmp_path / "logs").mkdir()
@@ -51,7 +51,7 @@ class TestGetComponents:
 class TestUninstall:
     @pytest.fixture
     def setup_home(self, tmp_path):
-        """Create a fake ~/.pocketclaw directory."""
+        """Create a fake ~/.pocketpaw directory."""
         (tmp_path / "venv" / "bin").mkdir(parents=True)
         (tmp_path / "uv").mkdir()
         (tmp_path / "logs").mkdir()
@@ -62,7 +62,7 @@ class TestUninstall:
         return tmp_path
 
     def test_removes_venv_and_uv(self, setup_home):
-        with patch("installer.launcher.uninstall.POCKETCLAW_HOME", setup_home):
+        with patch("installer.launcher.uninstall.POCKETPAW_HOME", setup_home):
             uninstaller = Uninstaller()
             results = uninstaller.uninstall(
                 remove_venv=True,
@@ -79,26 +79,26 @@ class TestUninstall:
             assert any("venv" in r for r in results)
 
     def test_preserves_config_and_memory_by_default(self, setup_home):
-        with patch("installer.launcher.uninstall.POCKETCLAW_HOME", setup_home):
+        with patch("installer.launcher.uninstall.POCKETPAW_HOME", setup_home):
             uninstaller = Uninstaller()
             uninstaller.uninstall()
             assert (setup_home / "config.json").exists()
             assert (setup_home / "memory").exists()
 
     def test_removes_config_when_requested(self, setup_home):
-        with patch("installer.launcher.uninstall.POCKETCLAW_HOME", setup_home):
+        with patch("installer.launcher.uninstall.POCKETPAW_HOME", setup_home):
             uninstaller = Uninstaller()
             uninstaller.uninstall(remove_config=True)
             assert not (setup_home / "config.json").exists()
 
     def test_removes_memory_when_requested(self, setup_home):
-        with patch("installer.launcher.uninstall.POCKETCLAW_HOME", setup_home):
+        with patch("installer.launcher.uninstall.POCKETPAW_HOME", setup_home):
             uninstaller = Uninstaller()
             uninstaller.uninstall(remove_memory=True)
             assert not (setup_home / "memory").exists()
 
     def test_handles_missing_components(self, tmp_path):
-        with patch("installer.launcher.uninstall.POCKETCLAW_HOME", tmp_path):
+        with patch("installer.launcher.uninstall.POCKETPAW_HOME", tmp_path):
             uninstaller = Uninstaller()
             results = uninstaller.uninstall()
             # Should not raise, results should mention "not found"
@@ -109,7 +109,7 @@ class TestUninstall:
         mock_mgr.is_enabled.return_value = True
 
         with (
-            patch("installer.launcher.uninstall.POCKETCLAW_HOME", setup_home),
+            patch("installer.launcher.uninstall.POCKETPAW_HOME", setup_home),
             patch(
                 "installer.launcher.uninstall.Uninstaller.uninstall",
                 wraps=Uninstaller().uninstall,
@@ -121,7 +121,7 @@ class TestUninstall:
                 uninstaller.uninstall()
 
     def test_returns_result_messages(self, setup_home):
-        with patch("installer.launcher.uninstall.POCKETCLAW_HOME", setup_home):
+        with patch("installer.launcher.uninstall.POCKETPAW_HOME", setup_home):
             uninstaller = Uninstaller()
             results = uninstaller.uninstall(remove_venv=True, remove_logs=True)
             assert isinstance(results, list)
@@ -131,7 +131,7 @@ class TestUninstall:
 
 class TestInteractiveUninstall:
     def test_no_components_prints_message(self, tmp_path, capsys):
-        with patch("installer.launcher.uninstall.POCKETCLAW_HOME", tmp_path):
+        with patch("installer.launcher.uninstall.POCKETPAW_HOME", tmp_path):
             uninstaller = Uninstaller()
             uninstaller.interactive_uninstall()
             output = capsys.readouterr().out

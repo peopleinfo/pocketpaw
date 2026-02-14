@@ -6,8 +6,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from pocketclaw.agents.loop import AgentLoop
-from pocketclaw.bus import Channel, InboundMessage
+from pocketpaw.agents.loop import AgentLoop
+from pocketpaw.bus import Channel, InboundMessage
 
 
 @pytest.fixture
@@ -54,10 +54,10 @@ def mock_router():
     return router
 
 
-@patch("pocketclaw.agents.loop.get_message_bus")
-@patch("pocketclaw.agents.loop.get_memory_manager")
-@patch("pocketclaw.agents.loop.AgentContextBuilder")
-@patch("pocketclaw.agents.loop.AgentRouter")
+@patch("pocketpaw.agents.loop.get_message_bus")
+@patch("pocketpaw.agents.loop.get_memory_manager")
+@patch("pocketpaw.agents.loop.AgentContextBuilder")
+@patch("pocketpaw.agents.loop.AgentRouter")
 @pytest.mark.asyncio
 async def test_agent_loop_process_message(
     mock_router_cls,
@@ -79,13 +79,13 @@ async def test_agent_loop_process_message(
     mock_builder_instance.build_system_prompt = AsyncMock(return_value="System Prompt")
 
     # Mock settings
-    with patch("pocketclaw.agents.loop.get_settings") as mock_settings:
+    with patch("pocketpaw.agents.loop.get_settings") as mock_settings:
         settings = MagicMock()
         settings.agent_backend = "claude_agent_sdk"
         settings.max_concurrent_conversations = 5
         mock_settings.return_value = settings
 
-        with patch("pocketclaw.agents.loop.Settings") as mock_settings_cls:
+        with patch("pocketpaw.agents.loop.Settings") as mock_settings_cls:
             mock_settings_cls.load.return_value = settings
 
             # Init loop
@@ -112,9 +112,9 @@ async def test_agent_loop_process_message(
             assert mock_bus.publish_system.call_count >= 1  # At least thinking event
 
 
-@patch("pocketclaw.agents.loop.get_message_bus")
-@patch("pocketclaw.agents.loop.get_memory_manager")
-@patch("pocketclaw.agents.loop.AgentContextBuilder")
+@patch("pocketpaw.agents.loop.get_message_bus")
+@patch("pocketpaw.agents.loop.get_memory_manager")
+@patch("pocketpaw.agents.loop.AgentContextBuilder")
 @pytest.mark.asyncio
 async def test_agent_loop_reset_router(
     mock_builder_cls, mock_get_memory, mock_get_bus, mock_bus, mock_memory
@@ -123,7 +123,7 @@ async def test_agent_loop_reset_router(
     mock_get_bus.return_value = mock_bus
     mock_get_memory.return_value = mock_memory
 
-    with patch("pocketclaw.agents.loop.get_settings") as mock_settings:
+    with patch("pocketpaw.agents.loop.get_settings") as mock_settings:
         settings = MagicMock()
         settings.agent_backend = "claude_agent_sdk"
         settings.max_concurrent_conversations = 5
@@ -139,10 +139,10 @@ async def test_agent_loop_reset_router(
         assert loop._router is None
 
 
-@patch("pocketclaw.agents.loop.get_message_bus")
-@patch("pocketclaw.agents.loop.get_memory_manager")
-@patch("pocketclaw.agents.loop.AgentContextBuilder")
-@patch("pocketclaw.agents.loop.AgentRouter")
+@patch("pocketpaw.agents.loop.get_message_bus")
+@patch("pocketpaw.agents.loop.get_memory_manager")
+@patch("pocketpaw.agents.loop.AgentContextBuilder")
+@patch("pocketpaw.agents.loop.AgentRouter")
 @pytest.mark.asyncio
 async def test_agent_loop_handles_error(
     mock_router_cls, mock_builder_cls, mock_get_memory, mock_get_bus, mock_bus, mock_memory
@@ -164,13 +164,13 @@ async def test_agent_loop_handles_error(
     mock_builder_instance = mock_builder_cls.return_value
     mock_builder_instance.build_system_prompt = AsyncMock(return_value="System Prompt")
 
-    with patch("pocketclaw.agents.loop.get_settings") as mock_settings:
+    with patch("pocketpaw.agents.loop.get_settings") as mock_settings:
         settings = MagicMock()
         settings.agent_backend = "claude_agent_sdk"
         settings.max_concurrent_conversations = 5
         mock_settings.return_value = settings
 
-        with patch("pocketclaw.agents.loop.Settings") as mock_settings_cls:
+        with patch("pocketpaw.agents.loop.Settings") as mock_settings_cls:
             mock_settings_cls.load.return_value = settings
 
             loop = AgentLoop()
@@ -189,10 +189,10 @@ async def test_agent_loop_handles_error(
             mock_bus.publish_system.assert_called()
 
 
-@patch("pocketclaw.agents.loop.get_message_bus")
-@patch("pocketclaw.agents.loop.get_memory_manager")
-@patch("pocketclaw.agents.loop.AgentContextBuilder")
-@patch("pocketclaw.agents.loop.AgentRouter")
+@patch("pocketpaw.agents.loop.get_message_bus")
+@patch("pocketpaw.agents.loop.get_memory_manager")
+@patch("pocketpaw.agents.loop.AgentContextBuilder")
+@patch("pocketpaw.agents.loop.AgentRouter")
 @pytest.mark.asyncio
 async def test_agent_loop_emits_tool_events(
     mock_router_cls,
@@ -211,13 +211,13 @@ async def test_agent_loop_emits_tool_events(
     mock_builder_instance = mock_builder_cls.return_value
     mock_builder_instance.build_system_prompt = AsyncMock(return_value="System Prompt")
 
-    with patch("pocketclaw.agents.loop.get_settings") as mock_settings:
+    with patch("pocketpaw.agents.loop.get_settings") as mock_settings:
         settings = MagicMock()
         settings.agent_backend = "claude_agent_sdk"
         settings.max_concurrent_conversations = 5
         mock_settings.return_value = settings
 
-        with patch("pocketclaw.agents.loop.Settings") as mock_settings_cls:
+        with patch("pocketpaw.agents.loop.Settings") as mock_settings_cls:
             mock_settings_cls.load.return_value = settings
 
             loop = AgentLoop()
@@ -240,10 +240,10 @@ async def test_agent_loop_emits_tool_events(
             assert "tool_result" in event_types
 
 
-@patch("pocketclaw.agents.loop.get_message_bus")
-@patch("pocketclaw.agents.loop.get_memory_manager")
-@patch("pocketclaw.agents.loop.AgentContextBuilder")
-@patch("pocketclaw.agents.loop.AgentRouter")
+@patch("pocketpaw.agents.loop.get_message_bus")
+@patch("pocketpaw.agents.loop.get_memory_manager")
+@patch("pocketpaw.agents.loop.AgentContextBuilder")
+@patch("pocketpaw.agents.loop.AgentRouter")
 @pytest.mark.asyncio
 async def test_agent_loop_builds_context_and_passes_to_router(
     mock_router_cls,
@@ -284,13 +284,13 @@ async def test_agent_loop_builds_context_and_passes_to_router(
     ]
     mock_memory.get_compacted_history = AsyncMock(return_value=session_history)
 
-    with patch("pocketclaw.agents.loop.get_settings") as mock_settings:
+    with patch("pocketpaw.agents.loop.get_settings") as mock_settings:
         settings = MagicMock()
         settings.agent_backend = "claude_agent_sdk"
         settings.max_concurrent_conversations = 5
         mock_settings.return_value = settings
 
-        with patch("pocketclaw.agents.loop.Settings") as mock_settings_cls:
+        with patch("pocketpaw.agents.loop.Settings") as mock_settings_cls:
             mock_settings_cls.load.return_value = settings
 
             loop = AgentLoop()

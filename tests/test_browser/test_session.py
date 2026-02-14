@@ -5,7 +5,7 @@
 import asyncio
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-from pocketclaw.browser.session import (
+from pocketpaw.browser.session import (
     BrowserSession,
     BrowserSessionManager,
     get_browser_session_manager,
@@ -54,7 +54,7 @@ class TestBrowserSessionManager:
         """Should create new session if none exists."""
         manager = BrowserSessionManager()
 
-        with patch("pocketclaw.browser.session.BrowserDriver") as MockDriver:
+        with patch("pocketpaw.browser.session.BrowserDriver") as MockDriver:
             mock_driver = AsyncMock()
             MockDriver.return_value = mock_driver
 
@@ -69,7 +69,7 @@ class TestBrowserSessionManager:
         """Should return existing session if it exists."""
         manager = BrowserSessionManager()
 
-        with patch("pocketclaw.browser.session.BrowserDriver") as MockDriver:
+        with patch("pocketpaw.browser.session.BrowserDriver") as MockDriver:
             mock_driver = AsyncMock()
             mock_driver.is_launched = True
             MockDriver.return_value = mock_driver
@@ -86,7 +86,7 @@ class TestBrowserSessionManager:
         """Should recreate session if the previous one was closed."""
         manager = BrowserSessionManager()
 
-        with patch("pocketclaw.browser.session.BrowserDriver") as MockDriver:
+        with patch("pocketpaw.browser.session.BrowserDriver") as MockDriver:
             mock_driver1 = AsyncMock()
             mock_driver1.is_launched = True
             mock_driver2 = AsyncMock()
@@ -108,7 +108,7 @@ class TestBrowserSessionManager:
         """Should close and remove session."""
         manager = BrowserSessionManager()
 
-        with patch("pocketclaw.browser.session.BrowserDriver") as MockDriver:
+        with patch("pocketpaw.browser.session.BrowserDriver") as MockDriver:
             mock_driver = AsyncMock()
             MockDriver.return_value = mock_driver
 
@@ -131,7 +131,7 @@ class TestBrowserSessionManager:
         """Should close sessions idle longer than timeout."""
         manager = BrowserSessionManager()
 
-        with patch("pocketclaw.browser.session.BrowserDriver") as MockDriver:
+        with patch("pocketpaw.browser.session.BrowserDriver") as MockDriver:
             mock_driver = AsyncMock()
             mock_driver.is_launched = True
             MockDriver.return_value = mock_driver
@@ -154,7 +154,7 @@ class TestBrowserSessionManager:
         """Should keep recently used sessions."""
         manager = BrowserSessionManager()
 
-        with patch("pocketclaw.browser.session.BrowserDriver") as MockDriver:
+        with patch("pocketpaw.browser.session.BrowserDriver") as MockDriver:
             mock_driver = AsyncMock()
             mock_driver.is_launched = True
             MockDriver.return_value = mock_driver
@@ -171,7 +171,7 @@ class TestBrowserSessionManager:
         """Should close all sessions."""
         manager = BrowserSessionManager()
 
-        with patch("pocketclaw.browser.session.BrowserDriver") as MockDriver:
+        with patch("pocketpaw.browser.session.BrowserDriver") as MockDriver:
             mock_driver1 = AsyncMock()
             mock_driver2 = AsyncMock()
             MockDriver.side_effect = [mock_driver1, mock_driver2]
@@ -234,7 +234,7 @@ class TestBrowserSessionManagerConcurrency:
         """Should handle concurrent session creation safely."""
         manager = BrowserSessionManager()
 
-        with patch("pocketclaw.browser.session.BrowserDriver") as MockDriver:
+        with patch("pocketpaw.browser.session.BrowserDriver") as MockDriver:
             mock_driver = AsyncMock()
             mock_driver.is_launched = True
             MockDriver.return_value = mock_driver

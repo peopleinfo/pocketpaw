@@ -88,7 +88,7 @@ The notifier delivers messages to any configured channel without user interactio
 Set notification targets in settings as `"channel:chat_id"` strings:
 
 ```bash
-export POCKETCLAW_NOTIFICATION_CHANNELS='["telegram:123456789","discord:987654321","slack:C0A1B2C3D"]'
+export POCKETPAW_NOTIFICATION_CHANNELS='["telegram:123456789","discord:987654321","slack:C0A1B2C3D"]'
 ```
 
 Supported channel formats:
@@ -117,12 +117,12 @@ The notifier is called by:
 Set the `owner_id` to identify yourself. This enables the memory system to distinguish between your messages and those from other users on shared channels.
 
 ```bash
-export POCKETCLAW_OWNER_ID="your_telegram_user_id"
+export POCKETPAW_OWNER_ID="your_telegram_user_id"
 ```
 
 ## Persistence
 
-- Intentions are stored in `~/.pocketclaw/intentions.json`
+- Intentions are stored in `~/.pocketpaw/intentions.json`
 - Notification channel targets are stored in config
 - The daemon reloads all intentions on startup and re-schedules triggers
 

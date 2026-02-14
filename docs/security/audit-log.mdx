@@ -1,6 +1,6 @@
 ---
 title: Audit Log
-description: "PocketPaw maintains an append-only JSONL audit log at ~/.pocketclaw/audit.jsonl recording all security-relevant events with timestamps, severity levels, and structured metadata for compliance."
+description: "PocketPaw maintains an append-only JSONL audit log at ~/.pocketpaw/audit.jsonl recording all security-relevant events with timestamps, severity levels, and structured metadata for compliance."
 section: Security
 ogType: article
 keywords: ["audit log", "jsonl", "security events", "compliance", "append-only log"]
@@ -9,7 +9,7 @@ tags: ["security", "audit"]
 
 # Audit Log
 
-PocketPaw maintains an append-only JSONL audit log at `~/.pocketclaw/audit.jsonl`.
+PocketPaw maintains an append-only JSONL audit log at `~/.pocketpaw/audit.jsonl`.
 
 ## What Gets Logged
 
@@ -44,16 +44,16 @@ Each line is a JSON object:
 
 ```bash
 # View recent entries
-tail -20 ~/.pocketclaw/audit.jsonl | jq .
+tail -20 ~/.pocketpaw/audit.jsonl | jq .
 
 # Find all blocked messages
-cat ~/.pocketclaw/audit.jsonl | jq 'select(.event == "message_blocked")'
+cat ~/.pocketpaw/audit.jsonl | jq 'select(.event == "message_blocked")'
 
 # Find all shell commands
-cat ~/.pocketclaw/audit.jsonl | jq 'select(.tool == "shell")'
+cat ~/.pocketpaw/audit.jsonl | jq 'select(.tool == "shell")'
 
 # Count events by type
-cat ~/.pocketclaw/audit.jsonl | jq -r '.event' | sort | uniq -c | sort -rn
+cat ~/.pocketpaw/audit.jsonl | jq -r '.event' | sort | uniq -c | sort -rn
 ```
 
 ## Security

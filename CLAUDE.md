@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-PocketPaw is a self-hosted AI agent that runs locally and is controlled via Telegram, Discord, Slack, WhatsApp, or a web dashboard. The Python package is named `pocketclaw` (the internal/legacy name), while the public-facing name is `pocketpaw`. Python 3.11+ required.
+PocketPaw is a self-hosted AI agent that runs locally and is controlled via Telegram, Discord, Slack, WhatsApp, or a web dashboard. The Python package is named `pocketpaw` (the internal/legacy name), while the public-facing name is `pocketpaw`. Python 3.11+ required.
 
 ## Commands
 
@@ -56,7 +56,7 @@ python -m build
 
 ### Message Bus Pattern
 
-The core architecture is an event-driven message bus (`src/pocketclaw/bus/`). All communication flows through three event types defined in `bus/events.py`:
+The core architecture is an event-driven message bus (`src/pocketpaw/bus/`). All communication flows through three event types defined in `bus/events.py`:
 
 - **InboundMessage** — user input from any channel (Telegram, WebSocket, CLI)
 - **OutboundMessage** — agent responses back to channels (supports streaming via `is_stream_chunk`/`is_stream_end`)
@@ -104,5 +104,5 @@ The web dashboard (`frontend/`) is vanilla JS/CSS/HTML served via FastAPI+Jinja2
 - **Protocol-oriented**: Core interfaces (`AgentProtocol`, `ToolProtocol`, `MemoryStoreProtocol`, `BaseChannelAdapter`) are Python `Protocol` classes for swappable implementations
 - **Env vars**: All settings use `POCKETPAW_` prefix (e.g., `POCKETPAW_ANTHROPIC_API_KEY`)
 - **Ruff config**: line-length 100, target Python 3.11, lint rules E/F/I/UP
-- **Entry point**: `pocketclaw.__main__:main`
+- **Entry point**: `pocketpaw.__main__:main`
 - **Lazy imports**: Agent backends are imported inside `AgentRouter._initialize_agent()` to avoid loading unused dependencies

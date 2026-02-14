@@ -5,8 +5,8 @@ import os
 import shutil
 
 # Import app and config logic
-from pocketclaw.dashboard import app
-from pocketclaw.config import get_config_dir, get_access_token, regenerate_token, Settings
+from pocketpaw.dashboard import app
+from pocketpaw.config import get_config_dir, get_access_token, regenerate_token, Settings
 
 
 # Mock config dir specifically for tests to avoid messing with real token

@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from pocketclaw.bootstrap.default_provider import DefaultBootstrapProvider
-from pocketclaw.bootstrap.protocol import BootstrapContext
+from pocketpaw.bootstrap.default_provider import DefaultBootstrapProvider
+from pocketpaw.bootstrap.protocol import BootstrapContext
 
 
 @pytest.fixture

@@ -3,9 +3,9 @@
 import hashlib
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from pocketclaw.memory.file_store import FileMemoryStore
-from pocketclaw.memory.manager import MemoryManager
-from pocketclaw.memory.protocol import MemoryEntry, MemoryType
+from pocketpaw.memory.file_store import FileMemoryStore
+from pocketpaw.memory.manager import MemoryManager
+from pocketpaw.memory.protocol import MemoryEntry, MemoryType
 
 # ---------------------------------------------------------------------------
 # _resolve_user_id
@@ -24,19 +24,19 @@ class TestResolveUserId:
         assert mgr._resolve_user_id(None) == "default"
         assert mgr._resolve_user_id("") == "default"
 
-    @patch("pocketclaw.config.get_settings")
+    @patch("pocketpaw.config.get_settings")
     def test_no_owner_id_returns_default(self, mock_settings):
         mock_settings.return_value = MagicMock(owner_id="")
         mgr = self._make_manager()
         assert mgr._resolve_user_id("some_sender") == "default"
 
-    @patch("pocketclaw.config.get_settings")
+    @patch("pocketpaw.config.get_settings")
     def test_sender_is_owner_returns_default(self, mock_settings):
         mock_settings.return_value = MagicMock(owner_id="owner123")
         mgr = self._make_manager()
         assert mgr._resolve_user_id("owner123") == "default"
 
-    @patch("pocketclaw.config.get_settings")
+    @patch("pocketpaw.config.get_settings")
     def test_non_owner_returns_hash(self, mock_settings):
         mock_settings.return_value = MagicMock(owner_id="owner123")
         mgr = self._make_manager()
@@ -44,13 +44,13 @@ class TestResolveUserId:
         expected = hashlib.sha256(b"stranger456").hexdigest()[:16]
         assert result == expected
 
-    @patch("pocketclaw.config.get_settings")
+    @patch("pocketpaw.config.get_settings")
     def test_hash_is_deterministic(self, mock_settings):
         mock_settings.return_value = MagicMock(owner_id="owner123")
         mgr = self._make_manager()
         assert mgr._resolve_user_id("bob") == mgr._resolve_user_id("bob")
 
-    @patch("pocketclaw.config.get_settings")
+    @patch("pocketpaw.config.get_settings")
     def test_different_senders_different_hashes(self, mock_settings):
         mock_settings.return_value = MagicMock(owner_id="owner123")
         mgr = self._make_manager()
@@ -185,7 +185,7 @@ class TestFileStoreUserScoping:
 class TestMemoryManagerScoping:
     """Integration tests for MemoryManager with sender_id."""
 
-    @patch("pocketclaw.config.get_settings")
+    @patch("pocketpaw.config.get_settings")
     async def test_remember_sets_user_id(self, mock_settings, tmp_path):
         mock_settings.return_value = MagicMock(owner_id="owner1")
         store = FileMemoryStore(base_path=tmp_path)
@@ -195,7 +195,7 @@ class TestMemoryManagerScoping:
         assert len(lt) == 1
         assert lt[0].metadata.get("user_id") != "default"
 
-    @patch("pocketclaw.config.get_settings")
+    @patch("pocketpaw.config.get_settings")
     async def test_remember_owner_uses_default(self, mock_settings, tmp_path):
         mock_settings.return_value = MagicMock(owner_id="owner1")
         store = FileMemoryStore(base_path=tmp_path)
@@ -205,7 +205,7 @@ class TestMemoryManagerScoping:
         assert len(lt) == 1
         assert lt[0].metadata.get("user_id") == "default"
 
-    @patch("pocketclaw.config.get_settings")
+    @patch("pocketpaw.config.get_settings")
     async def test_get_context_scoped(self, mock_settings, tmp_path):
         mock_settings.return_value = MagicMock(owner_id="owner1")
         store = FileMemoryStore(base_path=tmp_path)
@@ -240,9 +240,9 @@ class TestMemoryManagerScoping:
 class TestContextBuilderIdentity:
     """Tests for sender identity block in system prompt."""
 
-    @patch("pocketclaw.config.get_settings")
+    @patch("pocketpaw.config.get_settings")
     async def test_owner_identity_block(self, mock_settings):
-        from pocketclaw.bootstrap.context_builder import AgentContextBuilder
+        from pocketpaw.bootstrap.context_builder import AgentContextBuilder
 
         mock_settings.return_value = MagicMock(owner_id="owner1")
         memory = MagicMock()
@@ -258,9 +258,9 @@ class TestContextBuilderIdentity:
         assert "role: owner" in prompt
         assert "This is your owner" in prompt
 
-    @patch("pocketclaw.config.get_settings")
+    @patch("pocketpaw.config.get_settings")
     async def test_external_user_identity_block(self, mock_settings):
-        from pocketclaw.bootstrap.context_builder import AgentContextBuilder
+        from pocketpaw.bootstrap.context_builder import AgentContextBuilder
 
         mock_settings.return_value = MagicMock(owner_id="owner1")
         memory = MagicMock()
@@ -277,7 +277,7 @@ class TestContextBuilderIdentity:
         assert "NOT your owner" in prompt
 
     async def test_no_owner_id_no_identity_block(self):
-        from pocketclaw.bootstrap.context_builder import AgentContextBuilder
+        from pocketpaw.bootstrap.context_builder import AgentContextBuilder
 
         memory = MagicMock()
         memory.get_semantic_context = AsyncMock(return_value="")
@@ -291,9 +291,9 @@ class TestContextBuilderIdentity:
         prompt = await builder.build_system_prompt(user_query="hi")
         assert "sender_id=" not in prompt
 
-    @patch("pocketclaw.config.get_settings")
+    @patch("pocketpaw.config.get_settings")
     async def test_no_owner_configured_no_block(self, mock_settings):
-        from pocketclaw.bootstrap.context_builder import AgentContextBuilder
+        from pocketpaw.bootstrap.context_builder import AgentContextBuilder
 
         mock_settings.return_value = MagicMock(owner_id="")
         memory = MagicMock()

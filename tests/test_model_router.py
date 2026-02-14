@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from pocketclaw.agents.model_router import ModelRouter, ModelSelection, TaskComplexity
+from pocketpaw.agents.model_router import ModelRouter, ModelSelection, TaskComplexity
 
 
 @pytest.fixture

@@ -11,7 +11,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from installer.launcher.common import POCKETCLAW_HOME
+from installer.launcher.common import POCKETPAW_HOME
 
 logger = logging.getLogger(__name__)
 
@@ -93,8 +93,8 @@ class AutoStartManager:
             "ProgramArguments": program_args,
             "RunAtLoad": True,
             "KeepAlive": False,
-            "StandardOutPath": str(POCKETCLAW_HOME / "logs" / "launcher-launchd.log"),
-            "StandardErrorPath": str(POCKETCLAW_HOME / "logs" / "launcher-launchd.log"),
+            "StandardOutPath": str(POCKETPAW_HOME / "logs" / "launcher-launchd.log"),
+            "StandardErrorPath": str(POCKETPAW_HOME / "logs" / "launcher-launchd.log"),
         }
 
     def _macos_is_enabled(self) -> bool:

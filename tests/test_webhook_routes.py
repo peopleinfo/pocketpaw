@@ -11,7 +11,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
-from pocketclaw.dashboard import _channel_adapters, app
+from pocketpaw.dashboard import _channel_adapters, app
 
 # ---------- fixtures ----------
 
@@ -28,7 +28,7 @@ _TEST_TOKEN = "test-dashboard-token-12345"
 @pytest.fixture(autouse=True)
 def _mock_settings():
     """Patch Settings.load() to return a Settings with one webhook config."""
-    with patch("pocketclaw.dashboard.Settings") as MockSettings:
+    with patch("pocketpaw.dashboard.Settings") as MockSettings:
         mock_instance = MagicMock()
         mock_instance.webhook_configs = [_TEST_SLOT.copy()]
         mock_instance.webhook_sync_timeout = 30
@@ -41,7 +41,7 @@ def _mock_settings():
 @pytest.fixture(autouse=True)
 def _mock_token():
     """Mock get_access_token so dashboard auth middleware allows /api/* calls."""
-    with patch("pocketclaw.dashboard.get_access_token", return_value=_TEST_TOKEN):
+    with patch("pocketpaw.dashboard.get_access_token", return_value=_TEST_TOKEN):
         yield
 
 

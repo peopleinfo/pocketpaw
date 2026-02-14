@@ -24,7 +24,7 @@ Three built-in profiles provide preset tool collections:
 Set the profile:
 
 ```bash
-export POCKETCLAW_TOOL_PROFILE="coding"
+export POCKETPAW_TOOL_PROFILE="coding"
 ```
 
 ## Allow and Deny Lists
@@ -33,10 +33,10 @@ Fine-tune tool availability with allow and deny lists:
 
 ```bash
 # Allow specific tools (added to profile)
-export POCKETCLAW_TOOLS_ALLOW="web_search,image_gen"
+export POCKETPAW_TOOLS_ALLOW="web_search,image_gen"
 
 # Deny specific tools (takes precedence over everything)
-export POCKETCLAW_TOOLS_DENY="shell,write_file"
+export POCKETPAW_TOOLS_DENY="shell,write_file"
 ```
 
 ### Using Groups
@@ -45,13 +45,13 @@ Reference tool groups with the `group:` prefix:
 
 ```bash
 # Allow all search tools
-export POCKETCLAW_TOOLS_ALLOW="group:search"
+export POCKETPAW_TOOLS_ALLOW="group:search"
 
 # Deny all media tools
-export POCKETCLAW_TOOLS_DENY="group:media"
+export POCKETPAW_TOOLS_DENY="group:media"
 
 # Deny all MCP tools
-export POCKETCLAW_TOOLS_DENY="group:mcp"
+export POCKETPAW_TOOLS_DENY="group:mcp"
 ```
 
 ## Precedence
@@ -71,24 +71,24 @@ deny > allow > profile
 ### Minimal + Web Search
 
 ```bash
-export POCKETCLAW_TOOL_PROFILE="minimal"
-export POCKETCLAW_TOOLS_ALLOW="web_search"
+export POCKETPAW_TOOL_PROFILE="minimal"
+export POCKETPAW_TOOLS_ALLOW="web_search"
 # Result: memory tools + web_search
 ```
 
 ### Full Except Shell
 
 ```bash
-export POCKETCLAW_TOOL_PROFILE="full"
-export POCKETCLAW_TOOLS_DENY="shell"
+export POCKETPAW_TOOL_PROFILE="full"
+export POCKETPAW_TOOLS_DENY="shell"
 # Result: all tools except shell commands
 ```
 
 ### Coding + Google Tools
 
 ```bash
-export POCKETCLAW_TOOL_PROFILE="coding"
-export POCKETCLAW_TOOLS_ALLOW="group:gmail,group:calendar"
+export POCKETPAW_TOOL_PROFILE="coding"
+export POCKETPAW_TOOLS_ALLOW="group:gmail,group:calendar"
 # Result: filesystem + shell + memory + gmail + calendar
 ```
 
@@ -98,13 +98,13 @@ MCP server tools use the pattern `mcp:<server>:<tool>`:
 
 ```bash
 # Allow all tools from a specific server
-export POCKETCLAW_TOOLS_ALLOW="mcp:filesystem:*"
+export POCKETPAW_TOOLS_ALLOW="mcp:filesystem:*"
 
 # Deny a specific MCP tool
-export POCKETCLAW_TOOLS_DENY="mcp:github:delete_repo"
+export POCKETPAW_TOOLS_DENY="mcp:github:delete_repo"
 
 # Deny all MCP tools
-export POCKETCLAW_TOOLS_DENY="group:mcp"
+export POCKETPAW_TOOLS_DENY="group:mcp"
 ```
 
 ## Tool Groups Reference

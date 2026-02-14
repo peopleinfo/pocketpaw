@@ -68,33 +68,37 @@ title: Get Channel Status
 description: ...
 api: GET /api/channels/status
 baseUrl: http://localhost:8000
-layout: '@/layouts/APIEndpointLayout.astro'
+layout: "@/layouts/APIEndpointLayout.astro"
 auth: bearer
 ---
 
 ## Overview
+
 ...
 
 ## Response
-<ResponseField name="..." type="...">...</ResponseField>
+
+<ResponseField name="..." type="...">
+  ...
+</ResponseField>
 
 <RequestExample>
-<Tabs items={["cURL", "JavaScript", "Python"]}>
-  <Tab title="cURL">...</Tab>
-  ...
-</Tabs>
+  <Tabs items={["cURL", "JavaScript", "Python"]}>
+    <Tab title="cURL">...</Tab>
+    ...
+  </Tabs>
 </RequestExample>
 
 <ResponseExample>
-<Tabs items={["200"]}>
-  <Tab title="200">...</Tab>
-</Tabs>
+  <Tabs items={["200"]}>
+    <Tab title="200">...</Tab>
+  </Tabs>
 </ResponseExample>
 ```
 
 ## Key Conventions
 
-- **Package name duality**: Internal Python package is `pocketclaw`, public-facing name in docs is `PocketPaw`. Import paths use `pocketclaw` (e.g., `from pocketclaw.tools.registry import ...`).
+- **Package name duality**: Internal Python package is `pocketpaw`, public-facing name in docs is `PocketPaw`. Import paths use `pocketpaw` (e.g., `from pocketpaw.tools.registry import ...`).
 - **Channel count**: "9+" channels (Telegram, Discord, Slack, WhatsApp, Signal, Matrix, Teams, Google Chat, Web Dashboard).
 - **Tool count**: "50+" built-in tools across search, media, integrations, sessions, desktop, and coding categories.
 - **Backend count**: 3 backends (Claude Agent SDK, PocketPaw Native, Open Interpreter).

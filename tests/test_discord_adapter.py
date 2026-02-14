@@ -23,9 +23,9 @@ mock_discord.app_commands = mock_app_commands
 sys.modules.setdefault("discord", mock_discord)
 sys.modules.setdefault("discord.app_commands", mock_app_commands)
 
-from pocketclaw.bus.adapters.discord_adapter import DISCORD_MSG_LIMIT, DiscordAdapter
-from pocketclaw.bus.events import Channel, InboundMessage, OutboundMessage
-from pocketclaw.bus.queue import MessageBus
+from pocketpaw.bus.adapters.discord_adapter import DISCORD_MSG_LIMIT, DiscordAdapter
+from pocketpaw.bus.events import Channel, InboundMessage, OutboundMessage
+from pocketpaw.bus.queue import MessageBus
 
 
 @pytest.fixture

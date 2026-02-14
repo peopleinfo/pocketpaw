@@ -98,21 +98,21 @@ pip install pocketpaw[dev]
 
 ## Environment Variables
 
-Set your API keys as environment variables. All PocketPaw settings use the `POCKETCLAW_` prefix:
+Set your API keys as environment variables. All PocketPaw settings use the `POCKETPAW_` prefix:
 
 ```bash
 # Option A: Anthropic API key for Claude (cloud)
-export POCKETCLAW_ANTHROPIC_API_KEY="sk-ant-..."
+export POCKETPAW_ANTHROPIC_API_KEY="sk-ant-..."
 
 # Option B: Ollama for local models (no API key needed)
-export POCKETCLAW_LLM_PROVIDER="ollama"
-export POCKETCLAW_OLLAMA_MODEL="qwen2.5:7b"
+export POCKETPAW_LLM_PROVIDER="ollama"
+export POCKETPAW_OLLAMA_MODEL="qwen2.5:7b"
 
 # Optional: Other API keys
-export POCKETCLAW_OPENAI_API_KEY="sk-..."          # For voice/TTS/STT
-export POCKETCLAW_TAVILY_API_KEY="tvly-..."        # For web search
-export POCKETCLAW_GOOGLE_API_KEY="..."             # For image generation
-export POCKETCLAW_BRAVE_SEARCH_API_KEY="..."       # For Brave Search
+export POCKETPAW_OPENAI_API_KEY="sk-..."          # For voice/TTS/STT
+export POCKETPAW_TAVILY_API_KEY="tvly-..."        # For web search
+export POCKETPAW_GOOGLE_API_KEY="..."             # For image generation
+export POCKETPAW_BRAVE_SEARCH_API_KEY="..."       # For Brave Search
 ```
 
 Alternatively, you can configure these through the web dashboard's settings panel.

@@ -56,8 +56,8 @@ All Google integrations (Gmail, Calendar, Drive, Docs) share the same OAuth fram
   </Step>
   <Step title="Configure PocketPaw">
     ```bash
-    export POCKETCLAW_GOOGLE_CLIENT_ID="your-client-id"
-    export POCKETCLAW_GOOGLE_CLIENT_SECRET="your-secret"
+    export POCKETPAW_GOOGLE_CLIENT_ID="your-client-id"
+    export POCKETPAW_GOOGLE_CLIENT_SECRET="your-secret"
     ```
   </Step>
   <Step title="Authorize">
@@ -71,7 +71,7 @@ All Google integrations (Gmail, Calendar, Drive, Docs) share the same OAuth fram
 ┌──────────────────┐
 │  OAuth Framework │ ← Token management, refresh, multi-provider
 ├──────────────────┤
-│   Token Store    │ ← ~/.pocketclaw/tokens/
+│   Token Store    │ ← ~/.pocketpaw/tokens/
 ├──────────────────┤
 │   API Clients    │ ← gmail.py, gcalendar.py, gdrive.py, etc.
 ├──────────────────┤

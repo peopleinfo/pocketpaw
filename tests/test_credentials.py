@@ -13,7 +13,7 @@ from unittest.mock import patch
 
 import pytest
 
-from pocketclaw.credentials import SECRET_FIELDS, CredentialStore
+from pocketpaw.credentials import SECRET_FIELDS, CredentialStore
 
 # =============================================================================
 # CREDENTIAL STORE — CORE
@@ -206,8 +206,8 @@ class TestConfigSecretSeparation:
     @pytest.fixture
     def env(self, tmp_path):
         """Set up a temp config dir with patched get_config_dir and credential store."""
-        import pocketclaw.config as cfg
-        import pocketclaw.credentials as creds
+        import pocketpaw.config as cfg
+        import pocketpaw.credentials as creds
 
         test_store = CredentialStore(config_dir=tmp_path)
 
@@ -228,7 +228,7 @@ class TestConfigSecretSeparation:
 
     def test_secrets_not_in_config_json(self, env):
         """Secrets must NOT be written to config.json in plaintext."""
-        from pocketclaw.config import Settings
+        from pocketpaw.config import Settings
 
         settings = Settings(
             anthropic_api_key="sk-ant-secret",
@@ -250,7 +250,7 @@ class TestConfigSecretSeparation:
 
     def test_non_secrets_in_config_json(self, env):
         """Non-secret fields should still be in config.json."""
-        from pocketclaw.config import Settings
+        from pocketpaw.config import Settings
 
         settings = Settings(
             agent_backend="claude_agent_sdk",
@@ -265,7 +265,7 @@ class TestConfigSecretSeparation:
 
     def test_secrets_stored_in_credential_store(self, env):
         """Secrets should be retrievable from the encrypted store after save()."""
-        from pocketclaw.config import Settings
+        from pocketpaw.config import Settings
 
         settings = Settings(
             anthropic_api_key="sk-ant-test",
@@ -279,7 +279,7 @@ class TestConfigSecretSeparation:
 
     def test_load_merges_secrets_and_config(self, env):
         """Settings.load() must combine config.json + encrypted store."""
-        from pocketclaw.config import Settings
+        from pocketpaw.config import Settings
 
         # Save settings (secrets go to store, non-secrets to config.json)
         settings = Settings(
@@ -297,7 +297,7 @@ class TestConfigSecretSeparation:
 
     def test_save_preserves_existing_secrets(self, env):
         """Saving new non-secret settings must not lose existing encrypted secrets."""
-        from pocketclaw.config import Settings
+        from pocketpaw.config import Settings
 
         # First save: set an API key
         s1 = Settings(anthropic_api_key="sk-ant-original")
@@ -323,8 +323,8 @@ class TestPlaintextMigration:
     @pytest.fixture
     def env(self, tmp_path):
         """Set up a temp config dir with NO migration flag (simulates upgrade)."""
-        import pocketclaw.config as cfg
-        import pocketclaw.credentials as creds
+        import pocketpaw.config as cfg
+        import pocketpaw.credentials as creds
 
         test_store = CredentialStore(config_dir=tmp_path)
 
@@ -342,7 +342,7 @@ class TestPlaintextMigration:
 
     def test_plaintext_keys_migrated_to_store(self, env):
         """Plaintext API keys in config.json are moved to encrypted store."""
-        from pocketclaw.config import Settings
+        from pocketpaw.config import Settings
 
         # Simulate pre-upgrade config.json with plaintext secrets
         old_config = {
@@ -365,7 +365,7 @@ class TestPlaintextMigration:
 
     def test_plaintext_keys_preserved_in_config_json(self, env):
         """After migration, config.json still has the keys (as fallback)."""
-        from pocketclaw.config import Settings
+        from pocketpaw.config import Settings
 
         old_config = {
             "telegram_bot_token": "123:AAOldToken",
@@ -384,7 +384,7 @@ class TestPlaintextMigration:
 
     def test_migration_flag_created(self, env):
         """Migration creates a .secrets_migrated flag file."""
-        from pocketclaw.config import Settings
+        from pocketpaw.config import Settings
 
         (env["tmp_path"] / "config.json").write_text(json.dumps({"agent_backend": "test"}))
         Settings.load()
@@ -392,8 +392,8 @@ class TestPlaintextMigration:
 
     def test_migration_runs_only_once(self, env):
         """If the flag file exists, migration should not re-run."""
-        import pocketclaw.config as cfg
-        from pocketclaw.config import Settings
+        import pocketpaw.config as cfg
+        from pocketpaw.config import Settings
 
         # Write config with plaintext key
         old_config = {"anthropic_api_key": "sk-ant-should-not-migrate"}
@@ -411,7 +411,7 @@ class TestPlaintextMigration:
 
     def test_migration_with_no_config_file(self, env):
         """Migration with no config.json should set the flag and not crash."""
-        from pocketclaw.config import Settings
+        from pocketpaw.config import Settings
 
         # No config.json exists — just load
         Settings.load()
@@ -419,7 +419,7 @@ class TestPlaintextMigration:
 
     def test_loaded_settings_have_migrated_values(self, env):
         """After migration, Settings.load() returns the migrated secrets."""
-        from pocketclaw.config import Settings
+        from pocketpaw.config import Settings
 
         old_config = {
             "anthropic_api_key": "sk-ant-migrated",
@@ -498,7 +498,7 @@ class TestSecretFilter:
 
     @pytest.fixture
     def log_filter(self):
-        from pocketclaw.logging_setup import SecretFilter
+        from pocketpaw.logging_setup import SecretFilter
 
         return SecretFilter()
 

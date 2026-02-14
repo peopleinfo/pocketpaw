@@ -3,7 +3,7 @@
 
 from unittest.mock import MagicMock, patch
 
-from pocketclaw.tools.builtin.voice import TextToSpeechTool, _get_audio_dir
+from pocketpaw.tools.builtin.voice import TextToSpeechTool, _get_audio_dir
 
 # ---------------------------------------------------------------------------
 # Tool definition
@@ -38,7 +38,7 @@ async def test_openai_no_key():
     mock_settings.tts_voice = "alloy"
     mock_settings.openai_api_key = None
 
-    with patch("pocketclaw.tools.builtin.voice.get_settings", return_value=mock_settings):
+    with patch("pocketpaw.tools.builtin.voice.get_settings", return_value=mock_settings):
         result = await tool.execute(text="Hello world")
         assert "Error" in result
         assert "OpenAI" in result
@@ -51,7 +51,7 @@ async def test_elevenlabs_no_key():
     mock_settings.tts_voice = "test-voice-id"
     mock_settings.elevenlabs_api_key = None
 
-    with patch("pocketclaw.tools.builtin.voice.get_settings", return_value=mock_settings):
+    with patch("pocketpaw.tools.builtin.voice.get_settings", return_value=mock_settings):
         result = await tool.execute(text="Hello world")
         assert "Error" in result
         assert "ElevenLabs" in result
@@ -63,7 +63,7 @@ async def test_unknown_provider():
     mock_settings.tts_provider = "unknown"
     mock_settings.tts_voice = "x"
 
-    with patch("pocketclaw.tools.builtin.voice.get_settings", return_value=mock_settings):
+    with patch("pocketpaw.tools.builtin.voice.get_settings", return_value=mock_settings):
         result = await tool.execute(text="Hello")
         assert "Error" in result
         assert "Unknown TTS provider" in result
@@ -75,7 +75,7 @@ async def test_unknown_provider():
 
 
 def test_get_audio_dir(tmp_path, monkeypatch):
-    monkeypatch.setattr("pocketclaw.tools.builtin.voice.get_config_dir", lambda: tmp_path)
+    monkeypatch.setattr("pocketpaw.tools.builtin.voice.get_config_dir", lambda: tmp_path)
     d = _get_audio_dir()
     assert d.exists()
     assert d == tmp_path / "generated" / "audio"

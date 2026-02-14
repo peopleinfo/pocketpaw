@@ -10,7 +10,7 @@ class TestStatusTool:
 
     def test_get_system_status_returns_string(self):
         """Status should return a formatted string."""
-        from pocketclaw.tools import status
+        from pocketpaw.tools import status
 
         result = status.get_system_status()
 
@@ -22,7 +22,7 @@ class TestStatusTool:
 
     def test_get_system_status_contains_percentages(self):
         """Status should contain percentage values."""
-        from pocketclaw.tools import status
+        from pocketpaw.tools import status
 
         result = status.get_system_status()
 
@@ -35,7 +35,7 @@ class TestFetchTool:
 
     def test_is_safe_path_within_jail(self, tmp_path):
         """Paths within jail should be safe."""
-        from pocketclaw.tools.fetch import is_safe_path
+        from pocketpaw.tools.fetch import is_safe_path
 
         jail = tmp_path
         safe_path = tmp_path / "subdir"
@@ -45,7 +45,7 @@ class TestFetchTool:
 
     def test_is_safe_path_outside_jail(self, tmp_path):
         """Paths outside jail should be unsafe."""
-        from pocketclaw.tools.fetch import is_safe_path
+        from pocketpaw.tools.fetch import is_safe_path
 
         jail = tmp_path / "jail"
         jail.mkdir()
@@ -56,7 +56,7 @@ class TestFetchTool:
 
     def test_is_safe_path_parent_traversal(self, tmp_path):
         """Parent traversal should be blocked."""
-        from pocketclaw.tools.fetch import is_safe_path
+        from pocketpaw.tools.fetch import is_safe_path
 
         jail = tmp_path / "jail"
         jail.mkdir()
@@ -66,7 +66,7 @@ class TestFetchTool:
 
     def test_get_directory_keyboard_returns_markup(self, tmp_path):
         """Should return InlineKeyboardMarkup."""
-        from pocketclaw.tools.fetch import get_directory_keyboard
+        from pocketpaw.tools.fetch import get_directory_keyboard
         from telegram import InlineKeyboardMarkup
 
         # Create some test files
@@ -80,7 +80,7 @@ class TestFetchTool:
     @pytest.mark.asyncio
     async def test_handle_path_directory(self, tmp_path):
         """Should handle directory paths."""
-        from pocketclaw.tools.fetch import handle_path
+        from pocketpaw.tools.fetch import handle_path
 
         result = await handle_path(str(tmp_path), tmp_path)
 
@@ -90,7 +90,7 @@ class TestFetchTool:
     @pytest.mark.asyncio
     async def test_handle_path_file(self, tmp_path):
         """Should handle file paths."""
-        from pocketclaw.tools.fetch import handle_path
+        from pocketpaw.tools.fetch import handle_path
 
         test_file = tmp_path / "test.txt"
         test_file.write_text("content")
@@ -103,7 +103,7 @@ class TestFetchTool:
     @pytest.mark.asyncio
     async def test_handle_path_outside_jail(self, tmp_path):
         """Should reject paths outside jail."""
-        from pocketclaw.tools.fetch import handle_path
+        from pocketpaw.tools.fetch import handle_path
 
         jail = tmp_path / "jail"
         jail.mkdir()
@@ -120,17 +120,17 @@ class TestScreenshotTool:
 
     def test_take_screenshot_returns_bytes_or_none(self):
         """Screenshot should return bytes or None."""
-        from pocketclaw.tools import screenshot
+        from pocketpaw.tools import screenshot
 
         result = screenshot.take_screenshot()
 
         # Should be bytes or None (depending on display availability)
         assert result is None or isinstance(result, bytes)
 
-    @patch("pocketclaw.tools.screenshot.PYAUTOGUI_AVAILABLE", False)
+    @patch("pocketpaw.tools.screenshot.PYAUTOGUI_AVAILABLE", False)
     def test_take_screenshot_without_pyautogui(self):
         """Should return None when pyautogui unavailable."""
-        from pocketclaw.tools import screenshot
+        from pocketpaw.tools import screenshot
 
         # Force reimport to pick up patched value
         with patch.object(screenshot, "PYAUTOGUI_AVAILABLE", False):
@@ -143,7 +143,7 @@ class TestConfig:
 
     def test_settings_defaults(self):
         """Settings should have sensible defaults."""
-        from pocketclaw.config import Settings
+        from pocketpaw.config import Settings
 
         settings = Settings()
 
@@ -154,11 +154,11 @@ class TestConfig:
 
     def test_settings_save_and_load(self, tmp_path, monkeypatch):
         """Settings should persist to disk."""
-        from pocketclaw.config import Settings, get_config_path
+        from pocketpaw.config import Settings, get_config_path
 
         # Mock config path to use temp directory
         config_file = tmp_path / "config.json"
-        monkeypatch.setattr("pocketclaw.config.get_config_path", lambda: config_file)
+        monkeypatch.setattr("pocketpaw.config.get_config_path", lambda: config_file)
 
         # Create and save settings
         settings = Settings(telegram_bot_token="test-token", allowed_user_id=12345)
@@ -174,7 +174,7 @@ class TestConfig:
 
     def test_get_config_dir_creates_directory(self, tmp_path, monkeypatch):
         """Config dir should be created if not exists."""
-        from pocketclaw.config import get_config_dir
+        from pocketpaw.config import get_config_dir
 
         # Mock home to use temp
         new_home = tmp_path / "home"
@@ -184,7 +184,7 @@ class TestConfig:
         result = get_config_dir()
 
         assert result.exists()
-        assert result.name == ".pocketclaw"
+        assert result.name == ".pocketpaw"
 
 
 class TestLLMRouter:
@@ -192,8 +192,8 @@ class TestLLMRouter:
 
     def test_router_initialization(self):
         """Router should initialize without errors."""
-        from pocketclaw.config import Settings
-        from pocketclaw.llm.router import LLMRouter
+        from pocketpaw.config import Settings
+        from pocketpaw.llm.router import LLMRouter
 
         settings = Settings()
         router = LLMRouter(settings)
@@ -202,8 +202,8 @@ class TestLLMRouter:
 
     def test_router_clear_history(self):
         """Should clear conversation history."""
-        from pocketclaw.config import Settings
-        from pocketclaw.llm.router import LLMRouter
+        from pocketpaw.config import Settings
+        from pocketpaw.llm.router import LLMRouter
 
         settings = Settings()
         router = LLMRouter(settings)
@@ -216,8 +216,8 @@ class TestLLMRouter:
     @pytest.mark.asyncio
     async def test_router_no_backend_returns_error(self):
         """Should return error when no backend available."""
-        from pocketclaw.config import Settings
-        from pocketclaw.llm.router import LLMRouter
+        from pocketpaw.config import Settings
+        from pocketpaw.llm.router import LLMRouter
 
         settings = Settings(
             llm_provider="openai",
@@ -235,8 +235,8 @@ class TestAgentRouter:
 
     def test_router_defaults_to_open_interpreter(self):
         """Should default to Open Interpreter."""
-        from pocketclaw.config import Settings
-        from pocketclaw.agents.router import AgentRouter
+        from pocketpaw.config import Settings
+        from pocketpaw.agents.router import AgentRouter
 
         settings = Settings(agent_backend="open_interpreter")
         router = AgentRouter(settings)
@@ -245,8 +245,8 @@ class TestAgentRouter:
 
     def test_router_switches_to_claude_code(self):
         """Should switch to Claude Code when configured."""
-        from pocketclaw.config import Settings
-        from pocketclaw.agents.router import AgentRouter
+        from pocketpaw.config import Settings
+        from pocketpaw.agents.router import AgentRouter
 
         settings = Settings(agent_backend="claude_code", anthropic_api_key="test")
         router = AgentRouter(settings)

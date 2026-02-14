@@ -40,7 +40,7 @@ class FakeResultMessage:
 
 def _make_sdk(settings=None):
     """Create a ClaudeAgentSDK with mocked SDK imports."""
-    from pocketclaw.agents.claude_sdk import ClaudeAgentSDK
+    from pocketpaw.agents.claude_sdk import ClaudeAgentSDK
 
     s = settings or MagicMock(
         tool_profile="full",
@@ -228,13 +228,13 @@ class TestLoopThinkingIntegration:
 
     async def test_loop_thinking_publishes_system_event(self):
         """Loop publishes thinking as SystemEvent, not OutboundMessage."""
-        from pocketclaw.bus import Channel, InboundMessage
+        from pocketpaw.bus import Channel, InboundMessage
 
         with (
-            patch("pocketclaw.agents.loop.get_settings") as mock_settings,
-            patch("pocketclaw.agents.loop.get_message_bus") as mock_bus_fn,
-            patch("pocketclaw.agents.loop.get_memory_manager") as mock_mem_fn,
-            patch("pocketclaw.agents.loop.AgentContextBuilder") as mock_builder_cls,
+            patch("pocketpaw.agents.loop.get_settings") as mock_settings,
+            patch("pocketpaw.agents.loop.get_message_bus") as mock_bus_fn,
+            patch("pocketpaw.agents.loop.get_memory_manager") as mock_mem_fn,
+            patch("pocketpaw.agents.loop.AgentContextBuilder") as mock_builder_cls,
         ):
             mock_settings.return_value = MagicMock(
                 agent_backend="claude_agent_sdk",
@@ -254,7 +254,7 @@ class TestLoopThinkingIntegration:
                 return_value="System Prompt"
             )
 
-            from pocketclaw.agents.loop import AgentLoop
+            from pocketpaw.agents.loop import AgentLoop
 
             loop = AgentLoop()
 
@@ -291,13 +291,13 @@ class TestLoopThinkingIntegration:
 
     async def test_loop_thinking_not_in_memory(self):
         """Thinking content is excluded from full_response stored in memory."""
-        from pocketclaw.bus import Channel, InboundMessage
+        from pocketpaw.bus import Channel, InboundMessage
 
         with (
-            patch("pocketclaw.agents.loop.get_settings") as mock_settings,
-            patch("pocketclaw.agents.loop.get_message_bus") as mock_bus_fn,
-            patch("pocketclaw.agents.loop.get_memory_manager") as mock_mem_fn,
-            patch("pocketclaw.agents.loop.AgentContextBuilder") as mock_builder_cls,
+            patch("pocketpaw.agents.loop.get_settings") as mock_settings,
+            patch("pocketpaw.agents.loop.get_message_bus") as mock_bus_fn,
+            patch("pocketpaw.agents.loop.get_memory_manager") as mock_mem_fn,
+            patch("pocketpaw.agents.loop.AgentContextBuilder") as mock_builder_cls,
         ):
             mock_settings.return_value = MagicMock(
                 agent_backend="claude_agent_sdk",
@@ -317,7 +317,7 @@ class TestLoopThinkingIntegration:
                 return_value="System Prompt"
             )
 
-            from pocketclaw.agents.loop import AgentLoop
+            from pocketpaw.agents.loop import AgentLoop
 
             loop = AgentLoop()
 

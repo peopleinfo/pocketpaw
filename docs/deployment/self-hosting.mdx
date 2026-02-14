@@ -35,15 +35,15 @@ curl -fsSL https://pocketpaw.xyz/install.sh | sh
 Create the config file:
 
 ```bash
-mkdir -p ~/.pocketclaw
-cat > ~/.pocketclaw/config.json << 'EOF'
+mkdir -p ~/.pocketpaw
+cat > ~/.pocketpaw/config.json << 'EOF'
 {
   "anthropic_api_key": "sk-ant-your-key",
   "agent_backend": "claude_agent_sdk",
   "tool_profile": "coding"
 }
 EOF
-chmod 600 ~/.pocketclaw/config.json
+chmod 600 ~/.pocketpaw/config.json
 ```
 
 ### Run
@@ -99,10 +99,10 @@ Set environment variables in a `.env` file or your system's environment:
 
 ```bash
 # /etc/pocketpaw/env
-POCKETCLAW_ANTHROPIC_API_KEY=sk-ant-...
-POCKETCLAW_DASHBOARD_HOST=127.0.0.1
-POCKETCLAW_DASHBOARD_PORT=8000
-POCKETCLAW_TOOL_PROFILE=coding
+POCKETPAW_ANTHROPIC_API_KEY=sk-ant-...
+POCKETPAW_DASHBOARD_HOST=127.0.0.1
+POCKETPAW_DASHBOARD_PORT=8000
+POCKETPAW_TOOL_PROFILE=coding
 ```
 
 ### Security Hardening

@@ -2,7 +2,7 @@
 
 import pytest
 
-from pocketclaw.tools.policy import TOOL_GROUPS, ToolPolicy
+from pocketpaw.tools.policy import TOOL_GROUPS, ToolPolicy
 
 
 class TestToolGroups:
@@ -175,8 +175,8 @@ class TestRegistryPolicyIntegration:
     """Test that ToolRegistry respects the policy."""
 
     def test_registry_filters_definitions(self):
-        from pocketclaw.tools.protocol import BaseTool
-        from pocketclaw.tools.registry import ToolRegistry
+        from pocketpaw.tools.protocol import BaseTool
+        from pocketpaw.tools.registry import ToolRegistry
 
         class FakeTool(BaseTool):
             @property
@@ -208,8 +208,8 @@ class TestRegistryPolicyIntegration:
 
     @pytest.mark.asyncio
     async def test_registry_blocks_execution(self):
-        from pocketclaw.tools.protocol import BaseTool
-        from pocketclaw.tools.registry import ToolRegistry
+        from pocketpaw.tools.protocol import BaseTool
+        from pocketpaw.tools.registry import ToolRegistry
 
         class FakeTool(BaseTool):
             @property
@@ -231,8 +231,8 @@ class TestRegistryPolicyIntegration:
         assert "not allowed" in result
 
     def test_registry_allowed_tool_names(self):
-        from pocketclaw.tools.protocol import BaseTool
-        from pocketclaw.tools.registry import ToolRegistry
+        from pocketpaw.tools.protocol import BaseTool
+        from pocketpaw.tools.registry import ToolRegistry
 
         class FakeTool(BaseTool):
             @property

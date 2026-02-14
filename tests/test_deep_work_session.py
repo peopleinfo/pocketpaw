@@ -28,21 +28,21 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from pocketclaw.deep_work.human_tasks import HumanTaskRouter
-from pocketclaw.deep_work.models import (
+from pocketpaw.deep_work.human_tasks import HumanTaskRouter
+from pocketpaw.deep_work.models import (
     AgentSpec,
     PlannerResult,
     ProjectStatus,
     TaskSpec,
 )
-from pocketclaw.deep_work.planner import PlannerAgent
-from pocketclaw.deep_work.scheduler import DependencyScheduler
-from pocketclaw.deep_work.session import DeepWorkSession, _extract_title
-from pocketclaw.mission_control.manager import (
+from pocketpaw.deep_work.planner import PlannerAgent
+from pocketpaw.deep_work.scheduler import DependencyScheduler
+from pocketpaw.deep_work.session import DeepWorkSession, _extract_title
+from pocketpaw.mission_control.manager import (
     MissionControlManager,
     reset_mission_control_manager,
 )
-from pocketclaw.mission_control.store import (
+from pocketpaw.mission_control.store import (
     FileMissionControlStore,
     reset_mission_control_store,
 )
@@ -674,7 +674,7 @@ class TestSubscribeToBus:
         mock_bus = MagicMock()
         mock_bus.subscribe_system = MagicMock()
 
-        with patch("pocketclaw.bus.get_message_bus", return_value=mock_bus):
+        with patch("pocketpaw.bus.get_message_bus", return_value=mock_bus):
             session.subscribe_to_bus()
             session.subscribe_to_bus()
 
@@ -684,7 +684,7 @@ class TestSubscribeToBus:
         """subscribe_to_bus should not crash if bus is unavailable."""
         session = DeepWorkSession(manager=manager, executor=mock_executor)
 
-        with patch("pocketclaw.bus.get_message_bus", side_effect=RuntimeError("no bus")):
+        with patch("pocketpaw.bus.get_message_bus", side_effect=RuntimeError("no bus")):
             session.subscribe_to_bus()
 
         assert not session._subscribed
@@ -700,17 +700,17 @@ class TestPublicAPI:
 
     def test_get_deep_work_session_returns_singleton(self):
         """get_deep_work_session should return the same instance."""
-        from pocketclaw.deep_work import get_deep_work_session, reset_deep_work_session
+        from pocketpaw.deep_work import get_deep_work_session, reset_deep_work_session
 
         reset_deep_work_session()
 
         with (
             patch(
-                "pocketclaw.mission_control.manager.get_mission_control_manager",
+                "pocketpaw.mission_control.manager.get_mission_control_manager",
                 return_value=MagicMock(),
             ),
             patch(
-                "pocketclaw.mission_control.executor.get_mc_task_executor",
+                "pocketpaw.mission_control.executor.get_mc_task_executor",
                 return_value=MagicMock(),
             ),
         ):
@@ -722,17 +722,17 @@ class TestPublicAPI:
 
     def test_reset_deep_work_session_clears_singleton(self):
         """reset_deep_work_session should clear the cached instance."""
-        from pocketclaw.deep_work import get_deep_work_session, reset_deep_work_session
+        from pocketpaw.deep_work import get_deep_work_session, reset_deep_work_session
 
         reset_deep_work_session()
 
         with (
             patch(
-                "pocketclaw.mission_control.manager.get_mission_control_manager",
+                "pocketpaw.mission_control.manager.get_mission_control_manager",
                 return_value=MagicMock(),
             ),
             patch(
-                "pocketclaw.mission_control.executor.get_mc_task_executor",
+                "pocketpaw.mission_control.executor.get_mc_task_executor",
                 return_value=MagicMock(),
             ),
         ):

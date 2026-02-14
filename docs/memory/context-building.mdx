@@ -20,10 +20,10 @@ The builder combines these sources in order:
     The agent's system prompt with personality, capabilities, and behavioral guidelines.
   </Step>
   <Step title="User Profile">
-    Content from `~/.pocketclaw/identity/USER.md` — a user-editable file with preferences and background information.
+    Content from `~/.pocketpaw/identity/USER.md` — a user-editable file with preferences and background information.
   </Step>
   <Step title="Skills">
-    Loaded skill definitions from `~/.pocketclaw/skills/*.md`.
+    Loaded skill definitions from `~/.pocketpaw/skills/*.md`.
   </Step>
   <Step title="Long-term Facts">
     Extracted facts from previous sessions (e.g., "User prefers Python", "Uses Arch Linux").
@@ -48,7 +48,7 @@ The builder ensures the total context fits within the model's limits:
 
 ## User Profile (USER.md)
 
-PocketPaw automatically creates `~/.pocketclaw/identity/USER.md` on first run. Users can edit this file to provide context:
+PocketPaw automatically creates `~/.pocketpaw/identity/USER.md` on first run. Users can edit this file to provide context:
 
 ```markdown
 # About Me

@@ -7,7 +7,7 @@ class TestRedditToolSchemas:
     """Test Reddit tool properties and schemas."""
 
     def test_search_tool(self):
-        from pocketclaw.tools.builtin.reddit import RedditSearchTool
+        from pocketpaw.tools.builtin.reddit import RedditSearchTool
 
         tool = RedditSearchTool()
         assert tool.name == "reddit_search"
@@ -16,7 +16,7 @@ class TestRedditToolSchemas:
         assert "subreddit" in tool.parameters["properties"]
 
     def test_read_tool(self):
-        from pocketclaw.tools.builtin.reddit import RedditReadTool
+        from pocketpaw.tools.builtin.reddit import RedditReadTool
 
         tool = RedditReadTool()
         assert tool.name == "reddit_read"
@@ -24,7 +24,7 @@ class TestRedditToolSchemas:
         assert "url" in tool.parameters["required"]
 
     def test_trending_tool(self):
-        from pocketclaw.tools.builtin.reddit import RedditTrendingTool
+        from pocketpaw.tools.builtin.reddit import RedditTrendingTool
 
         tool = RedditTrendingTool()
         assert tool.name == "reddit_trending"
@@ -36,7 +36,7 @@ class TestRedditClientFormatPost:
     """Test RedditClient._format_post helper."""
 
     def test_format_post(self):
-        from pocketclaw.integrations.reddit import RedditClient
+        from pocketpaw.integrations.reddit import RedditClient
 
         post = {
             "title": "Test Post",
@@ -55,7 +55,7 @@ class TestRedditClientFormatPost:
         assert "reddit.com" in result["url"]
 
     def test_format_post_deleted(self):
-        from pocketclaw.integrations.reddit import RedditClient
+        from pocketpaw.integrations.reddit import RedditClient
 
         post = {}
         result = RedditClient._format_post(post)
@@ -64,7 +64,7 @@ class TestRedditClientFormatPost:
 
 
 async def test_reddit_search_success():
-    from pocketclaw.tools.builtin.reddit import RedditSearchTool
+    from pocketpaw.tools.builtin.reddit import RedditSearchTool
 
     tool = RedditSearchTool()
 
@@ -80,12 +80,12 @@ async def test_reddit_search_success():
     ]
 
     with patch(
-        "pocketclaw.integrations.reddit.RedditClient.search",
+        "pocketpaw.integrations.reddit.RedditClient.search",
         new_callable=AsyncMock,
         return_value=mock_posts,
     ):
         # Also skip rate limiting
-        with patch("pocketclaw.integrations.reddit._rate_limit", new_callable=AsyncMock):
+        with patch("pocketpaw.integrations.reddit._rate_limit", new_callable=AsyncMock):
             result = await tool.execute(query="python frameworks", subreddit="python")
 
     assert "Best Python Frameworks" in result
@@ -93,23 +93,23 @@ async def test_reddit_search_success():
 
 
 async def test_reddit_search_no_results():
-    from pocketclaw.tools.builtin.reddit import RedditSearchTool
+    from pocketpaw.tools.builtin.reddit import RedditSearchTool
 
     tool = RedditSearchTool()
 
     with patch(
-        "pocketclaw.integrations.reddit.RedditClient.search",
+        "pocketpaw.integrations.reddit.RedditClient.search",
         new_callable=AsyncMock,
         return_value=[],
     ):
-        with patch("pocketclaw.integrations.reddit._rate_limit", new_callable=AsyncMock):
+        with patch("pocketpaw.integrations.reddit._rate_limit", new_callable=AsyncMock):
             result = await tool.execute(query="xyznonexistent123")
 
     assert "No posts found" in result
 
 
 async def test_reddit_read_success():
-    from pocketclaw.tools.builtin.reddit import RedditReadTool
+    from pocketpaw.tools.builtin.reddit import RedditReadTool
 
     tool = RedditReadTool()
 
@@ -127,11 +127,11 @@ async def test_reddit_read_success():
     }
 
     with patch(
-        "pocketclaw.integrations.reddit.RedditClient.get_post",
+        "pocketpaw.integrations.reddit.RedditClient.get_post",
         new_callable=AsyncMock,
         return_value=mock_post,
     ):
-        with patch("pocketclaw.integrations.reddit._rate_limit", new_callable=AsyncMock):
+        with patch("pocketpaw.integrations.reddit._rate_limit", new_callable=AsyncMock):
             result = await tool.execute(url="https://reddit.com/r/test/comments/abc/")
 
     assert "My Post" in result
@@ -140,7 +140,7 @@ async def test_reddit_read_success():
 
 
 async def test_reddit_trending_success():
-    from pocketclaw.tools.builtin.reddit import RedditTrendingTool
+    from pocketpaw.tools.builtin.reddit import RedditTrendingTool
 
     tool = RedditTrendingTool()
 
@@ -156,11 +156,11 @@ async def test_reddit_trending_success():
     ]
 
     with patch(
-        "pocketclaw.integrations.reddit.RedditClient.get_subreddit_top",
+        "pocketpaw.integrations.reddit.RedditClient.get_subreddit_top",
         new_callable=AsyncMock,
         return_value=mock_posts,
     ):
-        with patch("pocketclaw.integrations.reddit._rate_limit", new_callable=AsyncMock):
+        with patch("pocketpaw.integrations.reddit._rate_limit", new_callable=AsyncMock):
             result = await tool.execute(subreddit="all", time_filter="day")
 
     assert "Trending Post 1" in result
@@ -168,34 +168,34 @@ async def test_reddit_trending_success():
 
 
 async def test_reddit_trending_empty():
-    from pocketclaw.tools.builtin.reddit import RedditTrendingTool
+    from pocketpaw.tools.builtin.reddit import RedditTrendingTool
 
     tool = RedditTrendingTool()
 
     with patch(
-        "pocketclaw.integrations.reddit.RedditClient.get_subreddit_top",
+        "pocketpaw.integrations.reddit.RedditClient.get_subreddit_top",
         new_callable=AsyncMock,
         return_value=[],
     ):
-        with patch("pocketclaw.integrations.reddit._rate_limit", new_callable=AsyncMock):
+        with patch("pocketpaw.integrations.reddit._rate_limit", new_callable=AsyncMock):
             result = await tool.execute(subreddit="deadsubreddit")
 
     assert "No trending posts" in result
 
 
 async def test_reddit_read_error():
-    from pocketclaw.tools.builtin.reddit import RedditReadTool
+    from pocketpaw.tools.builtin.reddit import RedditReadTool
 
     tool = RedditReadTool()
 
     mock_post = {"error": "Unexpected response format"}
 
     with patch(
-        "pocketclaw.integrations.reddit.RedditClient.get_post",
+        "pocketpaw.integrations.reddit.RedditClient.get_post",
         new_callable=AsyncMock,
         return_value=mock_post,
     ):
-        with patch("pocketclaw.integrations.reddit._rate_limit", new_callable=AsyncMock):
+        with patch("pocketpaw.integrations.reddit._rate_limit", new_callable=AsyncMock):
             result = await tool.execute(url="https://reddit.com/bad")
 
     assert result.startswith("Error:")

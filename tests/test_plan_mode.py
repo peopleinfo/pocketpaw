@@ -5,7 +5,7 @@ import asyncio
 
 import pytest
 
-from pocketclaw.agents.plan_mode import (
+from pocketpaw.agents.plan_mode import (
     ExecutionPlan,
     PlanManager,
     PlanStatus,

@@ -8,10 +8,10 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from pocketclaw.bootstrap.context_builder import AgentContextBuilder
-from pocketclaw.bootstrap.default_provider import DefaultBootstrapProvider
-from pocketclaw.bootstrap.protocol import BootstrapContext
-from pocketclaw.bus.events import Channel
+from pocketpaw.bootstrap.context_builder import AgentContextBuilder
+from pocketpaw.bootstrap.default_provider import DefaultBootstrapProvider
+from pocketpaw.bootstrap.protocol import BootstrapContext
+from pocketpaw.bus.events import Channel
 
 
 @pytest.fixture

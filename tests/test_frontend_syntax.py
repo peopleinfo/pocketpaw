@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 
 # Frontend directory
-FRONTEND_DIR = Path(__file__).parent.parent / "src" / "pocketclaw" / "frontend"
+FRONTEND_DIR = Path(__file__).parent.parent / "src" / "pocketpaw" / "frontend"
 
 
 def get_js_files():

@@ -8,14 +8,14 @@ from pathlib import Path
 
 import pytest
 
-from pocketclaw.deep_work.models import (
+from pocketpaw.deep_work.models import (
     AgentSpec,
     PlannerResult,
     Project,
     ProjectStatus,
     TaskSpec,
 )
-from pocketclaw.mission_control.store import (
+from pocketpaw.mission_control.store import (
     FileMissionControlStore,
     reset_mission_control_store,
 )

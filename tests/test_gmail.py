@@ -4,8 +4,8 @@
 import base64
 from unittest.mock import patch
 
-from pocketclaw.integrations.gmail import GmailClient
-from pocketclaw.tools.builtin.gmail import GmailReadTool, GmailSearchTool, GmailSendTool
+from pocketpaw.integrations.gmail import GmailClient
+from pocketpaw.tools.builtin.gmail import GmailReadTool, GmailSearchTool, GmailSendTool
 
 # ---------------------------------------------------------------------------
 # GmailClient._extract_body
@@ -91,7 +91,7 @@ class TestToolDefinitions:
 async def test_gmail_search_no_auth():
     tool = GmailSearchTool()
     with patch(
-        "pocketclaw.integrations.gmail.GmailClient._get_token",
+        "pocketpaw.integrations.gmail.GmailClient._get_token",
         side_effect=RuntimeError("Not authenticated"),
     ):
         result = await tool.execute(query="test")
@@ -102,7 +102,7 @@ async def test_gmail_search_no_auth():
 async def test_gmail_read_no_auth():
     tool = GmailReadTool()
     with patch(
-        "pocketclaw.integrations.gmail.GmailClient._get_token",
+        "pocketpaw.integrations.gmail.GmailClient._get_token",
         side_effect=RuntimeError("Not authenticated"),
     ):
         result = await tool.execute(message_id="abc123")
@@ -112,7 +112,7 @@ async def test_gmail_read_no_auth():
 async def test_gmail_send_no_auth():
     tool = GmailSendTool()
     with patch(
-        "pocketclaw.integrations.gmail.GmailClient._get_token",
+        "pocketpaw.integrations.gmail.GmailClient._get_token",
         side_effect=RuntimeError("Not authenticated"),
     ):
         result = await tool.execute(to="x@x.com", subject="Hi", body="Test")

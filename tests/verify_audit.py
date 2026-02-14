@@ -3,9 +3,9 @@ import json
 import logging
 import os
 from pathlib import Path
-from pocketclaw.tools import ToolRegistry
-from pocketclaw.tools.builtin import ShellTool
-from pocketclaw.security import get_audit_logger, AuditSeverity
+from pocketpaw.tools import ToolRegistry
+from pocketpaw.tools.builtin import ShellTool
+from pocketpaw.security import get_audit_logger, AuditSeverity
 
 # Setup Logging
 logging.basicConfig(level=logging.DEBUG)

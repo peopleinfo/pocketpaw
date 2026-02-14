@@ -10,7 +10,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from pocketclaw.security.audit_cli import (
+from pocketpaw.security.audit_cli import (
     _check_audit_log,
     _check_bypass_permissions,
     _check_config_permissions,
@@ -34,7 +34,7 @@ class TestConfigPermissions:
     """Tests for config file permission checks."""
 
     def test_no_config_file(self):
-        with patch("pocketclaw.security.audit_cli.get_config_path") as mock:
+        with patch("pocketpaw.security.audit_cli.get_config_path") as mock:
             mock.return_value = Path("/nonexistent/config.json")
             ok, msg, fixable = _check_config_permissions()
             assert ok is True
@@ -44,7 +44,7 @@ class TestConfigPermissions:
         config.write_text("{}")
         os.chmod(config, stat.S_IRUSR | stat.S_IWUSR)
 
-        with patch("pocketclaw.security.audit_cli.get_config_path", return_value=config):
+        with patch("pocketpaw.security.audit_cli.get_config_path", return_value=config):
             ok, msg, fixable = _check_config_permissions()
             assert ok is True
 
@@ -53,7 +53,7 @@ class TestConfigPermissions:
         config.write_text("{}")
         os.chmod(config, stat.S_IRUSR | stat.S_IWUSR | stat.S_IROTH)
 
-        with patch("pocketclaw.security.audit_cli.get_config_path", return_value=config):
+        with patch("pocketpaw.security.audit_cli.get_config_path", return_value=config):
             ok, msg, fixable = _check_config_permissions()
             assert ok is False
             assert fixable is True
@@ -63,7 +63,7 @@ class TestConfigPermissions:
         config.write_text("{}")
         os.chmod(config, stat.S_IRUSR | stat.S_IWUSR | stat.S_IROTH)
 
-        with patch("pocketclaw.security.audit_cli.get_config_path", return_value=config):
+        with patch("pocketpaw.security.audit_cli.get_config_path", return_value=config):
             _fix_config_permissions()
             mode = config.stat().st_mode
             assert not (mode & stat.S_IROTH)
@@ -74,7 +74,7 @@ class TestPlaintextApiKeys:
     """Tests for plaintext API key checks."""
 
     def test_no_config_file(self):
-        with patch("pocketclaw.security.audit_cli.get_config_path") as mock:
+        with patch("pocketpaw.security.audit_cli.get_config_path") as mock:
             mock.return_value = Path("/nonexistent/config.json")
             ok, msg, fixable = _check_plaintext_api_keys()
             assert ok is True
@@ -83,7 +83,7 @@ class TestPlaintextApiKeys:
         config = temp_config_dir / "config.json"
         config.write_text(json.dumps({"agent_backend": "claude_agent_sdk"}))
 
-        with patch("pocketclaw.security.audit_cli.get_config_path", return_value=config):
+        with patch("pocketpaw.security.audit_cli.get_config_path", return_value=config):
             ok, msg, fixable = _check_plaintext_api_keys()
             assert ok is True
 
@@ -91,7 +91,7 @@ class TestPlaintextApiKeys:
         config = temp_config_dir / "config.json"
         config.write_text(json.dumps({"anthropic_api_key": "sk-ant-123"}))
 
-        with patch("pocketclaw.security.audit_cli.get_config_path", return_value=config):
+        with patch("pocketpaw.security.audit_cli.get_config_path", return_value=config):
             ok, msg, fixable = _check_plaintext_api_keys()
             assert ok is False
             assert "anthropic_api_key" in msg
@@ -101,7 +101,7 @@ class TestAuditLog:
     """Tests for audit log checks."""
 
     def test_audit_log_missing(self, temp_config_dir):
-        with patch("pocketclaw.security.audit_cli.get_config_dir", return_value=temp_config_dir):
+        with patch("pocketpaw.security.audit_cli.get_config_dir", return_value=temp_config_dir):
             ok, msg, fixable = _check_audit_log()
             assert ok is False
             assert fixable is True
@@ -110,12 +110,12 @@ class TestAuditLog:
         audit = temp_config_dir / "audit.jsonl"
         audit.touch()
 
-        with patch("pocketclaw.security.audit_cli.get_config_dir", return_value=temp_config_dir):
+        with patch("pocketpaw.security.audit_cli.get_config_dir", return_value=temp_config_dir):
             ok, msg, fixable = _check_audit_log()
             assert ok is True
 
     def test_fix_creates_audit_log(self, temp_config_dir):
-        with patch("pocketclaw.security.audit_cli.get_config_dir", return_value=temp_config_dir):
+        with patch("pocketpaw.security.audit_cli.get_config_dir", return_value=temp_config_dir):
             _fix_audit_log()
             audit = temp_config_dir / "audit.jsonl"
             assert audit.exists()
@@ -125,13 +125,13 @@ class TestGuardianReachable:
     """Tests for guardian agent check."""
 
     def test_no_api_key(self):
-        with patch("pocketclaw.security.audit_cli.get_settings") as mock:
+        with patch("pocketpaw.security.audit_cli.get_settings") as mock:
             mock.return_value = MagicMock(anthropic_api_key=None)
             ok, msg, fixable = _check_guardian_reachable()
             assert ok is False
 
     def test_api_key_set(self):
-        with patch("pocketclaw.security.audit_cli.get_settings") as mock:
+        with patch("pocketpaw.security.audit_cli.get_settings") as mock:
             mock.return_value = MagicMock(anthropic_api_key="sk-ant-123")
             ok, msg, fixable = _check_guardian_reachable()
             assert ok is True
@@ -141,13 +141,13 @@ class TestFileJail:
     """Tests for file jail check."""
 
     def test_valid_jail(self, temp_config_dir):
-        with patch("pocketclaw.security.audit_cli.get_settings") as mock:
+        with patch("pocketpaw.security.audit_cli.get_settings") as mock:
             mock.return_value = MagicMock(file_jail_path=temp_config_dir)
             ok, msg, fixable = _check_file_jail()
             assert ok is True
 
     def test_nonexistent_jail(self):
-        with patch("pocketclaw.security.audit_cli.get_settings") as mock:
+        with patch("pocketpaw.security.audit_cli.get_settings") as mock:
             mock.return_value = MagicMock(file_jail_path=Path("/nonexistent/path"))
             ok, msg, fixable = _check_file_jail()
             assert ok is False
@@ -157,13 +157,13 @@ class TestToolProfile:
     """Tests for tool profile check."""
 
     def test_full_profile_warns(self):
-        with patch("pocketclaw.security.audit_cli.get_settings") as mock:
+        with patch("pocketpaw.security.audit_cli.get_settings") as mock:
             mock.return_value = MagicMock(tool_profile="full")
             ok, msg, fixable = _check_tool_profile()
             assert ok is False
 
     def test_coding_profile_ok(self):
-        with patch("pocketclaw.security.audit_cli.get_settings") as mock:
+        with patch("pocketpaw.security.audit_cli.get_settings") as mock:
             mock.return_value = MagicMock(tool_profile="coding")
             ok, msg, fixable = _check_tool_profile()
             assert ok is True
@@ -173,13 +173,13 @@ class TestBypassPermissions:
     """Tests for bypass permissions check."""
 
     def test_bypass_enabled_warns(self):
-        with patch("pocketclaw.security.audit_cli.get_settings") as mock:
+        with patch("pocketpaw.security.audit_cli.get_settings") as mock:
             mock.return_value = MagicMock(bypass_permissions=True)
             ok, msg, fixable = _check_bypass_permissions()
             assert ok is False
 
     def test_bypass_disabled_ok(self):
-        with patch("pocketclaw.security.audit_cli.get_settings") as mock:
+        with patch("pocketpaw.security.audit_cli.get_settings") as mock:
             mock.return_value = MagicMock(bypass_permissions=False)
             ok, msg, fixable = _check_bypass_permissions()
             assert ok is True
@@ -191,31 +191,31 @@ class TestRunSecurityAudit:
     async def test_all_pass(self):
         with (
             patch(
-                "pocketclaw.security.audit_cli._check_config_permissions",
+                "pocketpaw.security.audit_cli._check_config_permissions",
                 return_value=(True, "OK", False),
             ),
             patch(
-                "pocketclaw.security.audit_cli._check_plaintext_api_keys",
+                "pocketpaw.security.audit_cli._check_plaintext_api_keys",
                 return_value=(True, "OK", False),
             ),
             patch(
-                "pocketclaw.security.audit_cli._check_audit_log",
+                "pocketpaw.security.audit_cli._check_audit_log",
                 return_value=(True, "OK", False),
             ),
             patch(
-                "pocketclaw.security.audit_cli._check_guardian_reachable",
+                "pocketpaw.security.audit_cli._check_guardian_reachable",
                 return_value=(True, "OK", False),
             ),
             patch(
-                "pocketclaw.security.audit_cli._check_file_jail",
+                "pocketpaw.security.audit_cli._check_file_jail",
                 return_value=(True, "OK", False),
             ),
             patch(
-                "pocketclaw.security.audit_cli._check_tool_profile",
+                "pocketpaw.security.audit_cli._check_tool_profile",
                 return_value=(True, "OK", False),
             ),
             patch(
-                "pocketclaw.security.audit_cli._check_bypass_permissions",
+                "pocketpaw.security.audit_cli._check_bypass_permissions",
                 return_value=(True, "OK", False),
             ),
         ):
@@ -225,31 +225,31 @@ class TestRunSecurityAudit:
     async def test_issues_found(self):
         with (
             patch(
-                "pocketclaw.security.audit_cli._check_config_permissions",
+                "pocketpaw.security.audit_cli._check_config_permissions",
                 return_value=(False, "Bad perms", True),
             ),
             patch(
-                "pocketclaw.security.audit_cli._check_plaintext_api_keys",
+                "pocketpaw.security.audit_cli._check_plaintext_api_keys",
                 return_value=(True, "OK", False),
             ),
             patch(
-                "pocketclaw.security.audit_cli._check_audit_log",
+                "pocketpaw.security.audit_cli._check_audit_log",
                 return_value=(True, "OK", False),
             ),
             patch(
-                "pocketclaw.security.audit_cli._check_guardian_reachable",
+                "pocketpaw.security.audit_cli._check_guardian_reachable",
                 return_value=(True, "OK", False),
             ),
             patch(
-                "pocketclaw.security.audit_cli._check_file_jail",
+                "pocketpaw.security.audit_cli._check_file_jail",
                 return_value=(True, "OK", False),
             ),
             patch(
-                "pocketclaw.security.audit_cli._check_tool_profile",
+                "pocketpaw.security.audit_cli._check_tool_profile",
                 return_value=(True, "OK", False),
             ),
             patch(
-                "pocketclaw.security.audit_cli._check_bypass_permissions",
+                "pocketpaw.security.audit_cli._check_bypass_permissions",
                 return_value=(True, "OK", False),
             ),
         ):
@@ -265,35 +265,35 @@ class TestRunSecurityAudit:
 
         with (
             patch(
-                "pocketclaw.security.audit_cli._check_config_permissions",
+                "pocketpaw.security.audit_cli._check_config_permissions",
                 return_value=(False, "Bad perms", True),
             ),
             patch(
-                "pocketclaw.security.audit_cli._fix_config_permissions",
+                "pocketpaw.security.audit_cli._fix_config_permissions",
                 side_effect=mock_fix,
             ),
             patch(
-                "pocketclaw.security.audit_cli._check_plaintext_api_keys",
+                "pocketpaw.security.audit_cli._check_plaintext_api_keys",
                 return_value=(True, "OK", False),
             ),
             patch(
-                "pocketclaw.security.audit_cli._check_audit_log",
+                "pocketpaw.security.audit_cli._check_audit_log",
                 return_value=(True, "OK", False),
             ),
             patch(
-                "pocketclaw.security.audit_cli._check_guardian_reachable",
+                "pocketpaw.security.audit_cli._check_guardian_reachable",
                 return_value=(True, "OK", False),
             ),
             patch(
-                "pocketclaw.security.audit_cli._check_file_jail",
+                "pocketpaw.security.audit_cli._check_file_jail",
                 return_value=(True, "OK", False),
             ),
             patch(
-                "pocketclaw.security.audit_cli._check_tool_profile",
+                "pocketpaw.security.audit_cli._check_tool_profile",
                 return_value=(True, "OK", False),
             ),
             patch(
-                "pocketclaw.security.audit_cli._check_bypass_permissions",
+                "pocketpaw.security.audit_cli._check_bypass_permissions",
                 return_value=(True, "OK", False),
             ),
         ):

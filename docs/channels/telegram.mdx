@@ -21,7 +21,7 @@ PocketPaw supports Telegram via the `python-telegram-bot` library. It works as a
   </Step>
   <Step title="Configure">
     ```bash
-    export POCKETCLAW_TELEGRAM_TOKEN="your-bot-token"
+    export POCKETPAW_TELEGRAM_TOKEN="your-bot-token"
     ```
   </Step>
   <Step title="Start">
@@ -39,8 +39,8 @@ PocketPaw supports Telegram via the `python-telegram-bot` library. It works as a
 
 | Setting | Env Variable | Description |
 |---------|-------------|-------------|
-| Bot token | `POCKETCLAW_TELEGRAM_TOKEN` | Bot token from BotFather |
-| Allowed user IDs | `POCKETCLAW_ALLOWED_TELEGRAM_IDS` | Comma-separated user IDs |
+| Bot token | `POCKETPAW_TELEGRAM_TOKEN` | Bot token from BotFather |
+| Allowed user IDs | `POCKETPAW_ALLOWED_TELEGRAM_IDS` | Comma-separated user IDs |
 
 ## Features
 
@@ -60,7 +60,7 @@ PocketPaw supports Telegram's topic feature (available in groups with topics ena
 Restrict access by specifying allowed Telegram user IDs:
 
 ```bash
-export POCKETCLAW_ALLOWED_TELEGRAM_IDS="123456,789012"
+export POCKETPAW_ALLOWED_TELEGRAM_IDS="123456,789012"
 ```
 
 Only users with these IDs can interact with the bot. If not set, anyone can use the bot.

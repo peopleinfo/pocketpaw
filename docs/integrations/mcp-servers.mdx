@@ -17,7 +17,7 @@ MCP is an open protocol that allows AI agents to connect to external tools and d
 
 ## Configuration
 
-MCP servers are configured in `~/.pocketclaw/mcp.json`:
+MCP servers are configured in `~/.pocketpaw/mcp.json`:
 
 ```json
 {
@@ -103,13 +103,13 @@ MCP tools are subject to the tool policy system:
 
 ```bash
 # Allow all MCP tools
-export POCKETCLAW_TOOLS_ALLOW="group:mcp"
+export POCKETPAW_TOOLS_ALLOW="group:mcp"
 
 # Allow specific server's tools
-export POCKETCLAW_TOOLS_ALLOW="mcp:filesystem:*"
+export POCKETPAW_TOOLS_ALLOW="mcp:filesystem:*"
 
 # Deny a specific tool
-export POCKETCLAW_TOOLS_DENY="mcp:github:delete_repo"
+export POCKETPAW_TOOLS_DENY="mcp:github:delete_repo"
 ```
 
 ## Popular MCP Servers

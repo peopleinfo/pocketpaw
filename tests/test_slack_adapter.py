@@ -61,9 +61,9 @@ sys.modules.setdefault("slack_bolt.adapter", mock_socket_module)
 sys.modules.setdefault("slack_bolt.adapter.socket_mode", mock_socket_mode)
 sys.modules.setdefault("slack_bolt.adapter.socket_mode.async_handler", mock_async_handler)
 
-from pocketclaw.bus.adapters.slack_adapter import SlackAdapter
-from pocketclaw.bus.events import Channel, OutboundMessage
-from pocketclaw.bus.queue import MessageBus
+from pocketpaw.bus.adapters.slack_adapter import SlackAdapter
+from pocketpaw.bus.events import Channel, OutboundMessage
+from pocketpaw.bus.queue import MessageBus
 
 
 @pytest.fixture

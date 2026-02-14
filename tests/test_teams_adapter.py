@@ -17,8 +17,8 @@ sys.modules.setdefault("botbuilder.schema", mock_bb_schema)
 sys.modules.setdefault("botbuilder.integration.aiohttp", mock_bb_aiohttp)
 
 
-from pocketclaw.bus.adapters.teams_adapter import TeamsAdapter  # noqa: E402
-from pocketclaw.bus.events import Channel, OutboundMessage  # noqa: E402
+from pocketpaw.bus.adapters.teams_adapter import TeamsAdapter  # noqa: E402
+from pocketpaw.bus.events import Channel, OutboundMessage  # noqa: E402
 
 
 class TestTeamsAdapterInit:

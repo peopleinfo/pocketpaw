@@ -9,8 +9,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from pocketclaw.bus.adapters.webhook_adapter import WebhookAdapter, WebhookSlotConfig
-from pocketclaw.bus.events import Channel, OutboundMessage
+from pocketpaw.bus.adapters.webhook_adapter import WebhookAdapter, WebhookSlotConfig
+from pocketpaw.bus.events import Channel, OutboundMessage
 
 
 @pytest.fixture

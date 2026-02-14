@@ -79,7 +79,7 @@ test: add coverage for injection scanner
 ## Project Structure
 
 ```
-src/pocketclaw/          # Core package (internal name: pocketclaw)
+src/pocketpaw/          # Core package (internal name: pocketpaw)
   agents/                # Agent backends + routing
   bus/adapters/          # Channel adapters (Discord, Slack, etc.)
   tools/builtin/         # Built-in tools

@@ -18,8 +18,8 @@ sys.modules.setdefault("googleapiclient", MagicMock())
 sys.modules.setdefault("googleapiclient.discovery", mock_discovery)
 
 
-from pocketclaw.bus.adapters.gchat_adapter import GoogleChatAdapter  # noqa: E402
-from pocketclaw.bus.events import Channel, OutboundMessage  # noqa: E402
+from pocketpaw.bus.adapters.gchat_adapter import GoogleChatAdapter  # noqa: E402
+from pocketpaw.bus.events import Channel, OutboundMessage  # noqa: E402
 
 
 class TestGoogleChatAdapterInit:

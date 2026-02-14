@@ -6,9 +6,9 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from pocketclaw.bus.adapters import BaseChannelAdapter
-from pocketclaw.bus.events import Channel, InboundMessage, OutboundMessage
-from pocketclaw.bus.queue import MessageBus
+from pocketpaw.bus.adapters import BaseChannelAdapter
+from pocketpaw.bus.events import Channel, InboundMessage, OutboundMessage
+from pocketpaw.bus.queue import MessageBus
 
 
 class MockAdapter(BaseChannelAdapter):

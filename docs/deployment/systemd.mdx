@@ -36,7 +36,7 @@ EnvironmentFile=/etc/pocketpaw/env
 NoNewPrivileges=yes
 ProtectSystem=strict
 ProtectHome=read-only
-ReadWritePaths=/home/pocketpaw/.pocketclaw
+ReadWritePaths=/home/pocketpaw/.pocketpaw
 PrivateTmp=yes
 
 [Install]
@@ -48,11 +48,11 @@ WantedBy=multi-user.target
 Create `/etc/pocketpaw/env`:
 
 ```bash
-POCKETCLAW_ANTHROPIC_API_KEY=sk-ant-your-key
-POCKETCLAW_DASHBOARD_HOST=127.0.0.1
-POCKETCLAW_DASHBOARD_PORT=8000
-POCKETCLAW_AGENT_BACKEND=claude_agent_sdk
-POCKETCLAW_TOOL_PROFILE=coding
+POCKETPAW_ANTHROPIC_API_KEY=sk-ant-your-key
+POCKETPAW_DASHBOARD_HOST=127.0.0.1
+POCKETPAW_DASHBOARD_PORT=8000
+POCKETPAW_AGENT_BACKEND=claude_agent_sdk
+POCKETPAW_TOOL_PROFILE=coding
 ```
 
 Set permissions:
@@ -108,7 +108,7 @@ sudo journalctl -u pocketpaw --since "1 hour ago"
 Systemd handles log rotation via journald. For the audit log, add a logrotate config:
 
 ```
-/home/pocketpaw/.pocketclaw/audit.jsonl {
+/home/pocketpaw/.pocketpaw/audit.jsonl {
     weekly
     rotate 12
     compress

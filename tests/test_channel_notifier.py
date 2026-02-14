@@ -2,14 +2,14 @@
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from pocketclaw.bus.events import Channel, OutboundMessage
-from pocketclaw.bus.notifier import notify
+from pocketpaw.bus.events import Channel, OutboundMessage
+from pocketpaw.bus.notifier import notify
 
 
 class TestNotify:
     """Tests for notify()."""
 
-    @patch("pocketclaw.bus.get_message_bus")
+    @patch("pocketpaw.bus.get_message_bus")
     async def test_publishes_for_each_target(self, mock_bus_fn):
         bus = MagicMock()
         bus.publish_outbound = AsyncMock()
@@ -31,7 +31,7 @@ class TestNotify:
         assert msg2.channel == Channel.DISCORD
         assert msg2.chat_id == "456"
 
-    @patch("pocketclaw.bus.get_message_bus")
+    @patch("pocketpaw.bus.get_message_bus")
     async def test_skips_invalid_target_no_colon(self, mock_bus_fn):
         bus = MagicMock()
         bus.publish_outbound = AsyncMock()
@@ -41,7 +41,7 @@ class TestNotify:
         assert count == 0
         bus.publish_outbound.assert_not_called()
 
-    @patch("pocketclaw.bus.get_message_bus")
+    @patch("pocketpaw.bus.get_message_bus")
     async def test_skips_unknown_channel(self, mock_bus_fn):
         bus = MagicMock()
         bus.publish_outbound = AsyncMock()
@@ -55,8 +55,8 @@ class TestNotify:
         count = await notify("Test", targets=[])
         assert count == 0
 
-    @patch("pocketclaw.bus.get_message_bus")
-    @patch("pocketclaw.config.get_settings")
+    @patch("pocketpaw.bus.get_message_bus")
+    @patch("pocketpaw.config.get_settings")
     async def test_reads_from_settings_when_targets_none(self, mock_settings, mock_bus_fn):
         mock_settings.return_value = MagicMock(notification_channels=["slack:C123"])
         bus = MagicMock()
@@ -69,13 +69,13 @@ class TestNotify:
         assert msg.channel == Channel.SLACK
         assert msg.chat_id == "C123"
 
-    @patch("pocketclaw.config.get_settings")
+    @patch("pocketpaw.config.get_settings")
     async def test_returns_zero_no_configured_channels(self, mock_settings):
         mock_settings.return_value = MagicMock(notification_channels=[])
         count = await notify("Nothing")
         assert count == 0
 
-    @patch("pocketclaw.bus.get_message_bus")
+    @patch("pocketpaw.bus.get_message_bus")
     async def test_mixed_valid_invalid_targets(self, mock_bus_fn):
         bus = MagicMock()
         bus.publish_outbound = AsyncMock()
@@ -87,7 +87,7 @@ class TestNotify:
         )
         assert count == 2  # telegram + whatsapp succeed
 
-    @patch("pocketclaw.bus.get_message_bus")
+    @patch("pocketpaw.bus.get_message_bus")
     async def test_chat_id_with_colons(self, mock_bus_fn):
         """Targets like 'matrix:!room:server.org' should split on first colon only."""
         bus = MagicMock()
@@ -100,7 +100,7 @@ class TestNotify:
         assert msg.channel == Channel.MATRIX
         assert msg.chat_id == "!room:server.org"
 
-    @patch("pocketclaw.bus.get_message_bus")
+    @patch("pocketpaw.bus.get_message_bus")
     async def test_all_known_channels(self, mock_bus_fn):
         """Every Channel enum value should be recognized."""
         bus = MagicMock()
@@ -111,7 +111,7 @@ class TestNotify:
         count = await notify("Broadcast", targets=targets)
         assert count == len(Channel)
 
-    @patch("pocketclaw.bus.get_message_bus")
+    @patch("pocketpaw.bus.get_message_bus")
     async def test_content_passed_through(self, mock_bus_fn):
         bus = MagicMock()
         bus.publish_outbound = AsyncMock()

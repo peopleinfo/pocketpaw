@@ -3,7 +3,7 @@
 
 import pytest
 
-from pocketclaw.security.injection_scanner import (
+from pocketpaw.security.injection_scanner import (
     InjectionScanner,
     ThreatLevel,
     get_injection_scanner,

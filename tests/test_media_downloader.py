@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import httpx
 import pytest
 
-from pocketclaw.bus.media import (  # noqa: E402
+from pocketpaw.bus.media import (  # noqa: E402
     MediaDownloader,
     _sanitize_filename,
     _unique_filename,
@@ -75,8 +75,8 @@ def test_build_media_hint_multiple():
 # --- get_media_dir ---
 
 
-@patch("pocketclaw.bus.media.get_settings")
-@patch("pocketclaw.bus.media.get_config_dir")
+@patch("pocketpaw.bus.media.get_settings")
+@patch("pocketpaw.bus.media.get_config_dir")
 def test_get_media_dir_default(mock_config_dir, mock_settings, tmp_path):
     mock_settings.return_value = MagicMock(media_download_dir="")
     mock_config_dir.return_value = tmp_path
@@ -85,7 +85,7 @@ def test_get_media_dir_default(mock_config_dir, mock_settings, tmp_path):
     assert result.exists()
 
 
-@patch("pocketclaw.bus.media.get_settings")
+@patch("pocketpaw.bus.media.get_settings")
 def test_get_media_dir_custom(mock_settings, tmp_path):
     custom = tmp_path / "custom_media"
     mock_settings.return_value = MagicMock(media_download_dir=str(custom))
@@ -97,8 +97,8 @@ def test_get_media_dir_custom(mock_settings, tmp_path):
 # --- MediaDownloader.save_from_bytes ---
 
 
-@patch("pocketclaw.bus.media.get_media_dir")
-@patch("pocketclaw.bus.media.get_settings")
+@patch("pocketpaw.bus.media.get_media_dir")
+@patch("pocketpaw.bus.media.get_settings")
 async def test_save_from_bytes(mock_settings, mock_dir, tmp_path):
     mock_settings.return_value = MagicMock(media_max_file_size_mb=50)
     mock_dir.return_value = tmp_path
@@ -109,8 +109,8 @@ async def test_save_from_bytes(mock_settings, mock_dir, tmp_path):
     assert open(path, "rb").read() == b"hello world"
 
 
-@patch("pocketclaw.bus.media.get_media_dir")
-@patch("pocketclaw.bus.media.get_settings")
+@patch("pocketpaw.bus.media.get_media_dir")
+@patch("pocketpaw.bus.media.get_settings")
 async def test_save_from_bytes_size_limit(mock_settings, mock_dir, tmp_path):
     mock_settings.return_value = MagicMock(media_max_file_size_mb=1)  # 1 MB limit
     mock_dir.return_value = tmp_path
@@ -121,8 +121,8 @@ async def test_save_from_bytes_size_limit(mock_settings, mock_dir, tmp_path):
         await dl.save_from_bytes(data, "big.bin")
 
 
-@patch("pocketclaw.bus.media.get_media_dir")
-@patch("pocketclaw.bus.media.get_settings")
+@patch("pocketpaw.bus.media.get_media_dir")
+@patch("pocketpaw.bus.media.get_settings")
 async def test_save_from_bytes_unlimited(mock_settings, mock_dir, tmp_path):
     mock_settings.return_value = MagicMock(media_max_file_size_mb=0)  # unlimited
     mock_dir.return_value = tmp_path
@@ -136,8 +136,8 @@ async def test_save_from_bytes_unlimited(mock_settings, mock_dir, tmp_path):
 # --- MediaDownloader.download_url ---
 
 
-@patch("pocketclaw.bus.media.get_media_dir")
-@patch("pocketclaw.bus.media.get_settings")
+@patch("pocketpaw.bus.media.get_media_dir")
+@patch("pocketpaw.bus.media.get_settings")
 async def test_download_url(mock_settings, mock_dir, tmp_path):
     mock_settings.return_value = MagicMock(media_max_file_size_mb=50)
     mock_dir.return_value = tmp_path
@@ -160,8 +160,8 @@ async def test_download_url(mock_settings, mock_dir, tmp_path):
     mock_client.get.assert_called_once()
 
 
-@patch("pocketclaw.bus.media.get_media_dir")
-@patch("pocketclaw.bus.media.get_settings")
+@patch("pocketpaw.bus.media.get_media_dir")
+@patch("pocketpaw.bus.media.get_settings")
 async def test_download_url_http_error(mock_settings, mock_dir, tmp_path):
     mock_settings.return_value = MagicMock(media_max_file_size_mb=50)
     mock_dir.return_value = tmp_path
@@ -184,8 +184,8 @@ async def test_download_url_http_error(mock_settings, mock_dir, tmp_path):
 # --- MediaDownloader.download_url_with_auth ---
 
 
-@patch("pocketclaw.bus.media.get_media_dir")
-@patch("pocketclaw.bus.media.get_settings")
+@patch("pocketpaw.bus.media.get_media_dir")
+@patch("pocketpaw.bus.media.get_settings")
 async def test_download_url_with_auth(mock_settings, mock_dir, tmp_path):
     mock_settings.return_value = MagicMock(media_max_file_size_mb=50)
     mock_dir.return_value = tmp_path
@@ -216,7 +216,7 @@ async def test_download_url_with_auth(mock_settings, mock_dir, tmp_path):
 
 
 def test_get_media_downloader_singleton():
-    import pocketclaw.bus.media as media_mod
+    import pocketpaw.bus.media as media_mod
 
     # Reset singleton
     media_mod._downloader = None
@@ -229,8 +229,8 @@ def test_get_media_downloader_singleton():
 # --- download_url name inference ---
 
 
-@patch("pocketclaw.bus.media.get_media_dir")
-@patch("pocketclaw.bus.media.get_settings")
+@patch("pocketpaw.bus.media.get_media_dir")
+@patch("pocketpaw.bus.media.get_settings")
 async def test_download_url_infers_name(mock_settings, mock_dir, tmp_path):
     """When no name is given, extract from URL."""
     mock_settings.return_value = MagicMock(media_max_file_size_mb=50)

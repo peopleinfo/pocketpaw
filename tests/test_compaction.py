@@ -4,8 +4,8 @@ import json
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from pocketclaw.memory.manager import MemoryManager
-from pocketclaw.memory.protocol import MemoryEntry, MemoryType
+from pocketpaw.memory.manager import MemoryManager
+from pocketpaw.memory.protocol import MemoryEntry, MemoryType
 
 
 def _make_entries(n: int, content_len: int = 50) -> list[MemoryEntry]:

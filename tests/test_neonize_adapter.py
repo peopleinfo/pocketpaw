@@ -31,9 +31,9 @@ sys.modules.setdefault("neonize.aioze.client", mock_aioze_client)
 sys.modules.setdefault("neonize.aioze.events", mock_aioze_events)
 sys.modules.setdefault("neonize.utils", mock_utils)
 
-from pocketclaw.bus.adapters.neonize_adapter import NeonizeAdapter  # noqa: E402
-from pocketclaw.bus.events import Channel, OutboundMessage  # noqa: E402
-from pocketclaw.bus.queue import MessageBus  # noqa: E402
+from pocketpaw.bus.adapters.neonize_adapter import NeonizeAdapter  # noqa: E402
+from pocketpaw.bus.events import Channel, OutboundMessage  # noqa: E402
+from pocketpaw.bus.queue import MessageBus  # noqa: E402
 
 
 @pytest.fixture

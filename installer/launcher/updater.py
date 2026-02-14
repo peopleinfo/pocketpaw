@@ -17,7 +17,7 @@ from installer.launcher.common import (
     DEV_MODE_MARKER,
     GIT_REPO_URL,
     PACKAGE_NAME,
-    POCKETCLAW_HOME,
+    POCKETPAW_HOME,
     VENV_DIR,
     StatusCallback,
     find_uv,
@@ -119,7 +119,7 @@ class Updater:
             if uv:
                 logger.info("Running uv pip install --upgrade %s", PACKAGE_NAME)
                 # Use overrides file if it exists (created by bootstrap)
-                overrides = POCKETCLAW_HOME / "uv-overrides.txt"
+                overrides = POCKETPAW_HOME / "uv-overrides.txt"
                 cmd = [uv, "pip", "install", "--upgrade", PACKAGE_NAME, "--python", str(python)]
                 if overrides.exists():
                     cmd.extend(["--override", str(overrides)])

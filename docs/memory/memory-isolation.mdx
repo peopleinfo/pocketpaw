@@ -36,7 +36,7 @@ When a message arrives from a channel, the system resolves the sender:
 External users get isolated storage:
 
 ```
-~/.pocketclaw/memory/
+~/.pocketpaw/memory/
 ├── MEMORY.md              ← owner's long-term facts
 ├── sessions/              ← owner's session history
 └── users/
@@ -55,7 +55,7 @@ When using Mem0 for semantic memory, the `user_id` is passed through to Mem0's s
 ### Setting Your Owner ID
 
 ```bash
-export POCKETCLAW_OWNER_ID="123456789"  # Your Telegram user ID, Discord user ID, etc.
+export POCKETPAW_OWNER_ID="123456789"  # Your Telegram user ID, Discord user ID, etc.
 ```
 
 The owner ID should match the `sender_id` that your primary channel sends. For Telegram, this is your numeric user ID. For Discord, it's your Discord user ID.
@@ -74,7 +74,7 @@ This prevents the agent from leaking your personal information (preferences, API
 Some data is intentionally not scoped per-user:
 
 - **Daily notes** — Global operational context
-- **Skills** — Loaded from `~/.pocketclaw/skills/` for all users
+- **Skills** — Loaded from `~/.pocketpaw/skills/` for all users
 - **Session history** — Scoped by session key (which already includes channel + chat ID)
 
 <Callout type="warning">

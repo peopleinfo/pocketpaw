@@ -11,9 +11,9 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from pocketclaw.deep_work.models import Project, ProjectStatus, TaskSpec
-from pocketclaw.deep_work.scheduler import DependencyScheduler
-from pocketclaw.mission_control.models import Task, TaskStatus
+from pocketpaw.deep_work.models import Project, ProjectStatus, TaskSpec
+from pocketpaw.deep_work.scheduler import DependencyScheduler
+from pocketpaw.mission_control.models import Task, TaskStatus
 
 # ============================================================================
 # Fixtures

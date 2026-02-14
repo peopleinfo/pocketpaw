@@ -13,7 +13,7 @@ Skills are persistent markdown files that teach PocketPaw how to handle specific
 
 ## What is a Skill?
 
-A skill is a SKILL.md file stored in `~/.pocketclaw/skills/`. Each skill defines:
+A skill is a SKILL.md file stored in `~/.pocketpaw/skills/`. Each skill defines:
 
 - **When to activate** — Trigger phrases or conditions
 - **How to execute** — Step-by-step instructions
@@ -33,7 +33,7 @@ Agent: [uses skill_gen] → Created skill: daily-standup.md
 
 ### Manually
 
-Create a markdown file in `~/.pocketclaw/skills/`:
+Create a markdown file in `~/.pocketpaw/skills/`:
 
 ```markdown
 # Code Review Skill
@@ -65,7 +65,7 @@ Brief overall assessment.
 
 Skills are loaded by the `AgentContextBuilder`:
 
-1. On startup, all `*.md` files in `~/.pocketclaw/skills/` are read
+1. On startup, all `*.md` files in `~/.pocketpaw/skills/` are read
 2. Skill content is injected into the system prompt
 3. The agent uses skills as reference when handling matching requests
 4. After creating a new skill via `skill_gen`, the loader is reloaded
@@ -73,7 +73,7 @@ Skills are loaded by the `AgentContextBuilder`:
 ## Skill Directory
 
 ```
-~/.pocketclaw/skills/
+~/.pocketpaw/skills/
 ├── daily-standup.md
 ├── code-review.md
 ├── meeting-notes.md

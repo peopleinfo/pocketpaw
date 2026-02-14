@@ -56,19 +56,19 @@ COPY --from=builder /root/.cache/ms-playwright /home/pocketpaw/.cache/ms-playwri
 # Create non-root user
 RUN groupadd --system pocketpaw && \
     useradd --system --gid pocketpaw --create-home pocketpaw && \
-    mkdir -p /home/pocketpaw/.pocketclaw && \
+    mkdir -p /home/pocketpaw/.pocketpaw && \
     chown -R pocketpaw:pocketpaw /home/pocketpaw
 
 USER pocketpaw
 WORKDIR /home/pocketpaw
 
 # Bind to 0.0.0.0 so the container port is reachable from the host
-ENV POCKETCLAW_WEB_HOST=0.0.0.0
-ENV POCKETCLAW_WEB_PORT=8888
+ENV POCKETPAW_WEB_HOST=0.0.0.0
+ENV POCKETPAW_WEB_PORT=8888
 # Disable localhost auth bypass — Docker bridge networking means requests
 # arrive from 172.x.x.x, not 127.0.0.1, so the bypass would never trigger.
 # Users authenticate with the access token instead.
-ENV POCKETCLAW_LOCALHOST_AUTH_BYPASS=false
+ENV POCKETPAW_LOCALHOST_AUTH_BYPASS=false
 
 EXPOSE 8888
 

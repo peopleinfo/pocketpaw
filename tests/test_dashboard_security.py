@@ -14,8 +14,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from pocketclaw.security.rate_limiter import RateLimiter
-from pocketclaw.security.session_tokens import create_session_token, verify_session_token
+from pocketpaw.security.rate_limiter import RateLimiter
+from pocketpaw.security.session_tokens import create_session_token, verify_session_token
 
 
 class TestRateLimiter:
@@ -75,7 +75,7 @@ class TestSessionTokens:
         # Build an expired token with correct HMAC
         expired_ts = str(int(time.time()) - 100)
         # Re-sign with correct HMAC for the expired timestamp
-        from pocketclaw.security.session_tokens import _sign
+        from pocketpaw.security.session_tokens import _sign
 
         sig = _sign(master, expired_ts)
         expired_token = f"{expired_ts}:{sig}"
@@ -124,10 +124,10 @@ class TestIsGenuineLocalhost:
         req.headers = headers or {}
         return req
 
-    @patch("pocketclaw.dashboard.Settings")
-    @patch("pocketclaw.dashboard.get_tunnel_manager")
+    @patch("pocketpaw.dashboard.Settings")
+    @patch("pocketpaw.dashboard.get_tunnel_manager")
     def test_genuine_localhost_no_tunnel(self, mock_tunnel_fn, mock_settings_cls):
-        from pocketclaw.dashboard import _is_genuine_localhost
+        from pocketpaw.dashboard import _is_genuine_localhost
 
         settings = MagicMock()
         settings.localhost_auth_bypass = True
@@ -140,10 +140,10 @@ class TestIsGenuineLocalhost:
         req = self._make_request("127.0.0.1")
         assert _is_genuine_localhost(req) is True
 
-    @patch("pocketclaw.dashboard.Settings")
-    @patch("pocketclaw.dashboard.get_tunnel_manager")
+    @patch("pocketpaw.dashboard.Settings")
+    @patch("pocketpaw.dashboard.get_tunnel_manager")
     def test_tunneled_request_blocked(self, mock_tunnel_fn, mock_settings_cls):
-        from pocketclaw.dashboard import _is_genuine_localhost
+        from pocketpaw.dashboard import _is_genuine_localhost
 
         settings = MagicMock()
         settings.localhost_auth_bypass = True
@@ -157,10 +157,10 @@ class TestIsGenuineLocalhost:
         req = self._make_request("127.0.0.1", headers={"cf-connecting-ip": "1.2.3.4"})
         assert _is_genuine_localhost(req) is False
 
-    @patch("pocketclaw.dashboard.Settings")
-    @patch("pocketclaw.dashboard.get_tunnel_manager")
+    @patch("pocketpaw.dashboard.Settings")
+    @patch("pocketpaw.dashboard.get_tunnel_manager")
     def test_tunneled_request_x_forwarded_for(self, mock_tunnel_fn, mock_settings_cls):
-        from pocketclaw.dashboard import _is_genuine_localhost
+        from pocketpaw.dashboard import _is_genuine_localhost
 
         settings = MagicMock()
         settings.localhost_auth_bypass = True
@@ -173,13 +173,13 @@ class TestIsGenuineLocalhost:
         req = self._make_request("127.0.0.1", headers={"x-forwarded-for": "5.6.7.8"})
         assert _is_genuine_localhost(req) is False
 
-    @patch("pocketclaw.dashboard.Settings")
-    @patch("pocketclaw.dashboard.get_tunnel_manager")
+    @patch("pocketpaw.dashboard.Settings")
+    @patch("pocketpaw.dashboard.get_tunnel_manager")
     def test_genuine_localhost_with_active_tunnel_no_proxy_headers(
         self, mock_tunnel_fn, mock_settings_cls
     ):
         """Genuine localhost browser while tunnel is active — no proxy headers."""
-        from pocketclaw.dashboard import _is_genuine_localhost
+        from pocketpaw.dashboard import _is_genuine_localhost
 
         settings = MagicMock()
         settings.localhost_auth_bypass = True
@@ -192,10 +192,10 @@ class TestIsGenuineLocalhost:
         req = self._make_request("127.0.0.1", headers={})
         assert _is_genuine_localhost(req) is True
 
-    @patch("pocketclaw.dashboard.Settings")
-    @patch("pocketclaw.dashboard.get_tunnel_manager")
+    @patch("pocketpaw.dashboard.Settings")
+    @patch("pocketpaw.dashboard.get_tunnel_manager")
     def test_bypass_disabled(self, mock_tunnel_fn, mock_settings_cls):
-        from pocketclaw.dashboard import _is_genuine_localhost
+        from pocketpaw.dashboard import _is_genuine_localhost
 
         settings = MagicMock()
         settings.localhost_auth_bypass = False
@@ -204,10 +204,10 @@ class TestIsGenuineLocalhost:
         req = self._make_request("127.0.0.1")
         assert _is_genuine_localhost(req) is False
 
-    @patch("pocketclaw.dashboard.Settings")
-    @patch("pocketclaw.dashboard.get_tunnel_manager")
+    @patch("pocketpaw.dashboard.Settings")
+    @patch("pocketpaw.dashboard.get_tunnel_manager")
     def test_non_localhost_rejected(self, mock_tunnel_fn, mock_settings_cls):
-        from pocketclaw.dashboard import _is_genuine_localhost
+        from pocketpaw.dashboard import _is_genuine_localhost
 
         settings = MagicMock()
         settings.localhost_auth_bypass = True
@@ -216,10 +216,10 @@ class TestIsGenuineLocalhost:
         req = self._make_request("192.168.1.5")
         assert _is_genuine_localhost(req) is False
 
-    @patch("pocketclaw.dashboard.Settings")
-    @patch("pocketclaw.dashboard.get_tunnel_manager")
+    @patch("pocketpaw.dashboard.Settings")
+    @patch("pocketpaw.dashboard.get_tunnel_manager")
     def test_ipv6_localhost(self, mock_tunnel_fn, mock_settings_cls):
-        from pocketclaw.dashboard import _is_genuine_localhost
+        from pocketpaw.dashboard import _is_genuine_localhost
 
         settings = MagicMock()
         settings.localhost_auth_bypass = True
@@ -243,7 +243,7 @@ def test_client():
     """Create a FastAPI TestClient for the dashboard app."""
     from starlette.testclient import TestClient
 
-    from pocketclaw.dashboard import app
+    from pocketpaw.dashboard import app
 
     return TestClient(app, raise_server_exceptions=False)
 
@@ -264,9 +264,9 @@ class TestSecurityHeaders:
 
 
 class TestSessionTokenEndpoint:
-    @patch("pocketclaw.dashboard.get_access_token", return_value="master-abc")
-    @patch("pocketclaw.dashboard.Settings")
-    @patch("pocketclaw.dashboard._is_genuine_localhost", return_value=True)
+    @patch("pocketpaw.dashboard.get_access_token", return_value="master-abc")
+    @patch("pocketpaw.dashboard.Settings")
+    @patch("pocketpaw.dashboard._is_genuine_localhost", return_value=True)
     def test_exchange_valid_master(self, mock_local, mock_settings_cls, mock_token, test_client):
         settings = MagicMock()
         settings.session_token_ttl_hours = 24
@@ -282,8 +282,8 @@ class TestSessionTokenEndpoint:
         assert ":" in data["session_token"]
         assert data["expires_in_hours"] == 24
 
-    @patch("pocketclaw.dashboard.get_access_token", return_value="master-abc")
-    @patch("pocketclaw.dashboard._is_genuine_localhost", return_value=True)
+    @patch("pocketpaw.dashboard.get_access_token", return_value="master-abc")
+    @patch("pocketpaw.dashboard._is_genuine_localhost", return_value=True)
     def test_exchange_invalid_master(self, mock_local, mock_token, test_client):
         resp = test_client.post(
             "/api/auth/session",
@@ -293,8 +293,8 @@ class TestSessionTokenEndpoint:
 
 
 class TestAuthMiddlewareSessionToken:
-    @patch("pocketclaw.dashboard.get_access_token", return_value="master-xyz")
-    @patch("pocketclaw.dashboard._is_genuine_localhost", return_value=False)
+    @patch("pocketpaw.dashboard.get_access_token", return_value="master-xyz")
+    @patch("pocketpaw.dashboard._is_genuine_localhost", return_value=False)
     def test_session_token_accepted(self, mock_local, mock_token, test_client):
         session = create_session_token("master-xyz", ttl_hours=1)
         resp = test_client.get(
@@ -304,8 +304,8 @@ class TestAuthMiddlewareSessionToken:
         # Should not be 401 (may be other status depending on channel state)
         assert resp.status_code != 401
 
-    @patch("pocketclaw.dashboard.get_access_token", return_value="master-xyz")
-    @patch("pocketclaw.dashboard._is_genuine_localhost", return_value=False)
+    @patch("pocketpaw.dashboard.get_access_token", return_value="master-xyz")
+    @patch("pocketpaw.dashboard._is_genuine_localhost", return_value=False)
     def test_no_token_rejected(self, mock_local, mock_token, test_client):
         resp = test_client.get("/api/channels/status")
         assert resp.status_code == 401

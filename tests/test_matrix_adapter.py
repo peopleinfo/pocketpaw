@@ -15,8 +15,8 @@ mock_nio.RoomSendResponse = type("RoomSendResponse", (), {"event_id": "evt1"})
 sys.modules.setdefault("nio", mock_nio)
 
 
-from pocketclaw.bus.adapters.matrix_adapter import MatrixAdapter  # noqa: E402
-from pocketclaw.bus.events import Channel, OutboundMessage  # noqa: E402
+from pocketpaw.bus.adapters.matrix_adapter import MatrixAdapter  # noqa: E402
+from pocketpaw.bus.events import Channel, OutboundMessage  # noqa: E402
 
 
 class TestMatrixAdapterInit:

@@ -15,14 +15,14 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 # ── Paths ──────────────────────────────────────────────────────────────
-POCKETCLAW_HOME = Path.home() / ".pocketclaw"
-VENV_DIR = POCKETCLAW_HOME / "venv"
-UV_DIR = POCKETCLAW_HOME / "uv"
+POCKETPAW_HOME = Path.home() / ".pocketpaw"
+VENV_DIR = POCKETPAW_HOME / "venv"
+UV_DIR = POCKETPAW_HOME / "uv"
 
 # ── Package metadata ───────────────────────────────────────────────────
 PACKAGE_NAME = "pocketpaw"
 GIT_REPO_URL = "https://github.com/pocketpaw/pocketpaw.git"
-DEV_MODE_MARKER = POCKETCLAW_HOME / ".dev-mode"
+DEV_MODE_MARKER = POCKETPAW_HOME / ".dev-mode"
 
 # ── Callback types ─────────────────────────────────────────────────────
 StatusCallback = Callable[[str], None]

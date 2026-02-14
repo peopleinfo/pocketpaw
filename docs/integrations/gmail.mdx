@@ -107,8 +107,8 @@ Agent: [uses gmail_batch_modify] → Modified 5 messages: removed UNREAD, INBOX
 
 | Setting | Env Variable | Description |
 |---------|-------------|-------------|
-| Client ID | `POCKETCLAW_GOOGLE_CLIENT_ID` | Google OAuth client ID |
-| Client secret | `POCKETCLAW_GOOGLE_CLIENT_SECRET` | Google OAuth client secret |
+| Client ID | `POCKETPAW_GOOGLE_CLIENT_ID` | Google OAuth client ID |
+| Client secret | `POCKETPAW_GOOGLE_CLIENT_SECRET` | Google OAuth client secret |
 
 ## Policy Group
 
@@ -116,10 +116,10 @@ All Gmail tools belong to `group:gmail`.
 
 ```bash
 # Enable Gmail tools
-export POCKETCLAW_TOOLS_ALLOW="group:gmail"
+export POCKETPAW_TOOLS_ALLOW="group:gmail"
 
 # Or disable
-export POCKETCLAW_TOOLS_DENY="group:gmail"
+export POCKETPAW_TOOLS_DENY="group:gmail"
 ```
 
 ## Required Scopes

@@ -5,8 +5,8 @@ from unittest.mock import patch
 
 import pytest
 
-from pocketclaw.config import Settings
-from pocketclaw.llm.client import LLMClient, resolve_llm_client
+from pocketpaw.config import Settings
+from pocketpaw.llm.client import LLMClient, resolve_llm_client
 
 # ---------------------------------------------------------------------------
 # resolve_llm_client

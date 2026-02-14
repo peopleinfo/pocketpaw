@@ -89,7 +89,7 @@ def test_version_consistency():
     data = _load_pyproject()
     pyproject_version = data["project"]["version"]
 
-    main_path = Path(__file__).resolve().parent.parent / "src" / "pocketclaw" / "__main__.py"
+    main_path = Path(__file__).resolve().parent.parent / "src" / "pocketpaw" / "__main__.py"
     main_text = main_path.read_text()
 
     # Either the version string is hardcoded and matches pyproject.toml,

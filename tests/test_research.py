@@ -3,7 +3,7 @@
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from pocketclaw.tools.builtin.research import ResearchTool
+from pocketpaw.tools.builtin.research import ResearchTool
 
 # ---------------------------------------------------------------------------
 # Tool definition
@@ -67,7 +67,7 @@ async def test_research_search_failure():
     mock_search_tool = MagicMock()
     mock_search_tool.execute = AsyncMock(return_value="Error: No API key")
     with patch(
-        "pocketclaw.tools.builtin.research.WebSearchTool",
+        "pocketpaw.tools.builtin.research.WebSearchTool",
         return_value=mock_search_tool,
     ):
         result = await tool.execute(topic="quantum computing")
@@ -97,19 +97,19 @@ async def test_research_happy_path():
 
     with (
         patch(
-            "pocketclaw.tools.builtin.research.WebSearchTool",
+            "pocketpaw.tools.builtin.research.WebSearchTool",
             return_value=mock_search_tool,
         ),
         patch(
-            "pocketclaw.tools.builtin.research.UrlExtractTool",
+            "pocketpaw.tools.builtin.research.UrlExtractTool",
             return_value=mock_extract_tool,
         ),
         patch(
-            "pocketclaw.tools.builtin.research.LLMRouter",
+            "pocketpaw.tools.builtin.research.LLMRouter",
             return_value=mock_router,
         ),
         patch(
-            "pocketclaw.tools.builtin.research.Settings.load",
+            "pocketpaw.tools.builtin.research.Settings.load",
             return_value=MagicMock(),
         ),
     ):

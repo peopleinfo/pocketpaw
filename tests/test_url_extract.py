@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import httpx
 import pytest
 
-from pocketclaw.tools.builtin.url_extract import UrlExtractTool
+from pocketpaw.tools.builtin.url_extract import UrlExtractTool
 
 
 @pytest.fixture
@@ -29,7 +29,7 @@ class TestUrlExtractTool:
         assert params["properties"]["urls"]["type"] == "array"
         assert "urls" in params["required"]
 
-    @patch("pocketclaw.tools.builtin.url_extract.get_settings")
+    @patch("pocketpaw.tools.builtin.url_extract.get_settings")
     async def test_parallel_extract_success(self, mock_settings, tool):
         mock_settings.return_value = MagicMock(
             url_extract_provider="parallel",
@@ -61,7 +61,7 @@ class TestUrlExtractTool:
         assert "Example Page" in result
         assert "This is the page content." in result
 
-    @patch("pocketclaw.tools.builtin.url_extract.get_settings")
+    @patch("pocketpaw.tools.builtin.url_extract.get_settings")
     async def test_parallel_extract_multiple_urls(self, mock_settings, tool):
         mock_settings.return_value = MagicMock(
             url_extract_provider="parallel",
@@ -100,7 +100,7 @@ class TestUrlExtractTool:
         assert "Page B" in result
         assert "2 URLs" in result
 
-    @patch("pocketclaw.tools.builtin.url_extract.get_settings")
+    @patch("pocketpaw.tools.builtin.url_extract.get_settings")
     async def test_parallel_missing_api_key(self, mock_settings, tool):
         mock_settings.return_value = MagicMock(
             url_extract_provider="parallel",
@@ -110,7 +110,7 @@ class TestUrlExtractTool:
         assert "Error" in result
         assert "Parallel AI API key" in result
 
-    @patch("pocketclaw.tools.builtin.url_extract.get_settings")
+    @patch("pocketpaw.tools.builtin.url_extract.get_settings")
     async def test_parallel_http_error(self, mock_settings, tool):
         mock_settings.return_value = MagicMock(
             url_extract_provider="parallel",
@@ -137,7 +137,7 @@ class TestUrlExtractTool:
         assert "Error" in result
         assert "500" in result
 
-    @patch("pocketclaw.tools.builtin.url_extract.get_settings")
+    @patch("pocketpaw.tools.builtin.url_extract.get_settings")
     async def test_auto_mode_with_key(self, mock_settings, tool):
         """Auto mode routes to parallel when API key is set."""
         mock_settings.return_value = MagicMock(
@@ -171,7 +171,7 @@ class TestUrlExtractTool:
         # Verify it called post (Parallel), not get (local)
         mock_client.post.assert_called_once()
 
-    @patch("pocketclaw.tools.builtin.url_extract.get_settings")
+    @patch("pocketpaw.tools.builtin.url_extract.get_settings")
     async def test_auto_mode_without_key(self, mock_settings, tool):
         """Auto mode routes to local when no API key is set."""
         mock_settings.return_value = MagicMock(
@@ -204,7 +204,7 @@ class TestUrlExtractTool:
 
         assert "Local Test" in result
 
-    @patch("pocketclaw.tools.builtin.url_extract.get_settings")
+    @patch("pocketpaw.tools.builtin.url_extract.get_settings")
     async def test_local_extract_success(self, mock_settings, tool):
         mock_settings.return_value = MagicMock(
             url_extract_provider="local",
@@ -236,7 +236,7 @@ class TestUrlExtractTool:
         assert "Hello World" in result
         assert "This is content." in result
 
-    @patch("pocketclaw.tools.builtin.url_extract.get_settings")
+    @patch("pocketpaw.tools.builtin.url_extract.get_settings")
     async def test_local_missing_html2text(self, mock_settings, tool):
         mock_settings.return_value = MagicMock(
             url_extract_provider="local",
@@ -257,7 +257,7 @@ class TestUrlExtractTool:
         assert "Error" in result
         assert "html2text" in result
 
-    @patch("pocketclaw.tools.builtin.url_extract.get_settings")
+    @patch("pocketpaw.tools.builtin.url_extract.get_settings")
     async def test_local_http_error_per_url(self, mock_settings, tool):
         """One URL fails, others succeed."""
         mock_settings.return_value = MagicMock(
@@ -305,7 +305,7 @@ class TestUrlExtractTool:
         assert "Good" in result
         assert "Error fetching URL" in result
 
-    @patch("pocketclaw.tools.builtin.url_extract.get_settings")
+    @patch("pocketpaw.tools.builtin.url_extract.get_settings")
     async def test_unknown_provider(self, mock_settings, tool):
         mock_settings.return_value = MagicMock(url_extract_provider="unknown")
         result = await tool.execute(urls=["https://example.com"])

@@ -13,7 +13,7 @@ Changes:
 import asyncio
 import pytest
 from pathlib import Path
-from pocketclaw.config import Settings
+from pocketpaw.config import Settings
 
 
 # =============================================================================
@@ -26,7 +26,7 @@ class TestAgentProtocol:
 
     def test_agent_event_creation(self):
         """AgentEvent should be creatable with required fields."""
-        from pocketclaw.agents.protocol import AgentEvent
+        from pocketpaw.agents.protocol import AgentEvent
 
         event = AgentEvent(type="message", content="Hello")
 
@@ -36,7 +36,7 @@ class TestAgentProtocol:
 
     def test_agent_event_with_metadata(self):
         """AgentEvent should accept optional metadata."""
-        from pocketclaw.agents.protocol import AgentEvent
+        from pocketpaw.agents.protocol import AgentEvent
 
         event = AgentEvent(type="code", content="print('hi')", metadata={"lang": "python"})
 
@@ -44,7 +44,7 @@ class TestAgentProtocol:
 
     def test_agent_event_types(self):
         """AgentEvent should support all expected types."""
-        from pocketclaw.agents.protocol import AgentEvent
+        from pocketpaw.agents.protocol import AgentEvent
 
         types = ["message", "code", "tool_use", "tool_result", "error", "done"]
         for event_type in types:
@@ -53,13 +53,13 @@ class TestAgentProtocol:
 
     def test_executor_protocol_exists(self):
         """Protocol should have ExecutorProtocol."""
-        from pocketclaw.agents.protocol import ExecutorProtocol
+        from pocketpaw.agents.protocol import ExecutorProtocol
 
         assert ExecutorProtocol is not None
 
     def test_orchestrator_protocol_exists(self):
         """Protocol should have OrchestratorProtocol."""
-        from pocketclaw.agents.protocol import OrchestratorProtocol
+        from pocketpaw.agents.protocol import OrchestratorProtocol
 
         assert OrchestratorProtocol is not None
 
@@ -74,13 +74,13 @@ class TestExecutor:
 
     def test_executor_importable(self):
         """OpenInterpreterExecutor should be importable."""
-        from pocketclaw.agents.executor import OpenInterpreterExecutor
+        from pocketpaw.agents.executor import OpenInterpreterExecutor
 
         assert OpenInterpreterExecutor is not None
 
     def test_executor_initializes(self):
         """Executor should initialize without raising."""
-        from pocketclaw.agents.executor import OpenInterpreterExecutor
+        from pocketpaw.agents.executor import OpenInterpreterExecutor
 
         settings = Settings()
         executor = OpenInterpreterExecutor(settings)
@@ -90,7 +90,7 @@ class TestExecutor:
     @pytest.mark.asyncio
     async def test_run_shell_simple_command(self):
         """run_shell should execute simple commands via direct subprocess."""
-        from pocketclaw.agents.executor import OpenInterpreterExecutor
+        from pocketpaw.agents.executor import OpenInterpreterExecutor
 
         settings = Settings()
         executor = OpenInterpreterExecutor(settings)
@@ -104,7 +104,7 @@ class TestExecutor:
     @pytest.mark.asyncio
     async def test_run_shell_returns_output(self):
         """run_shell should return command output."""
-        from pocketclaw.agents.executor import OpenInterpreterExecutor
+        from pocketpaw.agents.executor import OpenInterpreterExecutor
 
         settings = Settings()
         executor = OpenInterpreterExecutor(settings)
@@ -117,7 +117,7 @@ class TestExecutor:
     @pytest.mark.asyncio
     async def test_run_shell_handles_errors(self):
         """run_shell should handle command errors gracefully."""
-        from pocketclaw.agents.executor import OpenInterpreterExecutor
+        from pocketpaw.agents.executor import OpenInterpreterExecutor
 
         settings = Settings()
         executor = OpenInterpreterExecutor(settings)
@@ -133,7 +133,7 @@ class TestExecutor:
     @pytest.mark.asyncio
     async def test_run_shell_with_pipe(self):
         """run_shell should handle piped commands."""
-        from pocketclaw.agents.executor import OpenInterpreterExecutor
+        from pocketpaw.agents.executor import OpenInterpreterExecutor
 
         settings = Settings()
         executor = OpenInterpreterExecutor(settings)
@@ -145,7 +145,7 @@ class TestExecutor:
     @pytest.mark.asyncio
     async def test_read_file(self):
         """read_file should read file contents."""
-        from pocketclaw.agents.executor import OpenInterpreterExecutor
+        from pocketpaw.agents.executor import OpenInterpreterExecutor
         import tempfile
 
         settings = Settings()
@@ -165,7 +165,7 @@ class TestExecutor:
     @pytest.mark.asyncio
     async def test_write_file(self):
         """write_file should write content to file."""
-        from pocketclaw.agents.executor import OpenInterpreterExecutor
+        from pocketpaw.agents.executor import OpenInterpreterExecutor
         import tempfile
 
         settings = Settings()
@@ -186,7 +186,7 @@ class TestExecutor:
     @pytest.mark.asyncio
     async def test_list_directory(self):
         """list_directory should return directory contents."""
-        from pocketclaw.agents.executor import OpenInterpreterExecutor
+        from pocketpaw.agents.executor import OpenInterpreterExecutor
 
         settings = Settings()
         executor = OpenInterpreterExecutor(settings)
@@ -198,7 +198,7 @@ class TestExecutor:
 
     def test_run_complex_task_method_exists(self):
         """Executor should have run_complex_task method for OI."""
-        from pocketclaw.agents.executor import OpenInterpreterExecutor
+        from pocketpaw.agents.executor import OpenInterpreterExecutor
 
         settings = Settings()
         executor = OpenInterpreterExecutor(settings)
@@ -216,19 +216,19 @@ class TestClaudeAgentSDK:
 
     def test_sdk_class_importable(self):
         """ClaudeAgentSDK class should be importable."""
-        from pocketclaw.agents.claude_sdk import ClaudeAgentSDK
+        from pocketpaw.agents.claude_sdk import ClaudeAgentSDK
 
         assert ClaudeAgentSDK is not None
 
     def test_sdk_wrapper_importable(self):
         """ClaudeAgentSDKWrapper should be importable."""
-        from pocketclaw.agents.claude_sdk import ClaudeAgentSDKWrapper
+        from pocketpaw.agents.claude_sdk import ClaudeAgentSDKWrapper
 
         assert ClaudeAgentSDKWrapper is not None
 
     def test_sdk_initializes_without_error(self):
         """SDK should initialize even without claude-agent-sdk installed."""
-        from pocketclaw.agents.claude_sdk import ClaudeAgentSDKWrapper
+        from pocketpaw.agents.claude_sdk import ClaudeAgentSDKWrapper
 
         settings = Settings()
         wrapper = ClaudeAgentSDKWrapper(settings)
@@ -238,7 +238,7 @@ class TestClaudeAgentSDK:
 
     def test_dangerous_pattern_detection(self):
         """Should detect dangerous command patterns."""
-        from pocketclaw.agents.claude_sdk import ClaudeAgentSDK
+        from pocketpaw.agents.claude_sdk import ClaudeAgentSDK
 
         settings = Settings()
         sdk = ClaudeAgentSDK(settings)
@@ -263,7 +263,7 @@ class TestClaudeAgentSDK:
 
     def test_sdk_has_system_prompt(self):
         """SDK should have identity fallback and tool instructions defined."""
-        from pocketclaw.agents.claude_sdk import _DEFAULT_IDENTITY, _TOOL_INSTRUCTIONS
+        from pocketpaw.agents.claude_sdk import _DEFAULT_IDENTITY, _TOOL_INSTRUCTIONS
 
         assert _DEFAULT_IDENTITY is not None
         assert "PocketPaw" in _DEFAULT_IDENTITY
@@ -272,7 +272,7 @@ class TestClaudeAgentSDK:
 
     def test_sdk_has_dangerous_patterns(self):
         """SDK should have dangerous patterns defined."""
-        from pocketclaw.agents.claude_sdk import DANGEROUS_PATTERNS
+        from pocketpaw.agents.claude_sdk import DANGEROUS_PATTERNS
 
         assert isinstance(DANGEROUS_PATTERNS, list)
         assert len(DANGEROUS_PATTERNS) > 0
@@ -281,7 +281,7 @@ class TestClaudeAgentSDK:
     @pytest.mark.asyncio
     async def test_sdk_status(self):
         """get_status should return backend info."""
-        from pocketclaw.agents.claude_sdk import ClaudeAgentSDK
+        from pocketpaw.agents.claude_sdk import ClaudeAgentSDK
 
         settings = Settings()
         sdk = ClaudeAgentSDK(settings)
@@ -297,7 +297,7 @@ class TestClaudeAgentSDK:
     @pytest.mark.asyncio
     async def test_sdk_stop(self):
         """stop should set stop flag."""
-        from pocketclaw.agents.claude_sdk import ClaudeAgentSDK
+        from pocketpaw.agents.claude_sdk import ClaudeAgentSDK
 
         settings = Settings()
         sdk = ClaudeAgentSDK(settings)
@@ -310,7 +310,7 @@ class TestClaudeAgentSDK:
 
     def test_sdk_set_working_directory(self):
         """set_working_directory should update cwd."""
-        from pocketclaw.agents.claude_sdk import ClaudeAgentSDK
+        from pocketpaw.agents.claude_sdk import ClaudeAgentSDK
 
         settings = Settings()
         sdk = ClaudeAgentSDK(settings)
@@ -322,7 +322,7 @@ class TestClaudeAgentSDK:
 
     def test_sdk_set_executor(self):
         """set_executor should store executor reference."""
-        from pocketclaw.agents.claude_sdk import ClaudeAgentSDK
+        from pocketpaw.agents.claude_sdk import ClaudeAgentSDK
 
         settings = Settings()
         sdk = ClaudeAgentSDK(settings)
@@ -339,7 +339,7 @@ class TestClaudeAgentSDK:
     @pytest.mark.asyncio
     async def test_sdk_chat_without_sdk_installed(self):
         """chat should yield error if SDK not available."""
-        from pocketclaw.agents.claude_sdk import ClaudeAgentSDK
+        from pocketpaw.agents.claude_sdk import ClaudeAgentSDK
 
         settings = Settings()
         sdk = ClaudeAgentSDK(settings)
@@ -366,13 +366,13 @@ class TestPocketPawNative:
 
     def test_orchestrator_importable(self):
         """PocketPawOrchestrator should be importable."""
-        from pocketclaw.agents.pocketpaw_native import PocketPawOrchestrator
+        from pocketpaw.agents.pocketpaw_native import PocketPawOrchestrator
 
         assert PocketPawOrchestrator is not None
 
     def test_orchestrator_initializes(self):
         """Orchestrator should initialize with settings."""
-        from pocketclaw.agents.pocketpaw_native import PocketPawOrchestrator
+        from pocketpaw.agents.pocketpaw_native import PocketPawOrchestrator
 
         settings = Settings(anthropic_api_key="test-key")
         orchestrator = PocketPawOrchestrator(settings)
@@ -381,14 +381,14 @@ class TestPocketPawNative:
 
     def test_dangerous_patterns_defined(self):
         """Should have dangerous patterns defined."""
-        from pocketclaw.agents.pocketpaw_native import DANGEROUS_PATTERNS
+        from pocketpaw.agents.pocketpaw_native import DANGEROUS_PATTERNS
 
         assert isinstance(DANGEROUS_PATTERNS, list)
         assert len(DANGEROUS_PATTERNS) > 0
 
     def test_sensitive_paths_defined(self):
         """Should have sensitive paths defined."""
-        from pocketclaw.agents.pocketpaw_native import SENSITIVE_PATHS
+        from pocketpaw.agents.pocketpaw_native import SENSITIVE_PATHS
 
         assert isinstance(SENSITIVE_PATHS, list)
         assert ".ssh/id_rsa" in SENSITIVE_PATHS
@@ -396,7 +396,7 @@ class TestPocketPawNative:
 
     def test_tools_defined(self):
         """Should have tools defined."""
-        from pocketclaw.agents.pocketpaw_native import TOOLS
+        from pocketpaw.agents.pocketpaw_native import TOOLS
 
         assert isinstance(TOOLS, list)
         assert len(TOOLS) > 0
@@ -413,7 +413,7 @@ class TestPocketPawNative:
 
     def test_security_validate_command(self):
         """Should validate commands for dangerous patterns."""
-        from pocketclaw.agents.pocketpaw_native import PocketPawOrchestrator
+        from pocketpaw.agents.pocketpaw_native import PocketPawOrchestrator
 
         settings = Settings(anthropic_api_key="test-key")
         orchestrator = PocketPawOrchestrator(settings)
@@ -429,7 +429,7 @@ class TestPocketPawNative:
 
     def test_security_validate_file_access(self):
         """Should validate file access for sensitive paths."""
-        from pocketclaw.agents.pocketpaw_native import PocketPawOrchestrator
+        from pocketpaw.agents.pocketpaw_native import PocketPawOrchestrator
 
         settings = Settings(anthropic_api_key="test-key")
         orchestrator = PocketPawOrchestrator(settings)
@@ -444,7 +444,7 @@ class TestPocketPawNative:
 
     def test_redact_secrets(self):
         """Should redact sensitive information from output."""
-        from pocketclaw.agents.pocketpaw_native import PocketPawOrchestrator
+        from pocketpaw.agents.pocketpaw_native import PocketPawOrchestrator
 
         settings = Settings(anthropic_api_key="test-key")
         orchestrator = PocketPawOrchestrator(settings)
@@ -463,7 +463,7 @@ class TestPocketPawNative:
     @pytest.mark.asyncio
     async def test_orchestrator_status(self):
         """get_status should return orchestrator info."""
-        from pocketclaw.agents.pocketpaw_native import PocketPawOrchestrator
+        from pocketpaw.agents.pocketpaw_native import PocketPawOrchestrator
 
         settings = Settings(anthropic_api_key="test-key")
         orchestrator = PocketPawOrchestrator(settings)
@@ -485,14 +485,14 @@ class TestAgentRouter:
 
     def test_router_importable(self):
         """AgentRouter should be importable."""
-        from pocketclaw.agents.router import AgentRouter
+        from pocketpaw.agents.router import AgentRouter
 
         assert AgentRouter is not None
 
     def test_router_defaults_to_claude_agent_sdk(self):
         """Should default to Claude Agent SDK (new recommended backend)."""
-        from pocketclaw.agents.router import AgentRouter
-        from pocketclaw.agents.claude_sdk import ClaudeAgentSDKWrapper
+        from pocketpaw.agents.router import AgentRouter
+        from pocketpaw.agents.claude_sdk import ClaudeAgentSDKWrapper
 
         settings = Settings()  # Default backend is now claude_agent_sdk
         router = AgentRouter(settings)
@@ -502,8 +502,8 @@ class TestAgentRouter:
 
     def test_router_selects_claude_agent_sdk(self):
         """Should select Claude Agent SDK when configured."""
-        from pocketclaw.agents.router import AgentRouter
-        from pocketclaw.agents.claude_sdk import ClaudeAgentSDKWrapper
+        from pocketpaw.agents.router import AgentRouter
+        from pocketpaw.agents.claude_sdk import ClaudeAgentSDKWrapper
 
         settings = Settings(agent_backend="claude_agent_sdk")
         router = AgentRouter(settings)
@@ -513,8 +513,8 @@ class TestAgentRouter:
 
     def test_router_selects_pocketpaw_native(self):
         """Should select PocketPaw Native when configured."""
-        from pocketclaw.agents.router import AgentRouter
-        from pocketclaw.agents.pocketpaw_native import PocketPawOrchestrator
+        from pocketpaw.agents.router import AgentRouter
+        from pocketpaw.agents.pocketpaw_native import PocketPawOrchestrator
 
         settings = Settings(agent_backend="pocketpaw_native", anthropic_api_key="test-key")
         router = AgentRouter(settings)
@@ -524,8 +524,8 @@ class TestAgentRouter:
 
     def test_router_selects_open_interpreter(self):
         """Should select Open Interpreter when configured."""
-        from pocketclaw.agents.router import AgentRouter
-        from pocketclaw.agents.open_interpreter import OpenInterpreterAgent
+        from pocketpaw.agents.router import AgentRouter
+        from pocketpaw.agents.open_interpreter import OpenInterpreterAgent
 
         settings = Settings(agent_backend="open_interpreter")
         router = AgentRouter(settings)
@@ -535,8 +535,8 @@ class TestAgentRouter:
 
     def test_router_claude_code_disabled(self):
         """claude_code should fallback to claude_agent_sdk (disabled)."""
-        from pocketclaw.agents.router import AgentRouter, DISABLED_BACKENDS
-        from pocketclaw.agents.claude_sdk import ClaudeAgentSDKWrapper
+        from pocketpaw.agents.router import AgentRouter, DISABLED_BACKENDS
+        from pocketpaw.agents.claude_sdk import ClaudeAgentSDKWrapper
 
         assert "claude_code" in DISABLED_BACKENDS
 
@@ -549,8 +549,8 @@ class TestAgentRouter:
 
     def test_router_falls_back_on_unknown(self):
         """Should fallback to Claude Agent SDK for unknown backends."""
-        from pocketclaw.agents.router import AgentRouter
-        from pocketclaw.agents.claude_sdk import ClaudeAgentSDKWrapper
+        from pocketpaw.agents.router import AgentRouter
+        from pocketpaw.agents.claude_sdk import ClaudeAgentSDKWrapper
 
         settings = Settings(agent_backend="unknown_backend_xyz")
         router = AgentRouter(settings)
@@ -561,7 +561,7 @@ class TestAgentRouter:
     @pytest.mark.asyncio
     async def test_router_has_run_method(self):
         """Router should have async run method."""
-        from pocketclaw.agents.router import AgentRouter
+        from pocketpaw.agents.router import AgentRouter
 
         settings = Settings()
         router = AgentRouter(settings)
@@ -571,7 +571,7 @@ class TestAgentRouter:
     @pytest.mark.asyncio
     async def test_router_has_stop_method(self):
         """Router should have async stop method."""
-        from pocketclaw.agents.router import AgentRouter
+        from pocketpaw.agents.router import AgentRouter
 
         settings = Settings()
         router = AgentRouter(settings)

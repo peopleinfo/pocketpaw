@@ -8,13 +8,13 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from pocketclaw.mission_control import (
+from pocketpaw.mission_control import (
     FileMissionControlStore,
     MissionControlManager,
     reset_mission_control_manager,
     reset_mission_control_store,
 )
-from pocketclaw.mission_control.heartbeat import (
+from pocketpaw.mission_control.heartbeat import (
     HeartbeatDaemon,
     reset_heartbeat_daemon,
 )
@@ -60,8 +60,8 @@ def patched_daemon(store, manager, monkeypatch):
     reset_heartbeat_daemon()
 
     # Patch the get functions
-    import pocketclaw.mission_control.manager as manager_module
-    import pocketclaw.mission_control.store as store_module
+    import pocketpaw.mission_control.manager as manager_module
+    import pocketpaw.mission_control.store as store_module
 
     monkeypatch.setattr(store_module, "_store_instance", store)
     monkeypatch.setattr(manager_module, "_manager_instance", manager)

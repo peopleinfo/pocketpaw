@@ -7,7 +7,7 @@ class TestDocsToolSchemas:
     """Test Docs tool properties and schemas."""
 
     def test_docs_read_tool(self):
-        from pocketclaw.tools.builtin.gdocs import DocsReadTool
+        from pocketpaw.tools.builtin.gdocs import DocsReadTool
 
         tool = DocsReadTool()
         assert tool.name == "docs_read"
@@ -15,7 +15,7 @@ class TestDocsToolSchemas:
         assert "document_id" in tool.parameters["properties"]
 
     def test_docs_create_tool(self):
-        from pocketclaw.tools.builtin.gdocs import DocsCreateTool
+        from pocketpaw.tools.builtin.gdocs import DocsCreateTool
 
         tool = DocsCreateTool()
         assert tool.name == "docs_create"
@@ -24,7 +24,7 @@ class TestDocsToolSchemas:
         assert "title" in tool.parameters["required"]
 
     def test_docs_search_tool(self):
-        from pocketclaw.tools.builtin.gdocs import DocsSearchTool
+        from pocketpaw.tools.builtin.gdocs import DocsSearchTool
 
         tool = DocsSearchTool()
         assert tool.name == "docs_search"
@@ -35,18 +35,18 @@ class TestDocIdParsing:
     """Test document ID extraction from URLs."""
 
     def test_plain_id(self):
-        from pocketclaw.tools.builtin.gdocs import _parse_doc_id
+        from pocketpaw.tools.builtin.gdocs import _parse_doc_id
 
         assert _parse_doc_id("abc123xyz") == "abc123xyz"
 
     def test_full_url(self):
-        from pocketclaw.tools.builtin.gdocs import _parse_doc_id
+        from pocketpaw.tools.builtin.gdocs import _parse_doc_id
 
         url = "https://docs.google.com/document/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms/edit"
         assert _parse_doc_id(url) == "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms"
 
     def test_url_with_fragment(self):
-        from pocketclaw.tools.builtin.gdocs import _parse_doc_id
+        from pocketpaw.tools.builtin.gdocs import _parse_doc_id
 
         url = "https://docs.google.com/document/d/abc_123-XYZ/edit#heading=h.1"
         assert _parse_doc_id(url) == "abc_123-XYZ"
@@ -56,7 +56,7 @@ class TestDocsTextExtraction:
     """Test plain text extraction from Docs API response."""
 
     def test_simple_text(self):
-        from pocketclaw.integrations.gdocs import DocsClient
+        from pocketpaw.integrations.gdocs import DocsClient
 
         doc = {
             "body": {
@@ -68,7 +68,7 @@ class TestDocsTextExtraction:
         assert DocsClient._extract_text(doc) == "Hello world"
 
     def test_multiple_paragraphs(self):
-        from pocketclaw.integrations.gdocs import DocsClient
+        from pocketpaw.integrations.gdocs import DocsClient
 
         doc = {
             "body": {
@@ -83,24 +83,24 @@ class TestDocsTextExtraction:
         assert "Second paragraph" in text
 
     def test_empty_doc(self):
-        from pocketclaw.integrations.gdocs import DocsClient
+        from pocketpaw.integrations.gdocs import DocsClient
 
         doc = {"body": {"content": []}}
         assert DocsClient._extract_text(doc) == ""
 
     def test_no_text_run(self):
-        from pocketclaw.integrations.gdocs import DocsClient
+        from pocketpaw.integrations.gdocs import DocsClient
 
         doc = {"body": {"content": [{"paragraph": {"elements": [{"inlineObjectElement": {}}]}}]}}
         assert DocsClient._extract_text(doc) == ""
 
 
 async def test_docs_read_no_auth():
-    from pocketclaw.tools.builtin.gdocs import DocsReadTool
+    from pocketpaw.tools.builtin.gdocs import DocsReadTool
 
     tool = DocsReadTool()
     with patch(
-        "pocketclaw.integrations.gdocs.DocsClient._get_token",
+        "pocketpaw.integrations.gdocs.DocsClient._get_token",
         side_effect=RuntimeError("Not authenticated"),
     ):
         result = await tool.execute(document_id="abc123")
@@ -109,11 +109,11 @@ async def test_docs_read_no_auth():
 
 
 async def test_docs_create_no_auth():
-    from pocketclaw.tools.builtin.gdocs import DocsCreateTool
+    from pocketpaw.tools.builtin.gdocs import DocsCreateTool
 
     tool = DocsCreateTool()
     with patch(
-        "pocketclaw.integrations.gdocs.DocsClient._get_token",
+        "pocketpaw.integrations.gdocs.DocsClient._get_token",
         side_effect=RuntimeError("Not authenticated"),
     ):
         result = await tool.execute(title="Test Doc")
@@ -121,11 +121,11 @@ async def test_docs_create_no_auth():
 
 
 async def test_docs_search_no_auth():
-    from pocketclaw.tools.builtin.gdocs import DocsSearchTool
+    from pocketpaw.tools.builtin.gdocs import DocsSearchTool
 
     tool = DocsSearchTool()
     with patch(
-        "pocketclaw.integrations.gdocs.DocsClient._get_token",
+        "pocketpaw.integrations.gdocs.DocsClient._get_token",
         side_effect=RuntimeError("Not authenticated"),
     ):
         result = await tool.execute(query="meeting notes")
@@ -133,7 +133,7 @@ async def test_docs_search_no_auth():
 
 
 async def test_docs_search_success():
-    from pocketclaw.tools.builtin.gdocs import DocsSearchTool
+    from pocketpaw.tools.builtin.gdocs import DocsSearchTool
 
     tool = DocsSearchTool()
     mock_docs = [
@@ -145,7 +145,7 @@ async def test_docs_search_success():
         }
     ]
     with patch(
-        "pocketclaw.integrations.gdocs.DocsClient._get_token",
+        "pocketpaw.integrations.gdocs.DocsClient._get_token",
         new_callable=AsyncMock,
         return_value="fake-token",
     ):

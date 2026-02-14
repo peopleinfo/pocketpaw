@@ -5,8 +5,8 @@ import json
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from pocketclaw.bus.events import Channel, InboundMessage, OutboundMessage
-from pocketclaw.memory.file_store import FileMemoryStore
+from pocketpaw.bus.events import Channel, InboundMessage, OutboundMessage
+from pocketpaw.memory.file_store import FileMemoryStore
 
 # =========================================================================
 # Helpers
@@ -29,7 +29,7 @@ def _make_msg(content: str, channel=Channel.DISCORD, chat_id="12345") -> Inbound
 
 class TestIsCommand:
     def setup_method(self):
-        from pocketclaw.bus.commands import CommandHandler
+        from pocketpaw.bus.commands import CommandHandler
 
         self.handler = CommandHandler()
 
@@ -142,11 +142,11 @@ class TestSessionAliases:
 
 class TestNewCommand:
     def setup_method(self):
-        from pocketclaw.bus.commands import CommandHandler
+        from pocketpaw.bus.commands import CommandHandler
 
         self.handler = CommandHandler()
 
-    @patch("pocketclaw.bus.commands.get_memory_manager")
+    @patch("pocketpaw.bus.commands.get_memory_manager")
     async def test_new_creates_alias(self, mock_get_mm):
         mm = MagicMock()
         mm.set_session_alias = AsyncMock()
@@ -162,7 +162,7 @@ class TestNewCommand:
         assert call_args[0][0] == "discord:12345"
         assert call_args[0][1].startswith("discord:12345:")
 
-    @patch("pocketclaw.bus.commands.get_memory_manager")
+    @patch("pocketpaw.bus.commands.get_memory_manager")
     async def test_new_with_bot_suffix(self, mock_get_mm):
         mm = MagicMock()
         mm.set_session_alias = AsyncMock()
@@ -182,11 +182,11 @@ class TestNewCommand:
 
 class TestSessionsCommand:
     def setup_method(self):
-        from pocketclaw.bus.commands import CommandHandler
+        from pocketpaw.bus.commands import CommandHandler
 
         self.handler = CommandHandler()
 
-    @patch("pocketclaw.bus.commands.get_memory_manager")
+    @patch("pocketpaw.bus.commands.get_memory_manager")
     async def test_sessions_empty(self, mock_get_mm):
         mm = MagicMock()
         mm.list_sessions_for_chat = AsyncMock(return_value=[])
@@ -198,7 +198,7 @@ class TestSessionsCommand:
         assert response is not None
         assert "no sessions" in response.content.lower()
 
-    @patch("pocketclaw.bus.commands.get_memory_manager")
+    @patch("pocketpaw.bus.commands.get_memory_manager")
     async def test_sessions_formatted_output(self, mock_get_mm):
         sessions = [
             {
@@ -230,7 +230,7 @@ class TestSessionsCommand:
         assert "(active)" in response.content
         assert "5 msgs" in response.content
 
-    @patch("pocketclaw.bus.commands.get_memory_manager")
+    @patch("pocketpaw.bus.commands.get_memory_manager")
     async def test_sessions_stores_last_shown(self, mock_get_mm):
         sessions = [
             {
@@ -259,11 +259,11 @@ class TestSessionsCommand:
 
 class TestResumeCommand:
     def setup_method(self):
-        from pocketclaw.bus.commands import CommandHandler
+        from pocketpaw.bus.commands import CommandHandler
 
         self.handler = CommandHandler()
 
-    @patch("pocketclaw.bus.commands.get_memory_manager")
+    @patch("pocketpaw.bus.commands.get_memory_manager")
     async def test_resume_no_args_shows_sessions(self, mock_get_mm):
         mm = MagicMock()
         mm.list_sessions_for_chat = AsyncMock(return_value=[])
@@ -276,7 +276,7 @@ class TestResumeCommand:
         # Should behave like /sessions
         mm.list_sessions_for_chat.assert_called_once()
 
-    @patch("pocketclaw.bus.commands.get_memory_manager")
+    @patch("pocketpaw.bus.commands.get_memory_manager")
     async def test_resume_valid_number(self, mock_get_mm):
         sessions = [
             {
@@ -310,7 +310,7 @@ class TestResumeCommand:
         assert "First Chat" in response.content
         mm.set_session_alias.assert_called_once_with("discord:12345", "discord:123:abc")
 
-    @patch("pocketclaw.bus.commands.get_memory_manager")
+    @patch("pocketpaw.bus.commands.get_memory_manager")
     async def test_resume_invalid_number(self, mock_get_mm):
         sessions = [
             {
@@ -333,7 +333,7 @@ class TestResumeCommand:
 
         assert "invalid" in response.content.lower()
 
-    @patch("pocketclaw.bus.commands.get_memory_manager")
+    @patch("pocketpaw.bus.commands.get_memory_manager")
     async def test_resume_text_search_single(self, mock_get_mm):
         sessions = [
             {
@@ -364,7 +364,7 @@ class TestResumeCommand:
         assert "Debug the API" in response.content
         mm.set_session_alias.assert_called_once()
 
-    @patch("pocketclaw.bus.commands.get_memory_manager")
+    @patch("pocketpaw.bus.commands.get_memory_manager")
     async def test_resume_text_search_multi(self, mock_get_mm):
         sessions = [
             {
@@ -395,7 +395,7 @@ class TestResumeCommand:
         assert "Write tests A" in response.content
         assert "Write tests B" in response.content
 
-    @patch("pocketclaw.bus.commands.get_memory_manager")
+    @patch("pocketpaw.bus.commands.get_memory_manager")
     async def test_resume_text_search_no_match(self, mock_get_mm):
         sessions = [
             {
@@ -424,7 +424,7 @@ class TestResumeCommand:
 
 class TestHelpCommand:
     def setup_method(self):
-        from pocketclaw.bus.commands import CommandHandler
+        from pocketpaw.bus.commands import CommandHandler
 
         self.handler = CommandHandler()
 
@@ -450,11 +450,11 @@ class TestHelpCommand:
 
 class TestClearCommand:
     def setup_method(self):
-        from pocketclaw.bus.commands import CommandHandler
+        from pocketpaw.bus.commands import CommandHandler
 
         self.handler = CommandHandler()
 
-    @patch("pocketclaw.bus.commands.get_memory_manager")
+    @patch("pocketpaw.bus.commands.get_memory_manager")
     async def test_clear_with_messages(self, mock_get_mm):
         mm = MagicMock()
         mm.resolve_session_key = AsyncMock(return_value="discord:12345")
@@ -468,7 +468,7 @@ class TestClearCommand:
         assert "7 messages" in response.content
         mm.clear_session.assert_called_once_with("discord:12345")
 
-    @patch("pocketclaw.bus.commands.get_memory_manager")
+    @patch("pocketpaw.bus.commands.get_memory_manager")
     async def test_clear_empty_session(self, mock_get_mm):
         mm = MagicMock()
         mm.resolve_session_key = AsyncMock(return_value="discord:12345")
@@ -480,7 +480,7 @@ class TestClearCommand:
 
         assert "already empty" in response.content.lower()
 
-    @patch("pocketclaw.bus.commands.get_memory_manager")
+    @patch("pocketpaw.bus.commands.get_memory_manager")
     async def test_clear_resolves_alias(self, mock_get_mm):
         mm = MagicMock()
         mm.resolve_session_key = AsyncMock(return_value="discord:12345:abc")
@@ -500,11 +500,11 @@ class TestClearCommand:
 
 class TestRenameCommand:
     def setup_method(self):
-        from pocketclaw.bus.commands import CommandHandler
+        from pocketpaw.bus.commands import CommandHandler
 
         self.handler = CommandHandler()
 
-    @patch("pocketclaw.bus.commands.get_memory_manager")
+    @patch("pocketpaw.bus.commands.get_memory_manager")
     async def test_rename_success(self, mock_get_mm):
         mm = MagicMock()
         mm.resolve_session_key = AsyncMock(return_value="discord:12345")
@@ -518,7 +518,7 @@ class TestRenameCommand:
         assert "My Cool Chat" in response.content
         mm.update_session_title.assert_called_once_with("discord:12345", "My Cool Chat")
 
-    @patch("pocketclaw.bus.commands.get_memory_manager")
+    @patch("pocketpaw.bus.commands.get_memory_manager")
     async def test_rename_no_args(self, mock_get_mm):
         mock_get_mm.return_value = MagicMock()
 
@@ -527,7 +527,7 @@ class TestRenameCommand:
 
         assert "usage" in response.content.lower()
 
-    @patch("pocketclaw.bus.commands.get_memory_manager")
+    @patch("pocketpaw.bus.commands.get_memory_manager")
     async def test_rename_session_not_found(self, mock_get_mm):
         mm = MagicMock()
         mm.resolve_session_key = AsyncMock(return_value="discord:12345")
@@ -539,7 +539,7 @@ class TestRenameCommand:
 
         assert "not found" in response.content.lower()
 
-    @patch("pocketclaw.bus.commands.get_memory_manager")
+    @patch("pocketpaw.bus.commands.get_memory_manager")
     async def test_rename_with_bot_suffix(self, mock_get_mm):
         mm = MagicMock()
         mm.resolve_session_key = AsyncMock(return_value="discord:12345")
@@ -559,12 +559,12 @@ class TestRenameCommand:
 
 class TestStatusCommand:
     def setup_method(self):
-        from pocketclaw.bus.commands import CommandHandler
+        from pocketpaw.bus.commands import CommandHandler
 
         self.handler = CommandHandler()
 
-    @patch("pocketclaw.config.get_settings")
-    @patch("pocketclaw.bus.commands.get_memory_manager")
+    @patch("pocketpaw.config.get_settings")
+    @patch("pocketpaw.bus.commands.get_memory_manager")
     async def test_status_with_active_session(self, mock_get_mm, mock_settings):
         settings = MagicMock()
         settings.agent_backend = "claude_agent_sdk"
@@ -593,8 +593,8 @@ class TestStatusCommand:
         assert "claude_agent_sdk" in response.content
         assert "discord" in response.content
 
-    @patch("pocketclaw.config.get_settings")
-    @patch("pocketclaw.bus.commands.get_memory_manager")
+    @patch("pocketpaw.config.get_settings")
+    @patch("pocketpaw.bus.commands.get_memory_manager")
     async def test_status_no_sessions(self, mock_get_mm, mock_settings):
         settings = MagicMock()
         settings.agent_backend = "pocketpaw_native"
@@ -611,8 +611,8 @@ class TestStatusCommand:
         assert "Default" in response.content
         assert "pocketpaw_native" in response.content
 
-    @patch("pocketclaw.config.get_settings")
-    @patch("pocketclaw.bus.commands.get_memory_manager")
+    @patch("pocketpaw.config.get_settings")
+    @patch("pocketpaw.bus.commands.get_memory_manager")
     async def test_status_shows_aliased_key(self, mock_get_mm, mock_settings):
         settings = MagicMock()
         settings.agent_backend = "claude_agent_sdk"
@@ -638,11 +638,11 @@ class TestStatusCommand:
 
 class TestDeleteCommand:
     def setup_method(self):
-        from pocketclaw.bus.commands import CommandHandler
+        from pocketpaw.bus.commands import CommandHandler
 
         self.handler = CommandHandler()
 
-    @patch("pocketclaw.bus.commands.get_memory_manager")
+    @patch("pocketpaw.bus.commands.get_memory_manager")
     async def test_delete_success(self, mock_get_mm):
         mm = MagicMock()
         mm.resolve_session_key = AsyncMock(return_value="discord:12345:abc")
@@ -658,7 +658,7 @@ class TestDeleteCommand:
         mm.delete_session.assert_called_once_with("discord:12345:abc")
         mm._store.remove_session_alias.assert_called_once_with("discord:12345")
 
-    @patch("pocketclaw.bus.commands.get_memory_manager")
+    @patch("pocketpaw.bus.commands.get_memory_manager")
     async def test_delete_nothing(self, mock_get_mm):
         mm = MagicMock()
         mm.resolve_session_key = AsyncMock(return_value="discord:12345")
@@ -672,7 +672,7 @@ class TestDeleteCommand:
 
         assert "no session" in response.content.lower()
 
-    @patch("pocketclaw.bus.commands.get_memory_manager")
+    @patch("pocketpaw.bus.commands.get_memory_manager")
     async def test_delete_removes_alias(self, mock_get_mm):
         mm = MagicMock()
         mm.resolve_session_key = AsyncMock(return_value="discord:12345:xyz")
@@ -694,7 +694,7 @@ class TestDeleteCommand:
 
 class TestIsCommandNewCommands:
     def setup_method(self):
-        from pocketclaw.bus.commands import CommandHandler
+        from pocketpaw.bus.commands import CommandHandler
 
         self.handler = CommandHandler()
 
@@ -720,7 +720,7 @@ class TestBangPrefixFallback:
     """Commands with ! prefix should work identically to / prefix."""
 
     def setup_method(self):
-        from pocketclaw.bus.commands import CommandHandler
+        from pocketpaw.bus.commands import CommandHandler
 
         self.handler = CommandHandler()
 
@@ -754,7 +754,7 @@ class TestBangPrefixFallback:
     def test_bang_with_bot_suffix(self):
         assert self.handler.is_command("!new@PocketPawBot")
 
-    @patch("pocketclaw.bus.commands.get_memory_manager")
+    @patch("pocketpaw.bus.commands.get_memory_manager")
     async def test_bang_new_works(self, mock_get_mm):
         mm = MagicMock()
         mm.set_session_alias = AsyncMock()
@@ -767,7 +767,7 @@ class TestBangPrefixFallback:
         assert "new conversation" in response.content.lower()
         mm.set_session_alias.assert_called_once()
 
-    @patch("pocketclaw.bus.commands.get_memory_manager")
+    @patch("pocketpaw.bus.commands.get_memory_manager")
     async def test_bang_resume_works(self, mock_get_mm):
         sessions = [
             {
@@ -869,7 +869,7 @@ class TestSlackSlashCommands:
         """All 8 commands should be in the registration loop."""
         import ast
 
-        from pocketclaw.bus.adapters import slack_adapter
+        from pocketpaw.bus.adapters import slack_adapter
 
         source = ast.parse(Path(slack_adapter.__file__).read_text())
 
@@ -899,16 +899,16 @@ class TestSlackSlashCommands:
 
 
 class TestAgentLoopCommandIntegration:
-    @patch("pocketclaw.agents.loop.get_injection_scanner")
-    @patch("pocketclaw.agents.loop.get_command_handler")
-    @patch("pocketclaw.agents.loop.get_memory_manager")
-    @patch("pocketclaw.agents.loop.get_message_bus")
-    @patch("pocketclaw.agents.loop.get_settings")
+    @patch("pocketpaw.agents.loop.get_injection_scanner")
+    @patch("pocketpaw.agents.loop.get_command_handler")
+    @patch("pocketpaw.agents.loop.get_memory_manager")
+    @patch("pocketpaw.agents.loop.get_message_bus")
+    @patch("pocketpaw.agents.loop.get_settings")
     async def test_command_intercepted_before_agent(
         self, mock_settings, mock_bus_fn, mock_mm_fn, mock_cmd_fn, mock_scanner_fn
     ):
         """Commands should be handled without invoking the agent backend."""
-        from pocketclaw.agents.loop import AgentLoop
+        from pocketpaw.agents.loop import AgentLoop
 
         settings = MagicMock()
         settings.max_concurrent_conversations = 5
@@ -951,16 +951,16 @@ class TestAgentLoopCommandIntegration:
         # Agent was NOT invoked (no add_to_session for user message)
         mm.add_to_session.assert_not_called()
 
-    @patch("pocketclaw.agents.loop.get_injection_scanner")
-    @patch("pocketclaw.agents.loop.get_command_handler")
-    @patch("pocketclaw.agents.loop.get_memory_manager")
-    @patch("pocketclaw.agents.loop.get_message_bus")
-    @patch("pocketclaw.agents.loop.get_settings")
+    @patch("pocketpaw.agents.loop.get_injection_scanner")
+    @patch("pocketpaw.agents.loop.get_command_handler")
+    @patch("pocketpaw.agents.loop.get_memory_manager")
+    @patch("pocketpaw.agents.loop.get_message_bus")
+    @patch("pocketpaw.agents.loop.get_settings")
     async def test_normal_message_not_intercepted(
         self, mock_settings, mock_bus_fn, mock_mm_fn, mock_cmd_fn, mock_scanner_fn
     ):
         """Non-command messages should pass through to the agent."""
-        from pocketclaw.agents.loop import AgentLoop
+        from pocketpaw.agents.loop import AgentLoop
 
         settings = MagicMock()
         settings.max_concurrent_conversations = 5
@@ -1006,15 +1006,15 @@ class TestAgentLoopCommandIntegration:
         # User message WAS stored in memory
         mm.add_to_session.assert_called()
 
-    @patch("pocketclaw.agents.loop.get_command_handler")
-    @patch("pocketclaw.agents.loop.get_memory_manager")
-    @patch("pocketclaw.agents.loop.get_message_bus")
-    @patch("pocketclaw.agents.loop.get_settings")
+    @patch("pocketpaw.agents.loop.get_command_handler")
+    @patch("pocketpaw.agents.loop.get_memory_manager")
+    @patch("pocketpaw.agents.loop.get_message_bus")
+    @patch("pocketpaw.agents.loop.get_settings")
     async def test_alias_resolved_for_session_lock(
         self, mock_settings, mock_bus_fn, mock_mm_fn, mock_cmd_fn
     ):
         """_process_message should resolve alias before acquiring session lock."""
-        from pocketclaw.agents.loop import AgentLoop
+        from pocketpaw.agents.loop import AgentLoop
 
         settings = MagicMock()
         settings.max_concurrent_conversations = 5
@@ -1057,7 +1057,7 @@ class TestMemoryManagerAliases:
     def setup_method(self):
         import tempfile
 
-        from pocketclaw.memory.manager import MemoryManager
+        from pocketpaw.memory.manager import MemoryManager
 
         self.tmpdir = tempfile.mkdtemp()
         self.store = FileMemoryStore(base_path=Path(self.tmpdir))
@@ -1077,7 +1077,7 @@ class TestMemoryManagerAliases:
         assert result == []
 
     async def test_list_sessions_with_data(self):
-        from pocketclaw.memory.protocol import MemoryEntry, MemoryType
+        from pocketpaw.memory.protocol import MemoryEntry, MemoryType
 
         # Create a session via alias
         await self.store.set_session_alias("discord:123", "discord:123:abc")
@@ -1105,16 +1105,16 @@ class TestMemoryManagerAliases:
 class TestWelcomeHint:
     """Test the one-time welcome hint on first channel interaction."""
 
-    @patch("pocketclaw.agents.loop.get_injection_scanner")
-    @patch("pocketclaw.agents.loop.get_command_handler")
-    @patch("pocketclaw.agents.loop.get_memory_manager")
-    @patch("pocketclaw.agents.loop.get_message_bus")
-    @patch("pocketclaw.agents.loop.get_settings")
+    @patch("pocketpaw.agents.loop.get_injection_scanner")
+    @patch("pocketpaw.agents.loop.get_command_handler")
+    @patch("pocketpaw.agents.loop.get_memory_manager")
+    @patch("pocketpaw.agents.loop.get_message_bus")
+    @patch("pocketpaw.agents.loop.get_settings")
     async def test_welcome_on_new_discord_session(
         self, mock_settings, mock_bus_fn, mock_mm_fn, mock_cmd_fn, mock_scanner_fn
     ):
         """First message on Discord should trigger a welcome hint."""
-        from pocketclaw.agents.loop import AgentLoop
+        from pocketpaw.agents.loop import AgentLoop
 
         settings = MagicMock()
         settings.max_concurrent_conversations = 5
@@ -1161,16 +1161,16 @@ class TestWelcomeHint:
         welcome_found = any("Welcome to PocketPaw" in str(c) for c in outbound_calls)
         assert welcome_found, f"Expected welcome hint in {outbound_calls}"
 
-    @patch("pocketclaw.agents.loop.get_injection_scanner")
-    @patch("pocketclaw.agents.loop.get_command_handler")
-    @patch("pocketclaw.agents.loop.get_memory_manager")
-    @patch("pocketclaw.agents.loop.get_message_bus")
-    @patch("pocketclaw.agents.loop.get_settings")
+    @patch("pocketpaw.agents.loop.get_injection_scanner")
+    @patch("pocketpaw.agents.loop.get_command_handler")
+    @patch("pocketpaw.agents.loop.get_memory_manager")
+    @patch("pocketpaw.agents.loop.get_message_bus")
+    @patch("pocketpaw.agents.loop.get_settings")
     async def test_no_welcome_on_existing_session(
         self, mock_settings, mock_bus_fn, mock_mm_fn, mock_cmd_fn, mock_scanner_fn
     ):
         """Existing session should NOT get welcome hint."""
-        from pocketclaw.agents.loop import AgentLoop
+        from pocketpaw.agents.loop import AgentLoop
 
         settings = MagicMock()
         settings.max_concurrent_conversations = 5
@@ -1216,16 +1216,16 @@ class TestWelcomeHint:
         welcome_found = any("Welcome to PocketPaw" in str(c) for c in outbound_calls)
         assert not welcome_found
 
-    @patch("pocketclaw.agents.loop.get_injection_scanner")
-    @patch("pocketclaw.agents.loop.get_command_handler")
-    @patch("pocketclaw.agents.loop.get_memory_manager")
-    @patch("pocketclaw.agents.loop.get_message_bus")
-    @patch("pocketclaw.agents.loop.get_settings")
+    @patch("pocketpaw.agents.loop.get_injection_scanner")
+    @patch("pocketpaw.agents.loop.get_command_handler")
+    @patch("pocketpaw.agents.loop.get_memory_manager")
+    @patch("pocketpaw.agents.loop.get_message_bus")
+    @patch("pocketpaw.agents.loop.get_settings")
     async def test_no_welcome_on_websocket(
         self, mock_settings, mock_bus_fn, mock_mm_fn, mock_cmd_fn, mock_scanner_fn
     ):
         """WebSocket channel should never get welcome hint."""
-        from pocketclaw.agents.loop import AgentLoop
+        from pocketpaw.agents.loop import AgentLoop
 
         settings = MagicMock()
         settings.max_concurrent_conversations = 5
@@ -1274,16 +1274,16 @@ class TestWelcomeHint:
         welcome_found = any("Welcome to PocketPaw" in str(c) for c in outbound_calls)
         assert not welcome_found
 
-    @patch("pocketclaw.agents.loop.get_injection_scanner")
-    @patch("pocketclaw.agents.loop.get_command_handler")
-    @patch("pocketclaw.agents.loop.get_memory_manager")
-    @patch("pocketclaw.agents.loop.get_message_bus")
-    @patch("pocketclaw.agents.loop.get_settings")
+    @patch("pocketpaw.agents.loop.get_injection_scanner")
+    @patch("pocketpaw.agents.loop.get_command_handler")
+    @patch("pocketpaw.agents.loop.get_memory_manager")
+    @patch("pocketpaw.agents.loop.get_message_bus")
+    @patch("pocketpaw.agents.loop.get_settings")
     async def test_no_welcome_when_disabled(
         self, mock_settings, mock_bus_fn, mock_mm_fn, mock_cmd_fn, mock_scanner_fn
     ):
         """welcome_hint_enabled=False should suppress the hint."""
-        from pocketclaw.agents.loop import AgentLoop
+        from pocketpaw.agents.loop import AgentLoop
 
         settings = MagicMock()
         settings.max_concurrent_conversations = 5
@@ -1332,16 +1332,16 @@ class TestWelcomeHint:
         welcome_found = any("Welcome to PocketPaw" in str(c) for c in outbound_calls)
         assert not welcome_found
 
-    @patch("pocketclaw.agents.loop.get_injection_scanner")
-    @patch("pocketclaw.agents.loop.get_command_handler")
-    @patch("pocketclaw.agents.loop.get_memory_manager")
-    @patch("pocketclaw.agents.loop.get_message_bus")
-    @patch("pocketclaw.agents.loop.get_settings")
+    @patch("pocketpaw.agents.loop.get_injection_scanner")
+    @patch("pocketpaw.agents.loop.get_command_handler")
+    @patch("pocketpaw.agents.loop.get_memory_manager")
+    @patch("pocketpaw.agents.loop.get_message_bus")
+    @patch("pocketpaw.agents.loop.get_settings")
     async def test_welcome_not_stored_in_memory(
         self, mock_settings, mock_bus_fn, mock_mm_fn, mock_cmd_fn, mock_scanner_fn
     ):
         """Welcome hint must not be stored in session memory."""
-        from pocketclaw.agents.loop import AgentLoop
+        from pocketpaw.agents.loop import AgentLoop
 
         settings = MagicMock()
         settings.max_concurrent_conversations = 5

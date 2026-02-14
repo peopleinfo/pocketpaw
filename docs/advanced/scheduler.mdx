@@ -3,7 +3,14 @@ title: Cron Scheduler
 description: "PocketPaw's built-in cron scheduler handles recurring tasks and one-time reminders with APScheduler. Tasks persist across restarts, support natural language time parsing, and auto-reschedule after execution."
 section: Advanced
 ogType: article
-keywords: ["cron scheduler", "recurring tasks", "reminders", "apscheduler", "task scheduling"]
+keywords:
+  [
+    "cron scheduler",
+    "recurring tasks",
+    "reminders",
+    "apscheduler",
+    "task scheduling",
+  ]
 tags: ["advanced", "automation"]
 ---
 
@@ -43,7 +50,7 @@ The scheduler provides two main functions:
 ### add_recurring
 
 ```python
-from pocketclaw.scheduler import scheduler
+from pocketpaw.scheduler import scheduler
 
 scheduler.add_recurring(
     task_id="weekly-summary",
@@ -67,9 +74,9 @@ Recurring tasks are persisted to the config and re-loaded on startup. One-time r
 
 Standard cron format: `minute hour day_of_month month day_of_week`
 
-| Expression | Description |
-|------------|-------------|
-| `0 9 * * 1` | Every Monday at 9:00 AM |
-| `*/30 * * * *` | Every 30 minutes |
-| `0 8,17 * * 1-5` | 8 AM and 5 PM on weekdays |
-| `0 0 1 * *` | First day of every month at midnight |
+| Expression       | Description                          |
+| ---------------- | ------------------------------------ |
+| `0 9 * * 1`      | Every Monday at 9:00 AM              |
+| `*/30 * * * *`   | Every 30 minutes                     |
+| `0 8,17 * * 1-5` | 8 AM and 5 PM on weekdays            |
+| `0 0 1 * *`      | First day of every month at midnight |

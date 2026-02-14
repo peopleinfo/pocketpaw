@@ -34,7 +34,7 @@ The dashboard is available at `http://localhost:8888`.
 Get the access token and paste it into the login page:
 
 ```bash
-docker exec pocketpaw cat /home/pocketpaw/.pocketclaw/access_token
+docker exec pocketpaw cat /home/pocketpaw/.pocketpaw/access_token
 ```
 
 ## Dockerfile Overview
@@ -53,7 +53,7 @@ The `Dockerfile` uses a multi-stage build for a lean runtime image:
 - Exposes port `8888` with a healthcheck
 
 <Callout type="info">
-  The container binds to `0.0.0.0:8888` by default (set via `POCKETCLAW_WEB_HOST` and `POCKETCLAW_WEB_PORT` environment variables in the Dockerfile).
+  The container binds to `0.0.0.0:8888` by default (set via `POCKETPAW_WEB_HOST` and `POCKETPAW_WEB_PORT` environment variables in the Dockerfile).
 </Callout>
 
 ## Docker Compose
@@ -75,7 +75,7 @@ docker compose --profile ollama up -d
 Set the Ollama host to the container service name in your `.env`:
 
 ```bash
-POCKETCLAW_OLLAMA_HOST=http://ollama:11434
+POCKETPAW_OLLAMA_HOST=http://ollama:11434
 ```
 
 Then pull the models you need:
@@ -111,7 +111,7 @@ All configuration is passed via environment variables. Copy `.env.example` to `.
 cp .env.example .env
 ```
 
-The `.env.example` file is organized by section (LLM, channels, memory, tools, security) and documents every available `POCKETCLAW_` variable. See the [Configuration reference](/getting-started/configuration) for full details.
+The `.env.example` file is organized by section (LLM, channels, memory, tools, security) and documents every available `POCKETPAW_` variable. See the [Configuration reference](/getting-started/configuration) for full details.
 
 You can also change the host port:
 
@@ -121,7 +121,7 @@ POCKETPAW_PORT=9000 docker compose up -d
 
 ## Persistent Data
 
-A named Docker volume (`pocketpaw-data`) is mounted at `/home/pocketpaw/.pocketclaw` to persist:
+A named Docker volume (`pocketpaw-data`) is mounted at `/home/pocketpaw/.pocketpaw` to persist:
 
 - Configuration (`config.json`, `secrets.enc`)
 - Session history

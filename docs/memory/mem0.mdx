@@ -28,12 +28,12 @@ curl -fsSL https://pocketpaw.xyz/install.sh | sh
 pip install pocketpaw[memory]
 
 # Configure Mem0
-export POCKETCLAW_MEM0_AUTO_LEARN=true
-export POCKETCLAW_MEM0_LLM_PROVIDER="ollama"
-export POCKETCLAW_MEM0_LLM_MODEL="llama3.2"
-export POCKETCLAW_MEM0_EMBEDDER_PROVIDER="ollama"
-export POCKETCLAW_MEM0_EMBEDDER_MODEL="nomic-embed-text"
-export POCKETCLAW_MEM0_VECTOR_STORE="qdrant"
+export POCKETPAW_MEM0_AUTO_LEARN=true
+export POCKETPAW_MEM0_LLM_PROVIDER="ollama"
+export POCKETPAW_MEM0_LLM_MODEL="llama3.2"
+export POCKETPAW_MEM0_EMBEDDER_PROVIDER="ollama"
+export POCKETPAW_MEM0_EMBEDDER_MODEL="nomic-embed-text"
+export POCKETPAW_MEM0_VECTOR_STORE="qdrant"
 ```
 
 ## Provider Configuration
@@ -105,12 +105,12 @@ ollama pull llama3.2
 ollama pull nomic-embed-text
 
 # Configure
-export POCKETCLAW_MEM0_AUTO_LEARN=true
-export POCKETCLAW_MEM0_LLM_PROVIDER="ollama"
-export POCKETCLAW_MEM0_LLM_MODEL="llama3.2"
-export POCKETCLAW_MEM0_EMBEDDER_PROVIDER="ollama"
-export POCKETCLAW_MEM0_EMBEDDER_MODEL="nomic-embed-text"
-export POCKETCLAW_MEM0_VECTOR_STORE="qdrant"
+export POCKETPAW_MEM0_AUTO_LEARN=true
+export POCKETPAW_MEM0_LLM_PROVIDER="ollama"
+export POCKETPAW_MEM0_LLM_MODEL="llama3.2"
+export POCKETPAW_MEM0_EMBEDDER_PROVIDER="ollama"
+export POCKETPAW_MEM0_EMBEDDER_MODEL="nomic-embed-text"
+export POCKETPAW_MEM0_VECTOR_STORE="qdrant"
 ```
 
 This runs everything locally — LLM inference, embedding, and vector storage.

@@ -12,15 +12,15 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from pocketclaw.deep_work.api import router as deep_work_router
-from pocketclaw.mission_control import (
+from pocketpaw.deep_work.api import router as deep_work_router
+from pocketpaw.mission_control import (
     FileMissionControlStore,
     MissionControlManager,
     reset_mission_control_manager,
     reset_mission_control_store,
 )
-from pocketclaw.mission_control.api import router as mc_router
-from pocketclaw.mission_control.models import TaskStatus
+from pocketpaw.mission_control.api import router as mc_router
+from pocketpaw.mission_control.models import TaskStatus
 
 # ============================================================================
 # Fixtures
@@ -42,8 +42,8 @@ def test_app(temp_store_path, monkeypatch):
     store = FileMissionControlStore(temp_store_path)
     manager = MissionControlManager(store)
 
-    import pocketclaw.mission_control.manager as manager_module
-    import pocketclaw.mission_control.store as store_module
+    import pocketpaw.mission_control.manager as manager_module
+    import pocketpaw.mission_control.store as store_module
 
     monkeypatch.setattr(store_module, "_store_instance", store)
     monkeypatch.setattr(manager_module, "_manager_instance", manager)
@@ -62,7 +62,7 @@ def client(test_app):
 
 @pytest.fixture
 def manager(test_app, monkeypatch):
-    import pocketclaw.mission_control.manager as manager_module
+    import pocketpaw.mission_control.manager as manager_module
 
     return manager_module._manager_instance
 

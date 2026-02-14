@@ -9,19 +9,19 @@ class TestOCRToolSchema:
     """Test OCRTool properties and schema."""
 
     def test_name(self):
-        from pocketclaw.tools.builtin.ocr import OCRTool
+        from pocketpaw.tools.builtin.ocr import OCRTool
 
         tool = OCRTool()
         assert tool.name == "ocr"
 
     def test_trust_level(self):
-        from pocketclaw.tools.builtin.ocr import OCRTool
+        from pocketpaw.tools.builtin.ocr import OCRTool
 
         tool = OCRTool()
         assert tool.trust_level == "standard"
 
     def test_parameters(self):
-        from pocketclaw.tools.builtin.ocr import OCRTool
+        from pocketpaw.tools.builtin.ocr import OCRTool
 
         tool = OCRTool()
         params = tool.parameters
@@ -30,7 +30,7 @@ class TestOCRToolSchema:
         assert "image_path" in params["required"]
 
     def test_description(self):
-        from pocketclaw.tools.builtin.ocr import OCRTool
+        from pocketpaw.tools.builtin.ocr import OCRTool
 
         tool = OCRTool()
         assert "ocr" in tool.description.lower() or "extract text" in tool.description.lower()
@@ -40,12 +40,12 @@ class TestOCRToolSchema:
 def _mock_settings():
     settings = MagicMock()
     settings.openai_api_key = "test-key"
-    with patch("pocketclaw.tools.builtin.ocr.get_settings", return_value=settings):
+    with patch("pocketpaw.tools.builtin.ocr.get_settings", return_value=settings):
         yield settings
 
 
 async def test_ocr_file_not_found(_mock_settings):
-    from pocketclaw.tools.builtin.ocr import OCRTool
+    from pocketpaw.tools.builtin.ocr import OCRTool
 
     tool = OCRTool()
     result = await tool.execute(image_path="/nonexistent/image.png")
@@ -54,7 +54,7 @@ async def test_ocr_file_not_found(_mock_settings):
 
 
 async def test_ocr_unsupported_format(_mock_settings, tmp_path):
-    from pocketclaw.tools.builtin.ocr import OCRTool
+    from pocketpaw.tools.builtin.ocr import OCRTool
 
     tool = OCRTool()
     bad_file = tmp_path / "test.xyz"
@@ -65,7 +65,7 @@ async def test_ocr_unsupported_format(_mock_settings, tmp_path):
 
 
 async def test_ocr_file_too_large(_mock_settings, tmp_path):
-    from pocketclaw.tools.builtin.ocr import OCRTool
+    from pocketpaw.tools.builtin.ocr import OCRTool
 
     tool = OCRTool()
     big_file = tmp_path / "big.png"
@@ -76,7 +76,7 @@ async def test_ocr_file_too_large(_mock_settings, tmp_path):
 
 
 async def test_ocr_openai_success(_mock_settings, tmp_path):
-    from pocketclaw.tools.builtin.ocr import OCRTool
+    from pocketpaw.tools.builtin.ocr import OCRTool
 
     tool = OCRTool()
     img = tmp_path / "test.png"
@@ -100,7 +100,7 @@ async def test_ocr_openai_success(_mock_settings, tmp_path):
 
 
 async def test_ocr_no_text_detected(_mock_settings, tmp_path):
-    from pocketclaw.tools.builtin.ocr import OCRTool
+    from pocketpaw.tools.builtin.ocr import OCRTool
 
     tool = OCRTool()
     img = tmp_path / "blank.png"
@@ -123,7 +123,7 @@ async def test_ocr_no_text_detected(_mock_settings, tmp_path):
 
 
 async def test_ocr_no_api_key_no_tesseract(tmp_path):
-    from pocketclaw.tools.builtin.ocr import OCRTool
+    from pocketpaw.tools.builtin.ocr import OCRTool
 
     tool = OCRTool()
     img = tmp_path / "test.jpg"
@@ -131,7 +131,7 @@ async def test_ocr_no_api_key_no_tesseract(tmp_path):
 
     settings = MagicMock()
     settings.openai_api_key = None
-    with patch("pocketclaw.tools.builtin.ocr.get_settings", return_value=settings):
+    with patch("pocketpaw.tools.builtin.ocr.get_settings", return_value=settings):
         # Mock pytesseract as not installed
         with patch.dict("sys.modules", {"pytesseract": None}):
             result = await tool.execute(image_path=str(img))
@@ -141,7 +141,7 @@ async def test_ocr_no_api_key_no_tesseract(tmp_path):
 
 
 async def test_ocr_api_error(_mock_settings, tmp_path):
-    from pocketclaw.tools.builtin.ocr import OCRTool
+    from pocketpaw.tools.builtin.ocr import OCRTool
 
     tool = OCRTool()
     img = tmp_path / "test.png"

@@ -2,7 +2,7 @@
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from pocketclaw.tools.builtin.sessions import (
+from pocketpaw.tools.builtin.sessions import (
     ClearSessionTool,
     DeleteSessionTool,
     ListSessionsTool,
@@ -23,7 +23,7 @@ class TestNewSessionTool:
     def test_name(self):
         assert self.tool.name == "new_session"
 
-    @patch("pocketclaw.tools.builtin.sessions.get_memory_manager")
+    @patch("pocketpaw.tools.builtin.sessions.get_memory_manager")
     async def test_creates_alias(self, mock_get_mm):
         mm = MagicMock()
         mm.set_session_alias = AsyncMock()
@@ -37,7 +37,7 @@ class TestNewSessionTool:
         assert call_args[0][0] == "discord:123"
         assert call_args[0][1].startswith("discord:123:")
 
-    @patch("pocketclaw.tools.builtin.sessions.get_memory_manager")
+    @patch("pocketpaw.tools.builtin.sessions.get_memory_manager")
     async def test_error_handling(self, mock_get_mm):
         mock_get_mm.side_effect = RuntimeError("boom")
 
@@ -58,7 +58,7 @@ class TestListSessionsTool:
     def test_name(self):
         assert self.tool.name == "list_sessions"
 
-    @patch("pocketclaw.tools.builtin.sessions.get_memory_manager")
+    @patch("pocketpaw.tools.builtin.sessions.get_memory_manager")
     async def test_empty(self, mock_get_mm):
         mm = MagicMock()
         mm.list_sessions_for_chat = AsyncMock(return_value=[])
@@ -68,7 +68,7 @@ class TestListSessionsTool:
 
         assert "no sessions" in result.lower()
 
-    @patch("pocketclaw.tools.builtin.sessions.get_memory_manager")
+    @patch("pocketpaw.tools.builtin.sessions.get_memory_manager")
     async def test_with_sessions(self, mock_get_mm):
         sessions = [
             {
@@ -112,7 +112,7 @@ class TestSwitchSessionTool:
     def test_name(self):
         assert self.tool.name == "switch_session"
 
-    @patch("pocketclaw.tools.builtin.sessions.get_memory_manager")
+    @patch("pocketpaw.tools.builtin.sessions.get_memory_manager")
     async def test_switch_by_number(self, mock_get_mm):
         sessions = [
             {
@@ -134,7 +134,7 @@ class TestSwitchSessionTool:
         assert "First Chat" in result
         mm.set_session_alias.assert_called_once_with("discord:123", "discord:123:abc")
 
-    @patch("pocketclaw.tools.builtin.sessions.get_memory_manager")
+    @patch("pocketpaw.tools.builtin.sessions.get_memory_manager")
     async def test_switch_invalid_number(self, mock_get_mm):
         sessions = [
             {
@@ -154,7 +154,7 @@ class TestSwitchSessionTool:
 
         assert "invalid" in result.lower()
 
-    @patch("pocketclaw.tools.builtin.sessions.get_memory_manager")
+    @patch("pocketpaw.tools.builtin.sessions.get_memory_manager")
     async def test_switch_by_text_single(self, mock_get_mm):
         sessions = [
             {
@@ -184,7 +184,7 @@ class TestSwitchSessionTool:
         assert "Debug API" in result
         mm.set_session_alias.assert_called_once()
 
-    @patch("pocketclaw.tools.builtin.sessions.get_memory_manager")
+    @patch("pocketpaw.tools.builtin.sessions.get_memory_manager")
     async def test_switch_by_text_no_match(self, mock_get_mm):
         sessions = [
             {
@@ -204,7 +204,7 @@ class TestSwitchSessionTool:
 
         assert "no sessions matching" in result.lower()
 
-    @patch("pocketclaw.tools.builtin.sessions.get_memory_manager")
+    @patch("pocketpaw.tools.builtin.sessions.get_memory_manager")
     async def test_switch_by_text_multiple(self, mock_get_mm):
         sessions = [
             {
@@ -234,7 +234,7 @@ class TestSwitchSessionTool:
         assert "Write tests A" in result
         assert "Write tests B" in result
 
-    @patch("pocketclaw.tools.builtin.sessions.get_memory_manager")
+    @patch("pocketpaw.tools.builtin.sessions.get_memory_manager")
     async def test_switch_no_sessions(self, mock_get_mm):
         mm = MagicMock()
         mm.list_sessions_for_chat = AsyncMock(return_value=[])
@@ -257,7 +257,7 @@ class TestClearSessionTool:
     def test_name(self):
         assert self.tool.name == "clear_session"
 
-    @patch("pocketclaw.tools.builtin.sessions.get_memory_manager")
+    @patch("pocketpaw.tools.builtin.sessions.get_memory_manager")
     async def test_clear_with_messages(self, mock_get_mm):
         mm = MagicMock()
         mm.resolve_session_key = AsyncMock(return_value="discord:123")
@@ -268,7 +268,7 @@ class TestClearSessionTool:
 
         assert "7 messages" in result
 
-    @patch("pocketclaw.tools.builtin.sessions.get_memory_manager")
+    @patch("pocketpaw.tools.builtin.sessions.get_memory_manager")
     async def test_clear_empty(self, mock_get_mm):
         mm = MagicMock()
         mm.resolve_session_key = AsyncMock(return_value="discord:123")
@@ -292,7 +292,7 @@ class TestRenameSessionTool:
     def test_name(self):
         assert self.tool.name == "rename_session"
 
-    @patch("pocketclaw.tools.builtin.sessions.get_memory_manager")
+    @patch("pocketpaw.tools.builtin.sessions.get_memory_manager")
     async def test_rename_success(self, mock_get_mm):
         mm = MagicMock()
         mm.resolve_session_key = AsyncMock(return_value="discord:123")
@@ -303,7 +303,7 @@ class TestRenameSessionTool:
 
         assert "My Project" in result
 
-    @patch("pocketclaw.tools.builtin.sessions.get_memory_manager")
+    @patch("pocketpaw.tools.builtin.sessions.get_memory_manager")
     async def test_rename_not_found(self, mock_get_mm):
         mm = MagicMock()
         mm.resolve_session_key = AsyncMock(return_value="discord:123")
@@ -327,7 +327,7 @@ class TestDeleteSessionTool:
     def test_name(self):
         assert self.tool.name == "delete_session"
 
-    @patch("pocketclaw.tools.builtin.sessions.get_memory_manager")
+    @patch("pocketpaw.tools.builtin.sessions.get_memory_manager")
     async def test_delete_success(self, mock_get_mm):
         mm = MagicMock()
         mm.resolve_session_key = AsyncMock(return_value="discord:123:abc")
@@ -341,7 +341,7 @@ class TestDeleteSessionTool:
         assert "deleted" in result.lower()
         mm.delete_session.assert_called_once_with("discord:123:abc")
 
-    @patch("pocketclaw.tools.builtin.sessions.get_memory_manager")
+    @patch("pocketpaw.tools.builtin.sessions.get_memory_manager")
     async def test_delete_nothing(self, mock_get_mm):
         mm = MagicMock()
         mm.resolve_session_key = AsyncMock(return_value="discord:123")
@@ -362,7 +362,7 @@ class TestDeleteSessionTool:
 
 class TestSessionToolPolicy:
     def test_group_sessions_exists(self):
-        from pocketclaw.tools.policy import TOOL_GROUPS
+        from pocketpaw.tools.policy import TOOL_GROUPS
 
         assert "group:sessions" in TOOL_GROUPS
         names = TOOL_GROUPS["group:sessions"]
@@ -374,7 +374,7 @@ class TestSessionToolPolicy:
         assert "delete_session" in names
 
     def test_minimal_profile_includes_sessions(self):
-        from pocketclaw.tools.policy import ToolPolicy
+        from pocketpaw.tools.policy import ToolPolicy
 
         policy = ToolPolicy(profile="minimal")
         assert policy.is_tool_allowed("new_session")

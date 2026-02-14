@@ -27,9 +27,9 @@ PocketPaw connects to the [Matrix](https://matrix.org) protocol via `matrix-nio`
   </Step>
   <Step title="Configure">
     ```bash
-    export POCKETCLAW_MATRIX_HOMESERVER="https://matrix.org"
-    export POCKETCLAW_MATRIX_USER_ID="@bot:matrix.org"
-    export POCKETCLAW_MATRIX_ACCESS_TOKEN="your-access-token"
+    export POCKETPAW_MATRIX_HOMESERVER="https://matrix.org"
+    export POCKETPAW_MATRIX_USER_ID="@bot:matrix.org"
+    export POCKETPAW_MATRIX_ACCESS_TOKEN="your-access-token"
     ```
   </Step>
   <Step title="Start">
@@ -43,12 +43,12 @@ PocketPaw connects to the [Matrix](https://matrix.org) protocol via `matrix-nio`
 
 | Setting | Env Variable | Description |
 |---------|-------------|-------------|
-| Homeserver | `POCKETCLAW_MATRIX_HOMESERVER` | Matrix homeserver URL |
-| User ID | `POCKETCLAW_MATRIX_USER_ID` | Bot's Matrix user ID |
-| Access token | `POCKETCLAW_MATRIX_ACCESS_TOKEN` | Authentication token |
-| Device ID | `POCKETCLAW_MATRIX_DEVICE_ID` | Device ID (auto-generated) |
-| Allowed rooms | `POCKETCLAW_MATRIX_ALLOWED_ROOM_IDS` | Comma-separated room IDs |
-| Display name | `POCKETCLAW_MATRIX_DISPLAY_NAME` | Bot display name |
+| Homeserver | `POCKETPAW_MATRIX_HOMESERVER` | Matrix homeserver URL |
+| User ID | `POCKETPAW_MATRIX_USER_ID` | Bot's Matrix user ID |
+| Access token | `POCKETPAW_MATRIX_ACCESS_TOKEN` | Authentication token |
+| Device ID | `POCKETPAW_MATRIX_DEVICE_ID` | Device ID (auto-generated) |
+| Allowed rooms | `POCKETPAW_MATRIX_ALLOWED_ROOM_IDS` | Comma-separated room IDs |
+| Display name | `POCKETPAW_MATRIX_DISPLAY_NAME` | Bot display name |
 
 ## Features
 
@@ -62,7 +62,7 @@ Matrix supports message editing via `m.replace` events. PocketPaw uses this for 
 
 ### Room Support
 
-The bot responds to messages in any room it's invited to. Use `POCKETCLAW_MATRIX_ALLOWED_ROOM_IDS` to restrict access to specific rooms.
+The bot responds to messages in any room it's invited to. Use `POCKETPAW_MATRIX_ALLOWED_ROOM_IDS` to restrict access to specific rooms.
 
 ### Session Keys
 

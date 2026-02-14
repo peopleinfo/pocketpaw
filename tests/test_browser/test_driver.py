@@ -5,8 +5,8 @@
 
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-from pocketclaw.browser.driver import BrowserDriver
-from pocketclaw.browser.snapshot import RefMap
+from pocketpaw.browser.driver import BrowserDriver
+from pocketpaw.browser.snapshot import RefMap
 
 
 class TestBrowserDriverInit:
@@ -332,7 +332,7 @@ class TestBrowserDriverScreenshot:
         driver = BrowserDriver()
         driver._page = AsyncMock()
 
-        with patch("pocketclaw.browser.driver.datetime") as mock_dt:
+        with patch("pocketpaw.browser.driver.datetime") as mock_dt:
             mock_dt.now.return_value.strftime.return_value = "20240101_120000"
             path = await driver.screenshot()
 

@@ -3,7 +3,7 @@
 
 from unittest.mock import MagicMock, patch
 
-from pocketclaw.daemon.self_audit import (
+from pocketpaw.daemon.self_audit import (
     _check_audit_log_size,
     _check_config_conflicts,
     _check_disk_usage,
@@ -19,7 +19,7 @@ from pocketclaw.daemon.self_audit import (
 
 class TestStaleSessions:
     def test_no_sessions_dir(self, tmp_path):
-        with patch("pocketclaw.daemon.self_audit.get_config_dir", return_value=tmp_path):
+        with patch("pocketpaw.daemon.self_audit.get_config_dir", return_value=tmp_path):
             ok, msg = _check_stale_sessions()
             assert ok is True
             assert "No sessions" in msg
@@ -28,7 +28,7 @@ class TestStaleSessions:
         sessions = tmp_path / "memory" / "sessions"
         sessions.mkdir(parents=True)
         (sessions / "recent.json").write_text("{}")
-        with patch("pocketclaw.daemon.self_audit.get_config_dir", return_value=tmp_path):
+        with patch("pocketpaw.daemon.self_audit.get_config_dir", return_value=tmp_path):
             ok, msg = _check_stale_sessions()
             assert ok is True
 
@@ -44,7 +44,7 @@ class TestConfigConflicts:
         mock_settings.bypass_permissions = False
         mock_settings.plan_mode = False
         mock_settings.injection_scan_enabled = True
-        with patch("pocketclaw.daemon.self_audit.get_settings", return_value=mock_settings):
+        with patch("pocketpaw.daemon.self_audit.get_settings", return_value=mock_settings):
             ok, msg = _check_config_conflicts()
             assert ok is True
 
@@ -53,7 +53,7 @@ class TestConfigConflicts:
         mock_settings.bypass_permissions = True
         mock_settings.plan_mode = True
         mock_settings.injection_scan_enabled = True
-        with patch("pocketclaw.daemon.self_audit.get_settings", return_value=mock_settings):
+        with patch("pocketpaw.daemon.self_audit.get_settings", return_value=mock_settings):
             ok, msg = _check_config_conflicts()
             assert ok is False
             assert "bypass_permissions" in msg
@@ -63,7 +63,7 @@ class TestConfigConflicts:
         mock_settings.bypass_permissions = False
         mock_settings.plan_mode = False
         mock_settings.injection_scan_enabled = False
-        with patch("pocketclaw.daemon.self_audit.get_settings", return_value=mock_settings):
+        with patch("pocketpaw.daemon.self_audit.get_settings", return_value=mock_settings):
             ok, msg = _check_config_conflicts()
             assert ok is False
             assert "safety net" in msg
@@ -77,7 +77,7 @@ class TestConfigConflicts:
 class TestDiskUsage:
     def test_small_directory(self, tmp_path):
         (tmp_path / "test.txt").write_text("hello")
-        with patch("pocketclaw.daemon.self_audit.get_config_dir", return_value=tmp_path):
+        with patch("pocketpaw.daemon.self_audit.get_config_dir", return_value=tmp_path):
             ok, msg = _check_disk_usage()
             assert ok is True
             assert "MB" in msg
@@ -90,13 +90,13 @@ class TestDiskUsage:
 
 class TestAuditLogSize:
     def test_no_audit_log(self, tmp_path):
-        with patch("pocketclaw.daemon.self_audit.get_config_dir", return_value=tmp_path):
+        with patch("pocketpaw.daemon.self_audit.get_config_dir", return_value=tmp_path):
             ok, msg = _check_audit_log_size()
             assert ok is True
 
     def test_small_audit_log(self, tmp_path):
         (tmp_path / "audit.jsonl").write_text("{}\n" * 100)
-        with patch("pocketclaw.daemon.self_audit.get_config_dir", return_value=tmp_path):
+        with patch("pocketpaw.daemon.self_audit.get_config_dir", return_value=tmp_path):
             ok, msg = _check_audit_log_size()
             assert ok is True
 
@@ -108,7 +108,7 @@ class TestAuditLogSize:
 
 class TestOAuthTokens:
     def test_no_oauth_dir(self, tmp_path):
-        with patch("pocketclaw.daemon.self_audit.get_config_dir", return_value=tmp_path):
+        with patch("pocketpaw.daemon.self_audit.get_config_dir", return_value=tmp_path):
             ok, msg = _check_orphan_oauth_tokens()
             assert ok is True
 
@@ -116,7 +116,7 @@ class TestOAuthTokens:
         oauth_dir = tmp_path / "oauth"
         oauth_dir.mkdir()
         (oauth_dir / "google_gmail.json").write_text("{}")
-        with patch("pocketclaw.daemon.self_audit.get_config_dir", return_value=tmp_path):
+        with patch("pocketpaw.daemon.self_audit.get_config_dir", return_value=tmp_path):
             ok, msg = _check_orphan_oauth_tokens()
             assert ok is True
             assert "1 OAuth" in msg
@@ -137,20 +137,20 @@ async def test_run_self_audit(tmp_path):
     mock_settings.anthropic_api_key = "test-key"
     mock_settings.file_jail_path = tmp_path
 
-    config_dir = tmp_path / ".pocketclaw"
+    config_dir = tmp_path / ".pocketpaw"
     config_dir.mkdir()
     (config_dir / "config.json").write_text("{}")
     (config_dir / "audit.jsonl").write_text("")
 
     with (
-        patch("pocketclaw.daemon.self_audit.get_config_dir", return_value=config_dir),
-        patch("pocketclaw.daemon.self_audit.get_settings", return_value=mock_settings),
-        patch("pocketclaw.security.audit_cli.get_config_dir", return_value=config_dir),
+        patch("pocketpaw.daemon.self_audit.get_config_dir", return_value=config_dir),
+        patch("pocketpaw.daemon.self_audit.get_settings", return_value=mock_settings),
+        patch("pocketpaw.security.audit_cli.get_config_dir", return_value=config_dir),
         patch(
-            "pocketclaw.security.audit_cli.get_config_path",
+            "pocketpaw.security.audit_cli.get_config_path",
             return_value=config_dir / "config.json",
         ),
-        patch("pocketclaw.security.audit_cli.get_settings", return_value=mock_settings),
+        patch("pocketpaw.security.audit_cli.get_settings", return_value=mock_settings),
     ):
         report = await run_self_audit()
         assert "total_checks" in report

@@ -3,8 +3,8 @@
 
 import pytest
 
-from pocketclaw.bus.events import Channel
-from pocketclaw.bus.format import (
+from pocketpaw.bus.events import Channel
+from pocketpaw.bus.format import (
     CHANNEL_FORMAT_HINTS,
     convert_markdown,
 )

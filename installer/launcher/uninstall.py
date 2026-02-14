@@ -9,7 +9,7 @@ import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
-from installer.launcher.common import POCKETCLAW_HOME
+from installer.launcher.common import POCKETPAW_HOME
 
 logger = logging.getLogger(__name__)
 
@@ -33,50 +33,50 @@ class Uninstaller:
             Component(
                 name="venv",
                 description="Virtual environment (~/.pocketpaw/venv/)",
-                path=POCKETCLAW_HOME / "venv",
-                exists=(POCKETCLAW_HOME / "venv").exists(),
+                path=POCKETPAW_HOME / "venv",
+                exists=(POCKETPAW_HOME / "venv").exists(),
             ),
             Component(
                 name="uv",
                 description="uv package manager (~/.pocketpaw/uv/)",
-                path=POCKETCLAW_HOME / "uv",
-                exists=(POCKETCLAW_HOME / "uv").exists(),
+                path=POCKETPAW_HOME / "uv",
+                exists=(POCKETPAW_HOME / "uv").exists(),
             ),
             Component(
                 name="python",
                 description="Embedded Python (~/.pocketpaw/python/)",
-                path=POCKETCLAW_HOME / "python",
-                exists=(POCKETCLAW_HOME / "python").exists(),
+                path=POCKETPAW_HOME / "python",
+                exists=(POCKETPAW_HOME / "python").exists(),
             ),
             Component(
                 name="logs",
                 description="Log files (~/.pocketpaw/logs/)",
-                path=POCKETCLAW_HOME / "logs",
-                exists=(POCKETCLAW_HOME / "logs").exists(),
+                path=POCKETPAW_HOME / "logs",
+                exists=(POCKETPAW_HOME / "logs").exists(),
             ),
             Component(
                 name="config",
                 description="Configuration (~/.pocketpaw/config.json)",
-                path=POCKETCLAW_HOME / "config.json",
-                exists=(POCKETCLAW_HOME / "config.json").exists(),
+                path=POCKETPAW_HOME / "config.json",
+                exists=(POCKETPAW_HOME / "config.json").exists(),
             ),
             Component(
                 name="memory",
                 description="Memory & conversation history (~/.pocketpaw/memory/)",
-                path=POCKETCLAW_HOME / "memory",
-                exists=(POCKETCLAW_HOME / "memory").exists(),
+                path=POCKETPAW_HOME / "memory",
+                exists=(POCKETPAW_HOME / "memory").exists(),
             ),
             Component(
                 name="audit",
                 description="Audit log (~/.pocketpaw/audit.jsonl)",
-                path=POCKETCLAW_HOME / "audit.jsonl",
-                exists=(POCKETCLAW_HOME / "audit.jsonl").exists(),
+                path=POCKETPAW_HOME / "audit.jsonl",
+                exists=(POCKETPAW_HOME / "audit.jsonl").exists(),
             ),
             Component(
                 name="pid",
                 description="PID file (~/.pocketpaw/launcher.pid)",
-                path=POCKETCLAW_HOME / "launcher.pid",
-                exists=(POCKETCLAW_HOME / "launcher.pid").exists(),
+                path=POCKETPAW_HOME / "launcher.pid",
+                exists=(POCKETPAW_HOME / "launcher.pid").exists(),
             ),
         ]
         return components

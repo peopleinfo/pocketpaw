@@ -42,13 +42,13 @@ Since Ollama v0.14.0, Ollama exposes an **Anthropic Messages API compatible endp
 <Tabs items={["Environment Variables", "Config File", "Dashboard"]}>
   <Tab title="Environment Variables">
     ```bash
-    export POCKETCLAW_LLM_PROVIDER=ollama
-    export POCKETCLAW_OLLAMA_MODEL=qwen2.5:7b
+    export POCKETPAW_LLM_PROVIDER=ollama
+    export POCKETPAW_OLLAMA_MODEL=qwen2.5:7b
     pocketpaw
     ```
   </Tab>
   <Tab title="Config File">
-    Edit `~/.pocketclaw/config.json`:
+    Edit `~/.pocketpaw/config.json`:
 
     ```json
     {
@@ -92,9 +92,9 @@ This performs 4 checks:
 
 | Setting | Env Var | Default | Description |
 |---------|---------|---------|-------------|
-| `llm_provider` | `POCKETCLAW_LLM_PROVIDER` | `"auto"` | Set to `"ollama"` for explicit Ollama usage |
-| `ollama_host` | `POCKETCLAW_OLLAMA_HOST` | `"http://localhost:11434"` | Ollama server URL |
-| `ollama_model` | `POCKETCLAW_OLLAMA_MODEL` | `"llama3.2"` | Model to use |
+| `llm_provider` | `POCKETPAW_LLM_PROVIDER` | `"auto"` | Set to `"ollama"` for explicit Ollama usage |
+| `ollama_host` | `POCKETPAW_OLLAMA_HOST` | `"http://localhost:11434"` | Ollama server URL |
+| `ollama_model` | `POCKETPAW_OLLAMA_MODEL` | `"llama3.2"` | Model to use |
 
 ### Auto-Detection
 
@@ -163,7 +163,7 @@ This means PocketPaw is trying to use a model you haven't pulled. The default mo
 ollama list
 
 # Set the correct model
-export POCKETCLAW_OLLAMA_MODEL="deepseek-r1:8b"
+export POCKETPAW_OLLAMA_MODEL="deepseek-r1:8b"
 ```
 
 Or update it in the dashboard: **Settings → General → Ollama Model**.

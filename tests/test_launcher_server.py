@@ -67,13 +67,13 @@ class TestConfigReading:
         config_path = tmp_path / "config.json"
         config_path.write_text(json.dumps({"web_port": 9999}))
 
-        with patch("installer.launcher.server.POCKETCLAW_HOME", tmp_path):
+        with patch("installer.launcher.server.POCKETPAW_HOME", tmp_path):
             mgr = ServerManager()
             assert mgr._read_port_from_config() == 9999
 
     def test_read_port_no_config(self, tmp_path: Path):
         """Should return None when config doesn't exist."""
-        with patch("installer.launcher.server.POCKETCLAW_HOME", tmp_path):
+        with patch("installer.launcher.server.POCKETPAW_HOME", tmp_path):
             mgr = ServerManager()
             assert mgr._read_port_from_config() is None
 
@@ -82,7 +82,7 @@ class TestConfigReading:
         config_path = tmp_path / "config.json"
         config_path.write_text("not json")
 
-        with patch("installer.launcher.server.POCKETCLAW_HOME", tmp_path):
+        with patch("installer.launcher.server.POCKETPAW_HOME", tmp_path):
             mgr = ServerManager()
             assert mgr._read_port_from_config() is None
 
@@ -91,7 +91,7 @@ class TestConfigReading:
         config_path = tmp_path / "config.json"
         config_path.write_text(json.dumps({"agent_backend": "claude_agent_sdk"}))
 
-        with patch("installer.launcher.server.POCKETCLAW_HOME", tmp_path):
+        with patch("installer.launcher.server.POCKETPAW_HOME", tmp_path):
             mgr = ServerManager()
             assert mgr._read_port_from_config() is None
 

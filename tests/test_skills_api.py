@@ -17,7 +17,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from pocketclaw.skills.loader import Skill, SkillLoader
+from pocketpaw.skills.loader import Skill, SkillLoader
 
 # ======================================================================
 # SkillLoader.search() tests
@@ -145,8 +145,8 @@ class TestSkillsRESTEndpoints:
 
     async def test_list_installed_skills(self, mock_loader):
         """GET /api/skills returns installed invocable skills."""
-        with patch("pocketclaw.dashboard.get_skill_loader", return_value=mock_loader):
-            from pocketclaw.dashboard import list_installed_skills
+        with patch("pocketpaw.dashboard.get_skill_loader", return_value=mock_loader):
+            from pocketpaw.dashboard import list_installed_skills
 
             result = await list_installed_skills()
             assert len(result) == 1
@@ -173,8 +173,8 @@ class TestSkillsRESTEndpoints:
                 user_invocable=False,
             ),
         }
-        with patch("pocketclaw.dashboard.get_skill_loader", return_value=mock_loader):
-            from pocketclaw.dashboard import reload_skills
+        with patch("pocketpaw.dashboard.get_skill_loader", return_value=mock_loader):
+            from pocketpaw.dashboard import reload_skills
 
             result = await reload_skills()
             assert result["status"] == "ok"
@@ -182,7 +182,7 @@ class TestSkillsRESTEndpoints:
 
     async def test_search_skills_library_empty_query(self):
         """GET /api/skills/search with empty q returns empty list."""
-        from pocketclaw.dashboard import search_skills_library
+        from pocketpaw.dashboard import search_skills_library
 
         result = await search_skills_library(q="", limit=30)
         assert result == {"skills": [], "count": 0}
@@ -202,7 +202,7 @@ class TestSkillsRESTEndpoints:
         mock_client.get = AsyncMock(return_value=mock_response)
 
         with patch("httpx.AsyncClient", return_value=mock_client):
-            from pocketclaw.dashboard import search_skills_library
+            from pocketpaw.dashboard import search_skills_library
 
             result = await search_skills_library(q="react", limit=10)
             assert result == {
@@ -216,7 +216,7 @@ class TestSkillsRESTEndpoints:
 
     async def test_install_skill_missing_source(self):
         """POST /api/skills/install with no source returns 400."""
-        from pocketclaw.dashboard import install_skill
+        from pocketpaw.dashboard import install_skill
 
         request = MagicMock()
         request.json = AsyncMock(return_value={})
@@ -227,7 +227,7 @@ class TestSkillsRESTEndpoints:
 
     async def test_install_skill_invalid_source(self):
         """POST /api/skills/install with dangerous chars returns 400."""
-        from pocketclaw.dashboard import install_skill
+        from pocketpaw.dashboard import install_skill
 
         request = MagicMock()
         request.json = AsyncMock(return_value={"source": "foo; rm -rf /"})
@@ -247,8 +247,8 @@ class TestSkillsRESTEndpoints:
         mock_proc.returncode = 0
 
         with (
-            patch("pocketclaw.dashboard.asyncio") as mock_asyncio,
-            patch("pocketclaw.dashboard.get_skill_loader", return_value=mock_loader),
+            patch("pocketpaw.dashboard.asyncio") as mock_asyncio,
+            patch("pocketpaw.dashboard.get_skill_loader", return_value=mock_loader),
             tempfile.TemporaryDirectory() as fake_home,
         ):
             mock_asyncio.create_subprocess_exec = AsyncMock(return_value=mock_proc)
@@ -278,7 +278,7 @@ class TestSkillsRESTEndpoints:
             # Patch install dir to use temp dir
             install_path = Path(fake_home) / ".agents" / "skills"
             with patch("pathlib.Path.home", return_value=Path(fake_home)):
-                from pocketclaw.dashboard import install_skill
+                from pocketpaw.dashboard import install_skill
 
                 result = await install_skill(request)
                 assert result["status"] == "ok"
@@ -297,7 +297,7 @@ class TestSkillsRESTEndpoints:
         mock_proc.returncode = 128
 
         with (
-            patch("pocketclaw.dashboard.asyncio") as mock_asyncio,
+            patch("pocketpaw.dashboard.asyncio") as mock_asyncio,
         ):
             mock_asyncio.create_subprocess_exec = AsyncMock(return_value=mock_proc)
             mock_asyncio.subprocess = asyncio.subprocess
@@ -307,14 +307,14 @@ class TestSkillsRESTEndpoints:
                 return await coro
             mock_asyncio.wait_for = passthrough
 
-            from pocketclaw.dashboard import install_skill
+            from pocketpaw.dashboard import install_skill
 
             result = await install_skill(request)
             assert result.status_code == 500
 
     async def test_remove_skill_missing_name(self):
         """POST /api/skills/remove with no name returns 400."""
-        from pocketclaw.dashboard import remove_skill
+        from pocketpaw.dashboard import remove_skill
 
         request = MagicMock()
         request.json = AsyncMock(return_value={})
@@ -324,7 +324,7 @@ class TestSkillsRESTEndpoints:
 
     async def test_remove_skill_invalid_name(self):
         """POST /api/skills/remove with dangerous chars returns 400."""
-        from pocketclaw.dashboard import remove_skill
+        from pocketpaw.dashboard import remove_skill
 
         request = MagicMock()
         request.json = AsyncMock(return_value={"name": "foo|bar"})
@@ -342,7 +342,7 @@ class TestSkillsRESTEndpoints:
 
         with (
             tempfile.TemporaryDirectory() as fake_home,
-            patch("pocketclaw.dashboard.get_skill_loader", return_value=mock_loader),
+            patch("pocketpaw.dashboard.get_skill_loader", return_value=mock_loader),
             patch("pathlib.Path.home", return_value=Path(fake_home)),
         ):
             # Create a fake installed skill
@@ -350,7 +350,7 @@ class TestSkillsRESTEndpoints:
             skill_dir.mkdir(parents=True)
             (skill_dir / "SKILL.md").write_text("---\nname: old-skill\n---\nContent")
 
-            from pocketclaw.dashboard import remove_skill
+            from pocketpaw.dashboard import remove_skill
 
             result = await remove_skill(request)
             assert result["status"] == "ok"
@@ -368,7 +368,7 @@ class TestSkillsRESTEndpoints:
             tempfile.TemporaryDirectory() as fake_home,
             patch("pathlib.Path.home", return_value=Path(fake_home)),
         ):
-            from pocketclaw.dashboard import remove_skill
+            from pocketpaw.dashboard import remove_skill
 
             result = await remove_skill(request)
             assert result.status_code == 404
@@ -381,28 +381,28 @@ class TestSkillsRESTEndpoints:
 
 class TestMCPPresetNeedsArgs:
     def test_filesystem_needs_args(self):
-        from pocketclaw.mcp.presets import get_preset
+        from pocketpaw.mcp.presets import get_preset
 
         p = get_preset("filesystem")
         assert p is not None
         assert p.needs_args is True
 
     def test_postgres_needs_args(self):
-        from pocketclaw.mcp.presets import get_preset
+        from pocketpaw.mcp.presets import get_preset
 
         p = get_preset("postgres")
         assert p is not None
         assert p.needs_args is True
 
     def test_sqlite_needs_args(self):
-        from pocketclaw.mcp.presets import get_preset
+        from pocketpaw.mcp.presets import get_preset
 
         p = get_preset("sqlite")
         assert p is not None
         assert p.needs_args is True
 
     def test_github_does_not_need_args(self):
-        from pocketclaw.mcp.presets import get_preset
+        from pocketpaw.mcp.presets import get_preset
 
         p = get_preset("github")
         assert p is not None
@@ -410,7 +410,7 @@ class TestMCPPresetNeedsArgs:
 
     def test_needs_args_in_preset_response(self):
         """list_mcp_presets includes needs_args in response."""
-        from pocketclaw.mcp.presets import get_all_presets
+        from pocketpaw.mcp.presets import get_all_presets
 
         for p in get_all_presets():
             # Every preset should have a bool needs_args
@@ -444,7 +444,7 @@ class TestMCPRegistryEndpoints:
         mock_client.get = AsyncMock(return_value=mock_response)
 
         with patch("httpx.AsyncClient", return_value=mock_client):
-            from pocketclaw.dashboard import search_mcp_registry
+            from pocketpaw.dashboard import search_mcp_registry
 
             result = await search_mcp_registry(q="", limit=30, cursor="")
             assert "servers" in result
@@ -472,7 +472,7 @@ class TestMCPRegistryEndpoints:
         mock_client.get = AsyncMock(return_value=mock_response)
 
         with patch("httpx.AsyncClient", return_value=mock_client):
-            from pocketclaw.dashboard import search_mcp_registry
+            from pocketpaw.dashboard import search_mcp_registry
 
             result = await search_mcp_registry(q="sql", limit=10, cursor="")
             # Unwrapped: flat server object
@@ -497,7 +497,7 @@ class TestMCPRegistryEndpoints:
         mock_client.get = AsyncMock(return_value=mock_response)
 
         with patch("httpx.AsyncClient", return_value=mock_client):
-            from pocketclaw.dashboard import search_mcp_registry
+            from pocketpaw.dashboard import search_mcp_registry
 
             await search_mcp_registry(q="test", limit=30, cursor="page2")
             call_kwargs = mock_client.get.call_args
@@ -516,7 +516,7 @@ class TestMCPRegistryEndpoints:
         mock_client.get = AsyncMock(return_value=mock_response)
 
         with patch("httpx.AsyncClient", return_value=mock_client):
-            from pocketclaw.dashboard import search_mcp_registry
+            from pocketpaw.dashboard import search_mcp_registry
 
             await search_mcp_registry(q="x", limit=999, cursor="")
             call_kwargs = mock_client.get.call_args
@@ -525,7 +525,7 @@ class TestMCPRegistryEndpoints:
 
     async def test_install_from_registry_missing_name(self):
         """POST /api/mcp/registry/install with empty server name returns 400."""
-        from pocketclaw.dashboard import install_from_registry
+        from pocketpaw.dashboard import install_from_registry
 
         request = MagicMock()
         request.json = AsyncMock(return_value={"server": {}, "env": {}})
@@ -551,8 +551,8 @@ class TestMCPRegistryEndpoints:
             }
         )
 
-        with patch("pocketclaw.mcp.manager.get_mcp_manager", return_value=mock_mgr):
-            from pocketclaw.dashboard import install_from_registry
+        with patch("pocketpaw.mcp.manager.get_mcp_manager", return_value=mock_mgr):
+            from pocketpaw.dashboard import install_from_registry
 
             result = await install_from_registry(request)
             assert result["status"] == "ok"
@@ -581,8 +581,8 @@ class TestMCPRegistryEndpoints:
             }
         )
 
-        with patch("pocketclaw.mcp.manager.get_mcp_manager", return_value=mock_mgr):
-            from pocketclaw.dashboard import install_from_registry
+        with patch("pocketpaw.mcp.manager.get_mcp_manager", return_value=mock_mgr):
+            from pocketpaw.dashboard import install_from_registry
 
             result = await install_from_registry(request)
             assert result["status"] == "ok"
@@ -617,8 +617,8 @@ class TestMCPRegistryEndpoints:
             }
         )
 
-        with patch("pocketclaw.mcp.manager.get_mcp_manager", return_value=mock_mgr):
-            from pocketclaw.dashboard import install_from_registry
+        with patch("pocketpaw.mcp.manager.get_mcp_manager", return_value=mock_mgr):
+            from pocketpaw.dashboard import install_from_registry
 
             result = await install_from_registry(request)
             assert result["status"] == "ok"
@@ -650,8 +650,8 @@ class TestMCPRegistryEndpoints:
             }
         )
 
-        with patch("pocketclaw.mcp.manager.get_mcp_manager", return_value=mock_mgr):
-            from pocketclaw.dashboard import install_from_registry
+        with patch("pocketpaw.mcp.manager.get_mcp_manager", return_value=mock_mgr):
+            from pocketpaw.dashboard import install_from_registry
 
             result = await install_from_registry(request)
             assert result["status"] == "ok"
@@ -686,8 +686,8 @@ class TestMCPRegistryEndpoints:
             }
         )
 
-        with patch("pocketclaw.mcp.manager.get_mcp_manager", return_value=mock_mgr):
-            from pocketclaw.dashboard import install_from_registry
+        with patch("pocketpaw.mcp.manager.get_mcp_manager", return_value=mock_mgr):
+            from pocketpaw.dashboard import install_from_registry
 
             result = await install_from_registry(request)
             assert result["status"] == "ok"
@@ -699,7 +699,7 @@ class TestMCPRegistryEndpoints:
 
     async def test_install_from_registry_no_install_method(self):
         """POST /api/mcp/registry/install with no packages or remotes returns 400."""
-        from pocketclaw.dashboard import install_from_registry
+        from pocketpaw.dashboard import install_from_registry
 
         request = MagicMock()
         request.json = AsyncMock(

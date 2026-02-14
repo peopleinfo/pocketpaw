@@ -5,9 +5,9 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from pocketclaw.bus.adapters.whatsapp_adapter import WhatsAppAdapter
-from pocketclaw.bus.events import Channel, OutboundMessage
-from pocketclaw.bus.queue import MessageBus
+from pocketpaw.bus.adapters.whatsapp_adapter import WhatsAppAdapter
+from pocketpaw.bus.events import Channel, OutboundMessage
+from pocketpaw.bus.queue import MessageBus
 
 
 @pytest.fixture

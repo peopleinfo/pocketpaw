@@ -8,9 +8,9 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from pocketclaw.agents.pocketpaw_native import PocketPawOrchestrator
-from pocketclaw.config import Settings
-from pocketclaw.mcp.manager import MCPManager, MCPToolInfo
+from pocketpaw.agents.pocketpaw_native import PocketPawOrchestrator
+from pocketpaw.config import Settings
+from pocketpaw.mcp.manager import MCPManager, MCPToolInfo
 
 
 def _make_orchestrator(**overrides) -> PocketPawOrchestrator:
@@ -24,7 +24,7 @@ def _make_orchestrator(**overrides) -> PocketPawOrchestrator:
         orch = PocketPawOrchestrator(settings)
         orch._client = None  # don't need real client
         orch._executor = None
-        from pocketclaw.tools.policy import ToolPolicy
+        from pocketpaw.tools.policy import ToolPolicy
 
         orch._policy = ToolPolicy(
             profile=settings.tool_profile,
@@ -42,7 +42,7 @@ class TestMCPToolDiscovery:
 
     def test_no_mcp_tools(self):
         orch = _make_orchestrator()
-        with patch("pocketclaw.mcp.manager.get_mcp_manager") as mock_get:
+        with patch("pocketpaw.mcp.manager.get_mcp_manager") as mock_get:
             mgr = MCPManager()
             mock_get.return_value = mgr
             tools = orch._get_mcp_tools()
@@ -52,8 +52,8 @@ class TestMCPToolDiscovery:
         orch = _make_orchestrator()
         mgr = MCPManager()
         # Inject fake tools via internal state
-        from pocketclaw.mcp.manager import _ServerState
-        from pocketclaw.mcp.config import MCPServerConfig
+        from pocketpaw.mcp.manager import _ServerState
+        from pocketpaw.mcp.config import MCPServerConfig
 
         state = _ServerState(
             config=MCPServerConfig(name="fs"),
@@ -69,7 +69,7 @@ class TestMCPToolDiscovery:
         )
         mgr._servers["fs"] = state
 
-        with patch("pocketclaw.mcp.manager.get_mcp_manager", return_value=mgr):
+        with patch("pocketpaw.mcp.manager.get_mcp_manager", return_value=mgr):
             tools = orch._get_mcp_tools()
 
         assert len(tools) == 1
@@ -80,8 +80,8 @@ class TestMCPToolDiscovery:
     def test_mcp_tools_filtered_by_policy(self):
         orch = _make_orchestrator(tools_deny=["mcp:fs:*"])
         mgr = MCPManager()
-        from pocketclaw.mcp.manager import _ServerState
-        from pocketclaw.mcp.config import MCPServerConfig
+        from pocketpaw.mcp.manager import _ServerState
+        from pocketpaw.mcp.config import MCPServerConfig
 
         state = _ServerState(
             config=MCPServerConfig(name="fs"),
@@ -90,15 +90,15 @@ class TestMCPToolDiscovery:
         )
         mgr._servers["fs"] = state
 
-        with patch("pocketclaw.mcp.manager.get_mcp_manager", return_value=mgr):
+        with patch("pocketpaw.mcp.manager.get_mcp_manager", return_value=mgr):
             tools = orch._get_mcp_tools()
         assert tools == []
 
     def test_get_filtered_tools_includes_mcp(self):
         orch = _make_orchestrator()
         mgr = MCPManager()
-        from pocketclaw.mcp.manager import _ServerState
-        from pocketclaw.mcp.config import MCPServerConfig
+        from pocketpaw.mcp.manager import _ServerState
+        from pocketpaw.mcp.config import MCPServerConfig
 
         state = _ServerState(
             config=MCPServerConfig(name="gh"),
@@ -107,7 +107,7 @@ class TestMCPToolDiscovery:
         )
         mgr._servers["gh"] = state
 
-        with patch("pocketclaw.mcp.manager.get_mcp_manager", return_value=mgr):
+        with patch("pocketpaw.mcp.manager.get_mcp_manager", return_value=mgr):
             tools = orch._get_filtered_tools()
 
         tool_names = [t["name"] for t in tools]
@@ -137,8 +137,8 @@ class TestMCPToolExecution:
     async def test_execute_mcp_tool(self):
         orch = _make_orchestrator()
         mgr = MCPManager()
-        from pocketclaw.mcp.manager import _ServerState
-        from pocketclaw.mcp.config import MCPServerConfig
+        from pocketpaw.mcp.manager import _ServerState
+        from pocketpaw.mcp.config import MCPServerConfig
 
         mock_session = AsyncMock()
         block = SimpleNamespace(text="file contents here")
@@ -150,7 +150,7 @@ class TestMCPToolExecution:
         )
         mgr._servers["fs"] = state
 
-        with patch("pocketclaw.mcp.manager.get_mcp_manager", return_value=mgr):
+        with patch("pocketpaw.mcp.manager.get_mcp_manager", return_value=mgr):
             result = await orch._execute_tool("mcp_fs__read_file", {"path": "/tmp/x"})
 
         assert result == "file contents here"
