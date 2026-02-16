@@ -49,6 +49,10 @@ class ShellTool(BaseTool):
 
     async def execute(self, command: str) -> str:
         """Execute a shell command."""
+        # Handle 'pwd' natively for cross-platform compatibility
+        if command.strip() == "pwd":
+            return self.working_dir
+
         # Security check
         for pattern in self.DANGEROUS_PATTERNS:
             if pattern.search(command):
