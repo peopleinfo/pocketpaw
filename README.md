@@ -148,7 +148,7 @@ Paw:  3 agents working on it. I'll ping you when it's ready.
 ## Architecture
 
 <p align="center">
-  <img src="assets/diagrams/pocket-paw-system-architecture.png" alt="PocketPaw System Architecture" width="800">
+  <img src="docs/public/pocketpaw-system-architecture.webp" alt="PocketPaw System Architecture" width="800">
 </p>
 
 **Event-driven message bus** — all channels publish to a unified bus, consumed by the AgentLoop, which routes to one of 6 backends via a registry-based router. All backends implement the `AgentBackend` protocol and yield standardized `AgentEvent` objects.
@@ -167,7 +167,7 @@ Paw:  3 agents working on it. I'll ping you when it's ready.
 ### Security
 
 <p align="center">
-  <img src="assets/diagrams/7-layer-security-stack.png" alt="PocketPaw 7-Layer Security Stack" width="500">
+  <img src="docs/public/pocketpaw-security-stack.webp" alt="PocketPaw 7-Layer Security Stack" width="500">
 </p>
 
 Guardian AI safety checks, injection scanner, tool policy engine (profiles + allow/deny), plan mode approval, audit CLI (`--security-audit`), self-audit daemon, and append-only audit log. [Learn more](https://docs.pocketpaw.xyz/security).
@@ -176,7 +176,7 @@ Guardian AI safety checks, injection scanner, tool policy engine (profiles + all
 <summary>Detailed security architecture</summary>
 <br>
 <p align="center">
-  <img src="assets/diagrams/security-architecture.png" alt="PocketPaw Security Architecture (Defense-in-Depth)" width="800">
+  <img src="docs/public/pocketpaw-security-architecture.webp" alt="PocketPaw Security Architecture (Defense-in-Depth)" width="800">
 </p>
 </details>
 
