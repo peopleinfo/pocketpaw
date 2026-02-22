@@ -59,6 +59,7 @@ dependencies = [
     "cryptography>=42.0",
     # Image basics
     "pillow>=10.0.0",
+    "crawlee[playwright]>=1.4.0",
 ]
 
 [project.optional-dependencies]

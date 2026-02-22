@@ -1616,6 +1616,225 @@ async def get_memory_stats():
     }
 
 
+# ==================== Anti-Detect Browser API ====================
+
+
+@app.get("/api/anti-browser/profiles")
+async def list_browser_profiles():
+    """List all anti-detect browser profiles."""
+    from pocketpaw.browser.profile import get_profile_store
+
+    store = get_profile_store()
+    return {"profiles": [p.to_dict() for p in store.list()]}
+
+
+@app.post("/api/anti-browser/profiles")
+async def create_browser_profile(request: Request):
+    """Create a new browser profile."""
+    from pocketpaw.browser.fingerprint import generate_fingerprint
+    from pocketpaw.browser.profile import get_profile_store
+
+    data = await request.json()
+    name = data.get("name", "").strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Profile name is required")
+
+    plugin = data.get("plugin", "playwright")
+    browser_type = "firefox" if plugin == "camoufox" else data.get("browser_type", "chromium")
+
+    store = get_profile_store()
+    profile = store.create(
+        name=name,
+        start_url=data.get("start_url", ""),
+        proxy=data.get("proxy", ""),
+        os_type=data.get("os_type", "macos"),
+        browser_type=browser_type,
+        plugin=plugin,
+        notes=data.get("notes", ""),
+    )
+
+    # Auto-generate fingerprint
+    fp = generate_fingerprint(
+        browser=profile.browser_type,
+        os_type=profile.os_type,
+    )
+    store.update(profile.id, fingerprint=fp)
+    profile.fingerprint = fp
+
+    return {"profile": profile.to_dict()}
+
+
+@app.put("/api/anti-browser/profiles/{profile_id}")
+async def update_browser_profile(profile_id: str, request: Request):
+    """Update a browser profile."""
+    from pocketpaw.browser.profile import get_profile_store
+
+    store = get_profile_store()
+    data = await request.json()
+    profile = store.update(profile_id, **data)
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profile not found")
+    return {"profile": profile.to_dict()}
+
+
+@app.delete("/api/anti-browser/profiles/{profile_id}")
+async def delete_browser_profile(profile_id: str):
+    """Delete a browser profile."""
+    from pocketpaw.browser.profile import get_profile_store
+
+    store = get_profile_store()
+    profile = store.get(profile_id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profile not found")
+    if profile.status == "RUNNING":
+        raise HTTPException(status_code=409, detail="Stop the profile session first")
+    store.delete(profile_id)
+    return {"status": "deleted"}
+
+
+@app.get("/api/anti-browser/actors")
+async def list_actor_templates():
+    """List available actor templates."""
+    from pocketpaw.browser.actors import list_actors
+
+    return {"actors": [a.to_dict() for a in list_actors()]}
+
+
+@app.get("/api/anti-browser/actors/{actor_id}/schema")
+async def get_actor_schema(actor_id: str):
+    """Get input schema for an actor template."""
+    from pocketpaw.browser.actors import get_actor
+
+    actor = get_actor(actor_id)
+    if not actor:
+        raise HTTPException(status_code=404, detail="Actor template not found")
+    return {"actor_id": actor_id, "input_schema": actor.input_schema}
+
+
+@app.post("/api/anti-browser/profiles/{profile_id}/run")
+async def run_actor_on_profile(profile_id: str, request: Request):
+    """Run an actor template on a profile."""
+    from pocketpaw.browser.actors import get_actor
+    from pocketpaw.browser.fingerprint import generate_fingerprint
+    from pocketpaw.browser.profile import get_profile_store
+
+    store = get_profile_store()
+    profile = store.get(profile_id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profile not found")
+    if profile.status == "RUNNING":
+        raise HTTPException(status_code=409, detail="Profile is already running")
+
+    data = await request.json()
+    actor_id = data.get("actor_id", "web-scraper")
+    inputs = data.get("inputs", {})
+
+    actor = get_actor(actor_id)
+    if not actor:
+        raise HTTPException(status_code=404, detail=f"Actor '{actor_id}' not found")
+
+    # Ensure fingerprint exists
+    fp = profile.fingerprint or generate_fingerprint(
+        browser=profile.browser_type,
+        os_type=profile.os_type,
+    )
+
+    store.set_status(profile_id, "RUNNING")
+    try:
+        result = await actor.run(
+            profile_fingerprint=fp,
+            plugin=profile.plugin,
+            inputs=inputs,
+            user_data_dir=str(profile.user_data_dir),
+            proxy=profile.proxy or None,
+        )
+        store.set_status(profile_id, "IDLE")
+        return {"result": result.to_dict(), "profile": store.get(profile_id).to_dict()}
+    except Exception as e:
+        store.set_status(profile_id, "ERROR")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/anti-browser/profiles/{profile_id}/stop")
+async def stop_profile_session(profile_id: str):
+    """Stop a running profile session."""
+    from pocketpaw.browser.profile import get_profile_store
+
+    store = get_profile_store()
+    profile = store.get(profile_id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profile not found")
+    store.set_status(profile_id, "IDLE")
+    return {"status": "stopped", "profile": profile.to_dict()}
+
+
+@app.get("/api/anti-browser/plugins")
+async def list_browser_plugins():
+    """List available browser plugins."""
+    from pocketpaw.browser.plugins import list_plugins, _check_installed
+
+    # Re-evaluate installed status dynamically
+    plugins = list_plugins()
+    for p in plugins:
+        if p.requires_package:
+            p.installed = _check_installed(p.requires_package)
+
+    return {"plugins": [p.__dict__ for p in plugins]}
+
+
+@app.post("/api/anti-browser/plugins/{plugin_id}/install")
+async def install_browser_plugin(plugin_id: str):
+    """Install a browser plugin's dependencies."""
+    import asyncio
+    from pocketpaw.browser.plugins import get_plugin
+
+    plugin = get_plugin(plugin_id)
+    if not plugin:
+        raise HTTPException(status_code=404, detail="Plugin not found")
+    
+    if plugin.installed or not plugin.requires_package:
+        return {"status": "installed"}
+
+    try:
+        # Run uv add to install the package in the environment
+        process = await asyncio.create_subprocess_exec(
+            "uv", "add", plugin.requires_package,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        stdout, stderr = await process.communicate()
+        
+        if process.returncode != 0:
+            raise HTTPException(status_code=500, detail=f"Failed to install {plugin.requires_package}: {stderr.decode()}")
+            
+        # Update plugin registry state
+        plugin.installed = True
+        return {"status": "success"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/anti-browser/profiles/{profile_id}/regenerate-fp")
+async def regenerate_fingerprint(profile_id: str):
+    """Regenerate fingerprint for a profile."""
+    from pocketpaw.browser.fingerprint import generate_fingerprint
+    from pocketpaw.browser.profile import get_profile_store
+
+    store = get_profile_store()
+    profile = store.get(profile_id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profile not found")
+    if profile.status == "RUNNING":
+        raise HTTPException(status_code=409, detail="Stop the profile first")
+
+    fp = generate_fingerprint(
+        browser=profile.browser_type,
+        os_type=profile.os_type,
+    )
+    store.update(profile_id, fingerprint=fp)
+    return {"fingerprint": fp, "profile": store.get(profile_id).to_dict()}
+
+
 def run_dashboard(
     host: str = "127.0.0.1",
     port: int = 8888,
