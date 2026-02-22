@@ -290,6 +290,13 @@
                 >Command Center</span
               >
             </button>
+            <button
+              class="px-4 md:px-6 py-1.5 rounded-[7px] text-[13px] font-medium transition-all hidden sm:flex items-center gap-1.5"
+              :class="view === 'anti-browser' ? 'bg-[#636366]/80 text-white shadow-sm' : 'text-[var(--text-secondary)] hover:text-white'"
+              @click="navigateToView('anti-browser')"
+            >
+              Anti-Browser
+            </button>
           </div>
         </div>
 
