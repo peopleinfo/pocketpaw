@@ -14,8 +14,8 @@ window.PocketPaw.AntiBrowser = {
   getState() {
     return {
       antiBrowser: {
-        show: false,
-        view: "detail", // 'detail' | 'create'
+        drawerOpen: false,
+        drawerView: "detail", // 'detail' | 'create'
         loading: false,
         creating: false,
         running: false,
@@ -45,14 +45,23 @@ window.PocketPaw.AntiBrowser = {
     return {
       // ==================== Open / Init ====================
 
-      async openAntiBrowser() {
-        this.antiBrowser.show = true;
-        this.antiBrowser.view = "detail";
-        this.antiBrowser.selectedProfile = null;
-        this.antiBrowser.lastResult = null;
-        await this.fetchAntiBrowserProfiles();
-        await this.fetchAntiBrowserActors();
-        await this.fetchAntiBrowserPlugins();
+      async initAntiBrowser() {
+        if (this.antiBrowser.profiles.length === 0) {
+          await this.fetchAntiBrowserProfiles();
+          await this.fetchAntiBrowserActors();
+          await this.fetchAntiBrowserPlugins();
+        }
+        this.$nextTick(() => {
+          if (window.refreshIcons) window.refreshIcons();
+        });
+      },
+
+      openAntiBrowserDrawer(mode = "detail") {
+        this.antiBrowser.drawerOpen = true;
+        this.antiBrowser.drawerView = mode;
+        if (mode === "create") {
+          this.antiBrowser.selectedProfile = null;
+        }
         this.$nextTick(() => {
           if (window.refreshIcons) window.refreshIcons();
         });
@@ -90,11 +99,12 @@ window.PocketPaw.AntiBrowser = {
 
       selectAntiBrowserProfile(profile) {
         this.antiBrowser.selectedProfile = profile;
-        this.antiBrowser.view = "detail";
+        this.antiBrowser.drawerView = "detail";
         this.antiBrowser.selectedActor = null;
         this.antiBrowser.actorSchema = null;
         this.antiBrowser.actorInputs = {};
         this.antiBrowser.lastResult = null;
+        this.antiBrowser.drawerOpen = true;
         this.$nextTick(() => {
           if (window.refreshIcons) window.refreshIcons();
         });
@@ -118,7 +128,7 @@ window.PocketPaw.AntiBrowser = {
             const data = await res.json();
             this.antiBrowser.profiles.unshift(data.profile);
             this.antiBrowser.selectedProfile = data.profile;
-            this.antiBrowser.view = "detail";
+            this.antiBrowser.drawerView = "detail";
             this.antiBrowser.form = {
               name: "",
               start_url: "",
@@ -316,7 +326,10 @@ window.PocketPaw.AntiBrowser = {
           const res = await fetch("/api/anti-browser/plugins");
           if (res.ok) {
             const data = await res.json();
-            this.antiBrowser.plugins = data.plugins || [];
+            this.antiBrowser.plugins = (data.plugins || []).map((p) => ({
+              ...p,
+              installing: false,
+            }));
           }
         } catch (e) {
           console.error("Failed to load plugins:", e);

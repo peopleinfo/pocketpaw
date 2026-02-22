@@ -1807,6 +1807,10 @@ async def install_browser_plugin(plugin_id: str):
         if process.returncode != 0:
             raise HTTPException(status_code=500, detail=f"Failed to install {plugin.requires_package}: {stderr.decode()}")
             
+        # Invalidate import caches so the new package is immediately recognized
+        import importlib
+        importlib.invalidate_caches()
+            
         # Update plugin registry state
         plugin.installed = True
         return {"status": "success"}
