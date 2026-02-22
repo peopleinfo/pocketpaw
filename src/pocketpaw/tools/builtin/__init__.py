@@ -17,6 +17,7 @@ _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
     "WriteFileTool": (".filesystem", "WriteFileTool"),
     "ListDirTool": (".filesystem", "ListDirTool"),
     "BrowserTool": (".browser", "BrowserTool"),
+    "AntiDetectBrowserTool": (".anti_detect_browser", "AntiDetectBrowserTool"),
     "RememberTool": (".memory", "RememberTool"),
     "RecallTool": (".memory", "RecallTool"),
     "ForgetTool": (".memory", "ForgetTool"),
