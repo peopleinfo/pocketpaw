@@ -77,6 +77,12 @@ class PlaywrightScraperActor(ActorTemplate):
                     "minimum": 5000,
                     "maximum": 120000,
                 },
+                "headless": {
+                    "type": "boolean",
+                    "title": "Headless",
+                    "description": "Run browser in headless mode (no visible window)",
+                    "default": True,
+                },
             },
             "required": ["start_urls"],
         }
@@ -113,6 +119,7 @@ class PlaywrightScraperActor(ActorTemplate):
         wait_until = inputs.get("wait_until", "load")
         timeout = inputs.get("timeout", 30000)
         take_screenshot = inputs.get("screenshot", False)
+        headless = inputs.get("headless", True)
 
         extracted_data: list[dict[str, Any]] = []
 
@@ -121,11 +128,11 @@ class PlaywrightScraperActor(ActorTemplate):
             if plugin == "camoufox":
                 try:
                     from camoufox import AsyncNewBrowser
-                    browser = await AsyncNewBrowser(pw, headless=True)
+                    browser = await AsyncNewBrowser(pw, headless=headless)
                 except ImportError:
                     return ActorResult(status="error", error="Camoufox plugin requested but not installed")
             else:
-                browser = await pw.chromium.launch(headless=True)
+                browser = await pw.chromium.launch(headless=headless)
 
             context_opts: dict[str, Any] = {
                 "user_agent": profile_fingerprint.get("user_agent", ""),

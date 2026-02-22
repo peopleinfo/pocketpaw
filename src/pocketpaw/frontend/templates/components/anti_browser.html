@@ -1,6 +1,6 @@
 <!-- Anti-Browser Main View -->
 <div
-  class="absolute inset-0 z-10 flex flex-col pt-[72px] bg-[var(--bg-color)] animate-[fadeScaleIn_0.3s_ease-out]"
+  class="absolute inset-0 z-10 flex flex-col pt-[72px] bg-[var(--bg-color)]"
   x-show="view === 'anti-browser'"
 >
   <!-- Header -->
@@ -170,12 +170,22 @@
                   x-text="profile.last_used_at ? new Date(profile.last_used_at).toLocaleDateString() : 'Never'"
                 ></td>
                 <td class="px-6 py-4 text-right">
-                  <button
-                    class="px-4 py-2 bg-white/5 text-white hover:bg-accent hover:text-white rounded-lg text-[12px] font-medium transition-all shadow-sm border border-white/10 group-hover:border-transparent group-hover:scale-105"
-                    @click.stop="selectAntiBrowserProfile(profile)"
-                  >
-                    Launch
-                  </button>
+                  <template x-if="profile.status === 'RUNNING'">
+                    <button
+                      class="px-4 py-2 bg-red-500/20 text-red-400 hover:bg-red-500/30 rounded-lg text-[12px] font-medium transition-all shadow-sm border border-red-500/30 hover:scale-105"
+                      @click.stop="stopAntiBrowserProfile(profile.id)"
+                    >
+                      Stop
+                    </button>
+                  </template>
+                  <template x-if="profile.status !== 'RUNNING'">
+                    <button
+                      class="px-4 py-2 bg-white/5 text-white hover:bg-accent hover:text-white rounded-lg text-[12px] font-medium transition-all shadow-sm border border-white/10 group-hover:border-transparent group-hover:scale-105"
+                      @click.stop="selectAntiBrowserProfile(profile)"
+                    >
+                      Launch
+                    </button>
+                  </template>
                 </td>
               </tr>
             </template>
@@ -197,15 +207,14 @@
 
   <!-- Slide-out Drawer Overlay -->
   <div
-    class="fixed inset-0 z-[100] flex justify-end bg-black/60 backdrop-blur-sm transition-opacity"
+    class="fixed inset-0 z-[200] flex justify-end bg-black/60 backdrop-blur-sm transition-opacity"
     x-show="antiBrowser.drawerOpen"
     x-transition.opacity
     @click.self="antiBrowser.drawerOpen = false"
   >
     <!-- Drawer Panel -->
     <div
-      class="h-full bg-[#1c1c1e] shadow-2xl flex flex-col border-l border-white/10 transition-[width] duration-300"
-      :class="antiBrowser.drawerView === 'create' ? 'w-full' : 'w-[480px]'"
+      class="w-full h-full bg-[#1c1c1e] shadow-2xl flex flex-col border-l border-white/10 transition-[width] duration-300"
       x-show="antiBrowser.drawerOpen"
       x-transition:enter="transition ease-out duration-300 transform"
       x-transition:enter-start="translate-x-full"
@@ -253,11 +262,20 @@
             x-if="antiBrowser.selectedProfile && antiBrowser.drawerView !== 'create'"
           >
             <button
-              class="p-2 text-white/40 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+              class="flex items-center gap-1 px-2 py-1.5 rounded-lg transition-all duration-200"
+              :class="antiBrowser._confirmDelete === antiBrowser.selectedProfile.id
+                ? 'bg-red-500/20 text-red-400 ring-1 ring-red-500/40'
+                : 'text-white/40 hover:text-red-400 hover:bg-red-500/10'"
               @click="deleteAntiBrowserProfile(antiBrowser.selectedProfile.id)"
               title="Delete Profile"
             >
               <i data-lucide="trash-2" class="w-4 h-4"></i>
+              <span
+                class="text-xs font-medium"
+                x-show="antiBrowser._confirmDelete === antiBrowser.selectedProfile.id"
+                x-transition
+                >Delete?</span
+              >
             </button>
           </template>
           <button
@@ -441,6 +459,28 @@
           x-if="antiBrowser.selectedProfile && antiBrowser.drawerView !== 'create'"
         >
           <div class="flex flex-col gap-8 animate-[fadeScaleIn_0.2s_ease-out]">
+            <!-- Stop Session Banner -->
+            <template x-if="antiBrowser.selectedProfile.status === 'RUNNING'">
+              <div
+                class="flex items-center justify-between px-5 py-4 bg-red-500/10 border border-red-500/20 rounded-2xl shadow-sm animate-pulse"
+              >
+                <div class="flex items-center gap-3">
+                  <span
+                    class="w-3 h-3 rounded-full bg-red-400 animate-pulse shadow-[0_0_10px_rgba(248,113,113,0.5)]"
+                  ></span>
+                  <span class="text-[13px] font-medium text-red-400"
+                    >Session is running</span
+                  >
+                </div>
+                <button
+                  class="px-4 py-2 bg-red-500 hover:bg-red-400 text-white rounded-xl text-[12px] font-semibold transition-all hover:scale-105 active:scale-95 flex items-center gap-2 shadow-lg shadow-red-500/20"
+                  @click="stopAntiBrowserProfile(antiBrowser.selectedProfile.id)"
+                >
+                  <i data-lucide="square" class="w-4 h-4"></i>
+                  Stop Session
+                </button>
+              </div>
+            </template>
             <!-- Details Section -->
             <div>
               <h4
@@ -459,7 +499,8 @@
                     class="text-[11px] text-accent hover:text-accent/80 transition-colors flex items-center gap-1"
                     @click="regenerateAntiBrowserFingerprint(antiBrowser.selectedProfile.id)"
                   >
-                    <i data-lucide="refresh-cw" class="w-3 h-3"></i> Regenerate
+                    <i data-lucide="refresh-cw" class="w-3 h-3"></i>
+                    Regenerate
                   </button>
                 </div>
                 <template x-if="antiBrowser.selectedProfile.fingerprint">
@@ -733,12 +774,78 @@
                     x-if="antiBrowser.lastResult.data && antiBrowser.lastResult.data.length > 0"
                   >
                     <div
-                      class="max-h-[300px] overflow-y-auto mt-2 bg-black/60 p-3 rounded-xl border border-white/5"
+                      class="overflow-x-auto mt-2 bg-black/60 rounded-xl border border-white/5"
                     >
-                      <pre
-                        class="text-[11px] text-white/60 font-mono whitespace-pre-wrap leading-relaxed"
-                        x-text="JSON.stringify(antiBrowser.lastResult.data, null, 2)"
-                      ></pre>
+                      <table
+                        class="w-full text-left border-collapse min-w-[600px]"
+                      >
+                        <thead>
+                          <tr class="border-b border-white/10 bg-white/[0.03]">
+                            <th
+                              class="px-4 py-3 text-[10px] font-semibold uppercase tracking-wider text-white/40 w-10"
+                            >
+                              #
+                            </th>
+                            <template
+                              x-for="col in Object.keys(antiBrowser.lastResult.data[0] || {})"
+                              :key="col"
+                            >
+                              <th
+                                class="px-4 py-3 text-[10px] font-semibold uppercase tracking-wider text-white/40"
+                                x-text="col.replace(/_/g, ' ')"
+                              ></th>
+                            </template>
+                          </tr>
+                        </thead>
+                        <tbody class="divide-y divide-white/5">
+                          <template
+                            x-for="(row, idx) in antiBrowser.lastResult.data"
+                            :key="idx"
+                          >
+                            <tr class="hover:bg-white/[0.04] transition-colors">
+                              <td
+                                class="px-4 py-3 text-[11px] text-white/30 font-mono"
+                                x-text="idx + 1"
+                              ></td>
+                              <template
+                                x-for="col in Object.keys(antiBrowser.lastResult.data[0] || {})"
+                                :key="col"
+                              >
+                                <td
+                                  class="px-4 py-3 text-[11px] text-white/70 max-w-[250px] truncate"
+                                  :title="typeof row[col] === 'object' ? JSON.stringify(row[col]) : String(row[col] ?? '')"
+                                >
+                                  <template
+                                    x-if="typeof row[col] === 'string' && (row[col].startsWith('http://') || row[col].startsWith('https://'))"
+                                  >
+                                    <a
+                                      :href="row[col]"
+                                      target="_blank"
+                                      class="text-accent hover:underline truncate block max-w-[200px]"
+                                      x-text="row[col]"
+                                    ></a>
+                                  </template>
+                                  <template
+                                    x-if="typeof row[col] === 'object' && row[col] !== null"
+                                  >
+                                    <span
+                                      class="text-white/40 font-mono text-[10px]"
+                                      x-text="JSON.stringify(row[col]).substring(0, 60) + (JSON.stringify(row[col]).length > 60 ? '…' : '')"
+                                    ></span>
+                                  </template>
+                                  <template
+                                    x-if="typeof row[col] !== 'object' && !(typeof row[col] === 'string' && (row[col].startsWith('http://') || row[col].startsWith('https://')))"
+                                  >
+                                    <span
+                                      x-text="String(row[col] ?? '—')"
+                                    ></span>
+                                  </template>
+                                </td>
+                              </template>
+                            </tr>
+                          </template>
+                        </tbody>
+                      </table>
                     </div>
                   </template>
                 </div>

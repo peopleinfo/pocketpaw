@@ -74,6 +74,12 @@ class WebScraperActor(ActorTemplate):
                     "description": "CSS selector to wait for before extracting data",
                     "default": "",
                 },
+                "headless": {
+                    "type": "boolean",
+                    "title": "Headless",
+                    "description": "Run browser in headless mode (no visible window)",
+                    "default": True,
+                },
             },
             "required": ["start_urls"],
         }
@@ -105,6 +111,7 @@ class WebScraperActor(ActorTemplate):
         max_pages = inputs.get("max_pages", 10)
         link_selector = inputs.get("link_selector", "")
         wait_for = inputs.get("wait_for", "")
+        headless = inputs.get("headless", True)
 
         try:
             return await self._run_crawlee(
@@ -116,12 +123,14 @@ class WebScraperActor(ActorTemplate):
                 fingerprint=profile_fingerprint,
                 plugin=plugin,
                 proxy=proxy,
+                headless=headless,
             )
         except ImportError:
             return await self._run_basic(
                 start_urls=start_urls,
                 selectors=selectors,
                 fingerprint=profile_fingerprint,
+                headless=headless,
             )
 
     async def _run_crawlee(
@@ -134,6 +143,7 @@ class WebScraperActor(ActorTemplate):
         fingerprint: dict[str, Any],
         plugin: str,
         proxy: str | None,
+        headless: bool = True,
     ) -> ActorResult:
         """Run with Crawlee's PlaywrightCrawler."""
         from crawlee.crawlers import PlaywrightCrawler, PlaywrightCrawlingContext
@@ -144,11 +154,11 @@ class WebScraperActor(ActorTemplate):
         if plugin == "camoufox":
             try:
                 from pocketpaw.browser.plugins.camoufox_plugin import CamoufoxPlugin
-                pool_plugins.append(CamoufoxPlugin(browser_launch_options={"headless": True}))
+                pool_plugins.append(CamoufoxPlugin(browser_launch_options={"headless": headless}))
             except ImportError:
-                pool_plugins.append(PlaywrightBrowserPlugin(browser_type="chromium", browser_launch_options={"headless": True}))
+                pool_plugins.append(PlaywrightBrowserPlugin(browser_type="chromium", browser_launch_options={"headless": headless}))
         else:
-            pool_plugins.append(PlaywrightBrowserPlugin(browser_type="chromium", browser_launch_options={"headless": True}))
+            pool_plugins.append(PlaywrightBrowserPlugin(browser_type="chromium", browser_launch_options={"headless": headless}))
 
         browser_pool = BrowserPool(plugins=pool_plugins)
 
@@ -206,6 +216,7 @@ class WebScraperActor(ActorTemplate):
         start_urls: list[str],
         selectors: dict[str, str],
         fingerprint: dict[str, Any],
+        headless: bool = True,
     ) -> ActorResult:
         """Basic fallback using Playwright directly (no Crawlee)."""
         try:
@@ -216,7 +227,7 @@ class WebScraperActor(ActorTemplate):
         extracted_data: list[dict[str, Any]] = []
 
         async with async_playwright() as pw:
-            browser = await pw.chromium.launch(headless=True)
+            browser = await pw.chromium.launch(headless=headless)
             context = await browser.new_context(
                 user_agent=fingerprint.get("user_agent", ""),
                 viewport=fingerprint.get("viewport"),

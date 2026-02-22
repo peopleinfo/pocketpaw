@@ -62,6 +62,12 @@ class CustomScriptActor(ActorTemplate):
                     "description": "CSS selector to wait for before running script",
                     "default": "",
                 },
+                "headless": {
+                    "type": "boolean",
+                    "title": "Headless",
+                    "description": "Run browser in headless mode (no visible window)",
+                    "default": True,
+                },
             },
             "required": ["start_urls", "script"],
         }
@@ -88,6 +94,7 @@ class CustomScriptActor(ActorTemplate):
 
         script = inputs.get("script", "return { title: document.title };")
         wait_for = inputs.get("wait_for", "")
+        headless = inputs.get("headless", True)
 
         # Wrap script in an IIFE if it doesn't start with function/return
         if not script.strip().startswith("(") and not script.strip().startswith("function"):
@@ -99,11 +106,11 @@ class CustomScriptActor(ActorTemplate):
             if plugin == "camoufox":
                 try:
                     from camoufox import AsyncNewBrowser
-                    browser = await AsyncNewBrowser(pw, headless=True)
+                    browser = await AsyncNewBrowser(pw, headless=headless)
                 except ImportError:
                     return ActorResult(status="error", error="Camoufox plugin requested but not installed")
             else:
-                browser = await pw.chromium.launch(headless=True)
+                browser = await pw.chromium.launch(headless=headless)
 
             context = await browser.new_context(
                 user_agent=profile_fingerprint.get("user_agent", ""),

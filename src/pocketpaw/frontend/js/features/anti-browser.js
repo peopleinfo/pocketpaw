@@ -28,6 +28,7 @@ window.PocketPaw.AntiBrowser = {
         actorInputs: {},
         plugins: [],
         lastResult: null,
+        _confirmDelete: null,
         form: {
           name: "",
           start_url: "",
@@ -155,7 +156,19 @@ window.PocketPaw.AntiBrowser = {
       },
 
       async deleteAntiBrowserProfile(profileId) {
-        if (!confirm("Delete this browser profile and all its data?")) return;
+        // Two-step confirmation (confirm() is blocked in Electron)
+        if (!this.antiBrowser._confirmDelete) {
+          this.antiBrowser._confirmDelete = profileId;
+          // Auto-reset after 3 seconds if user doesn't confirm
+          setTimeout(() => {
+            if (this.antiBrowser._confirmDelete === profileId) {
+              this.antiBrowser._confirmDelete = null;
+            }
+          }, 3000);
+          return;
+        }
+        // Second click — actually delete
+        this.antiBrowser._confirmDelete = null;
         try {
           const res = await fetch(`/api/anti-browser/profiles/${profileId}`, {
             method: "DELETE",
@@ -166,6 +179,7 @@ window.PocketPaw.AntiBrowser = {
             );
             if (this.antiBrowser.selectedProfile?.id === profileId) {
               this.antiBrowser.selectedProfile = null;
+              this.antiBrowser.drawerOpen = false;
             }
             this.showToast("Profile deleted", "info");
           } else {
@@ -204,6 +218,33 @@ window.PocketPaw.AntiBrowser = {
         }
       },
 
+      async stopAntiBrowserProfile(profileId) {
+        try {
+          const res = await fetch(
+            `/api/anti-browser/profiles/${profileId}/stop`,
+            { method: "POST" },
+          );
+          if (res.ok) {
+            const data = await res.json();
+            // Update local state
+            const idx = this.antiBrowser.profiles.findIndex(
+              (p) => p.id === profileId,
+            );
+            if (idx >= 0) this.antiBrowser.profiles[idx].status = "IDLE";
+            if (this.antiBrowser.selectedProfile?.id === profileId) {
+              this.antiBrowser.selectedProfile.status = "IDLE";
+            }
+            this.showToast("Session stopped", "info");
+          } else {
+            const err = await res.json();
+            this.showToast(err.detail || "Failed to stop session", "error");
+          }
+        } catch (e) {
+          console.error("Failed to stop profile session:", e);
+          this.showToast("Failed to stop session", "error");
+        }
+      },
+
       // ==================== Actors ====================
 
       async fetchAntiBrowserActors() {
@@ -222,6 +263,17 @@ window.PocketPaw.AntiBrowser = {
       },
 
       async selectAntiBrowserActor(actorId) {
+        // Toggle: collapse if clicking the already-selected actor
+        if (this.antiBrowser.selectedActor === actorId) {
+          this.antiBrowser.selectedActor = null;
+          this.antiBrowser.actorSchema = null;
+          this.antiBrowser.actorInputs = {};
+          this.$nextTick(() => {
+            if (window.refreshIcons) window.refreshIcons();
+          });
+          return;
+        }
+
         this.antiBrowser.selectedActor = actorId;
         this.antiBrowser.actorInputs = {};
 

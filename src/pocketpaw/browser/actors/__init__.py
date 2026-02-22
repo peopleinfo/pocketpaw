@@ -40,10 +40,12 @@ def _auto_register() -> None:
     from pocketpaw.browser.actors.web_scraper import WebScraperActor
     from pocketpaw.browser.actors.playwright_scraper import PlaywrightScraperActor
     from pocketpaw.browser.actors.custom_script import CustomScriptActor
+    from pocketpaw.browser.actors.instagram_scraper import InstagramScraperActor
 
     register_actor(WebScraperActor())
     register_actor(PlaywrightScraperActor())
     register_actor(CustomScriptActor())
+    register_actor(InstagramScraperActor())
 
 
 _auto_register()
