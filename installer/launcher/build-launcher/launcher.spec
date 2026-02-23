@@ -71,6 +71,7 @@ a = Analysis(
         "playwright",
         "fastapi",
         "uvicorn",
+        "plugins",
     ],
     noarchive=False,
 )
