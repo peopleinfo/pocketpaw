@@ -235,21 +235,53 @@ class TrayIcon:
     # ── Actions ────────────────────────────────────────────────────────
 
     def _on_open_dashboard(self, icon: pystray.Icon, item: pystray.MenuItem) -> None:
-        """Open the web dashboard in the default browser."""
+        """Open the web dashboard."""
         if not self.server.is_running():
             # Start the server first
             threading.Thread(target=self._start_and_open, daemon=True).start()
         else:
-            url = self.server.get_dashboard_url()
-            webbrowser.open(url)
+            self._open_url_smart(self.server.get_dashboard_url())
 
     def _start_and_open(self) -> None:
-        """Start server then open browser."""
+        """Start server then open dashboard."""
         if self.server.start():
             import time
 
             time.sleep(1)
-            webbrowser.open(self.server.get_dashboard_url())
+            self._open_url_smart(self.server.get_dashboard_url())
+
+    def _open_url_smart(self, url: str) -> None:
+        """Attempt to open URL in webview, fallback to browser."""
+        import sys
+        from pathlib import Path
+
+        has_webview = False
+        try:
+            import webview
+            has_webview = True
+        except ImportError:
+            pass
+
+        if has_webview:
+            logger.info("Tray: Launching webview process for: %s", url)
+            try:
+                import subprocess
+                # Launch the launcher process with --webview-url
+                if getattr(sys, 'frozen', False):
+                    cmd = [sys.executable, "--webview-url", url]
+                else:
+                    # In dev mode, we need the script path. 
+                    # We assume the main entry point is __main__.py in the same dir as this file's parent.
+                    main_py = Path(__file__).parent / "__main__.py"
+                    cmd = [sys.executable, str(main_py.resolve()), "--webview-url", url]
+                
+                subprocess.Popen(cmd)
+                return
+            except Exception as e:
+                logger.error("Tray: Failed to spawn webview process: %s", e)
+
+        logger.info("Tray: Opening browser: %s", url)
+        webbrowser.open(url)
 
     def _on_toggle_server(self, icon: pystray.Icon, item: pystray.MenuItem) -> None:
         """Start or stop the server."""

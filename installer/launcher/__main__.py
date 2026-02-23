@@ -94,6 +94,10 @@ def main() -> int:
         help="Override the web dashboard port",
     )
     parser.add_argument(
+        "--webview-url",
+        help="Internal flag: launch webview for the given URL and exit",
+    )
+    parser.add_argument(
         "--extras",
         default="recommended",
         help="Comma-separated pip extras for first install (default: recommended)",
@@ -142,6 +146,19 @@ def main() -> int:
     # Resolve --dev as shortcut for --branch dev
     if args.dev and not args.branch:
         args.branch = "dev"
+
+    # Handle --webview-url (internal flag to launch window and exit)
+    if args.webview_url:
+        try:
+            import webview
+
+            logger.info("Launching standalone webview for: %s", args.webview_url)
+            webview.create_window("PocketPaw", args.webview_url)
+            webview.start()
+            return 0
+        except Exception as e:
+            logger.error("Failed to launch standalone webview: %s", e)
+            return 1
 
     logger.info("PocketPaw Desktop Launcher starting")
 
@@ -244,12 +261,38 @@ def main() -> int:
         logger.error("Failed to start server")
         return 1
 
-    # Open browser
+    # Open browser or webview
     if not args.no_browser:
         time.sleep(1.5)
         url = server.get_dashboard_url()
-        logger.info("Opening browser: %s", url)
-        webbrowser.open(url)
+        
+        has_webview = False
+        try:
+            import webview
+            has_webview = True
+        except ImportError:
+            pass
+
+        if has_webview:
+            logger.info("Launching webview process for: %s", url)
+            try:
+                import subprocess
+                # Launch ourselves with the --webview-url flag
+                if getattr(sys, 'frozen', False):
+                    # In PyInstaller, sys.executable is the app/exe path
+                    cmd = [sys.executable, "--webview-url", url]
+                else:
+                    # In python script mode
+                    cmd = [sys.executable, str(Path(__file__).resolve()), "--webview-url", url]
+                
+                # Start as a detached process (use Popen)
+                subprocess.Popen(cmd)
+            except Exception as e:
+                logger.error("Failed to spawn webview process: %s", e)
+                webbrowser.open(url)
+        else:
+            logger.info("Opening browser: %s", url)
+            webbrowser.open(url)
 
     # Show system tray (blocks until quit)
     if not args.no_tray:

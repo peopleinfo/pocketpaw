@@ -48,6 +48,8 @@ a = Analysis(
         "PIL.Image",
         "tkinter",
         "tkinter.ttk",
+        "webview",
+        "webview.platforms.cocoa" if platform.system() == "Darwin" else "webview.platforms.winforms" if platform.system() == "Windows" else "webview.platforms.gtk",
         # Launcher modules — both package paths so PyInstaller collects them
         "launcher",
         "launcher.__init__",
