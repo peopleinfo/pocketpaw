@@ -16,6 +16,8 @@ OLLAMA_MANIFEST = {
 }
 
 OLLAMA_START_SH = '''#!/bin/bash
+export OLLAMA_ORIGINS="*"
+
 # 1. Start Ollama's local server in the background
 ./ollama serve &
 SERVER_PID=$!
