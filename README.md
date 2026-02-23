@@ -39,8 +39,8 @@
 
 Sets up Python and PocketPaw in one click, then opens the dashboard.
 
-| Platform | Download |
-| --- | --- |
+| Platform    | Download                                                                                                   |
+| ----------- | ---------------------------------------------------------------------------------------------------------- |
 | **Windows** | [PocketPaw-Setup.exe](https://github.com/pocketpaw/pocketpaw/releases/latest/download/PocketPaw-Setup.exe) |
 
 ### Install via Terminal
@@ -117,15 +117,15 @@ The web dashboard opens at `http://localhost:8888`. From there you can connect D
 
 ## Features
 
-| | |
-| --- | --- |
-| 📡 **9+ Channels** | Web Dashboard, Discord, Slack, WhatsApp, Telegram, Signal, Matrix, Teams, Google Chat |
-| 🧠 **6 Agent Backends** | Claude Agent SDK, OpenAI Agents, Google ADK, Codex CLI, OpenCode, Copilot SDK |
-| 🛠️ **50+ Tools** | Browser, web search, image gen, voice/TTS/STT, OCR, research, delegation, skills |
-| 🔌 **Integrations** | Gmail, Calendar, Google Drive & Docs, Spotify, Reddit, MCP servers |
-| 💾 **Memory** | Long-term facts, session history, smart compaction, Mem0 semantic search |
-| 🔒 **Security** | Guardian AI, injection scanner, tool policy, plan mode, audit log, self-audit daemon |
-| 🏠 **Local-First** | Runs on your machine. Ollama for fully offline operation. macOS / Windows / Linux. |
+|                         |                                                                                       |
+| ----------------------- | ------------------------------------------------------------------------------------- |
+| 📡 **9+ Channels**      | Web Dashboard, Discord, Slack, WhatsApp, Telegram, Signal, Matrix, Teams, Google Chat |
+| 🧠 **6 Agent Backends** | Claude Agent SDK, OpenAI Agents, Google ADK, Codex CLI, OpenCode, Copilot SDK         |
+| 🛠️ **50+ Tools**        | Browser, web search, image gen, voice/TTS/STT, OCR, research, delegation, skills      |
+| 🔌 **Integrations**     | Gmail, Calendar, Google Drive & Docs, Spotify, Reddit, MCP servers                    |
+| 💾 **Memory**           | Long-term facts, session history, smart compaction, Mem0 semantic search              |
+| 🔒 **Security**         | Guardian AI, injection scanner, tool policy, plan mode, audit log, self-audit daemon  |
+| 🏠 **Local-First**      | Runs on your machine. Ollama for fully offline operation. macOS / Windows / Linux.    |
 
 ### Examples
 
@@ -152,14 +152,14 @@ Everything goes through an event-driven message bus. Channels publish messages, 
 
 ### Agent Backends
 
-| Backend | Key | Providers | MCP |
-| --- | --- | --- | :---: |
-| **Claude Agent SDK** (Default) | `claude_agent_sdk` | Anthropic, Ollama | Yes |
-| **OpenAI Agents SDK** | `openai_agents` | OpenAI, Ollama | No |
-| **Google ADK** | `google_adk` | Google (Gemini) | Yes |
-| **Codex CLI** | `codex_cli` | OpenAI | Yes |
-| **OpenCode** | `opencode` | External server | No |
-| **Copilot SDK** | `copilot_sdk` | Copilot, OpenAI, Azure, Anthropic | No |
+| Backend                        | Key                | Providers                         | MCP |
+| ------------------------------ | ------------------ | --------------------------------- | :-: |
+| **Claude Agent SDK** (Default) | `claude_agent_sdk` | Anthropic, Ollama                 | Yes |
+| **OpenAI Agents SDK**          | `openai_agents`    | OpenAI, Ollama                    | No  |
+| **Google ADK**                 | `google_adk`       | Google (Gemini)                   | Yes |
+| **Codex CLI**                  | `codex_cli`        | OpenAI                            | Yes |
+| **OpenCode**                   | `opencode`         | External server                   | No  |
+| **Copilot SDK**                | `copilot_sdk`      | Copilot, OpenAI, Azure, Anthropic | No  |
 
 ### Security
 
@@ -243,6 +243,10 @@ pip install pocketpaw[all]                 # Everything
 </a>
 
 ---
+
+## useful links
+
+https://github.com/matt1398/claude-devtools
 
 ## Join the Pack
 
