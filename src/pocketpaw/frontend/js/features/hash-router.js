@@ -72,6 +72,11 @@ window.PocketPaw.HashRouter = {
           this.loadMCData();
         }
 
+        // Init AI UI data when switching to AI UI
+        if (viewName === "ai-ui" && this.initAiUI) {
+          this.initAiUI();
+        }
+
         // Map view names to hash routes
         const hashMap = {
           chat: "#/chat",
@@ -79,6 +84,7 @@ window.PocketPaw.HashRouter = {
           terminal: "#/terminal",
           missions: "#/crew",
           "anti-browser": "#/anti-browser",
+          "ai-ui": "#/ai-ui",
         };
         this.updateHash(hashMap[viewName] || "#/chat");
       },
@@ -114,6 +120,8 @@ window.PocketPaw.HashRouter = {
           route.view = "terminal";
         } else if (parts[0] === "anti-browser") {
           route.view = "anti-browser";
+        } else if (parts[0] === "ai-ui") {
+          route.view = "ai-ui";
         } else if (parts[0] === "crew") {
           route.view = "missions";
           route.crewTab = parts[1] === "projects" ? "projects" : "tasks";
@@ -150,6 +158,10 @@ window.PocketPaw.HashRouter = {
         } else if (route.view === "anti-browser") {
           if (this.initAntiBrowser) {
             this.initAntiBrowser();
+          }
+        } else if (route.view === "ai-ui") {
+          if (this.initAiUI) {
+            this.initAiUI();
           }
         }
 

@@ -297,6 +297,18 @@
             >
               Anti-Browser
             </button>
+            <button
+              class="relative px-4 md:px-6 py-1.5 rounded-[7px] text-[13px] font-medium transition-all hidden sm:flex items-center gap-1.5"
+              :class="view === 'ai-ui' ? 'bg-[#636366]/80 text-white shadow-sm' : 'text-[var(--text-secondary)] hover:text-white'"
+              @click="navigateToView('ai-ui')"
+            >
+              <i data-lucide="rocket" class="w-3.5 h-3.5"></i>
+              AI UI
+              <span
+                class="absolute -bottom-2.5 left-1/2 -translate-x-1/2 px-1.5 py-0.5 text-[7px] font-semibold uppercase tracking-wider rounded-full bg-purple-500/20 text-purple-400 leading-none whitespace-nowrap"
+                >Local Cloud</span
+              >
+            </button>
           </div>
         </div>
 
@@ -367,6 +379,7 @@
       {% include "components/chat.html" %} {% include "components/activity.html"
       %} {% include "components/terminal.html" %} {% include
       "components/missions.html" %} {% include "components/anti_browser.html" %}
+      {% include "components/ai_ui.html" %}
     </main>
 
     {% include "components/modals.html" %}
@@ -401,6 +414,7 @@
     <script src="/static/js/features/project-browser.js?v={{ v }}"></script>
     <script src="/static/js/features/health.js?v={{ v }}"></script>
     <script src="/static/js/features/anti-browser.js?v={{ v }}"></script>
+    <script src="/static/js/features/ai-ui.js?v={{ v }}"></script>
     <!-- Main app (assembles features) -->
     <script src="/static/js/app.js?v={{ v }}"></script>
 

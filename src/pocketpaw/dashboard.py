@@ -92,6 +92,7 @@ from pocketpaw.dashboard_ws import (
     handle_file_navigation,  # noqa: F401 — re-export for backward compat
     handle_tool,  # noqa: F401 — re-export for backward compat
 )
+from pocketpaw.ai_ui.api import router as ai_ui_router
 from pocketpaw.deep_work.api import router as deep_work_router
 from pocketpaw.memory import MemoryType, get_memory_manager
 from pocketpaw.mission_control.api import router as mission_control_router
@@ -142,7 +143,7 @@ _EXTRA_ORIGINS = list(set(_BUILTIN_ORIGINS + _custom_origins))
 async def security_headers_middleware(request: Request, call_next):
     """Add security headers to all responses."""
     response = await call_next(request)
-    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-Frame-Options"] = "SAMEORIGIN"
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
@@ -155,7 +156,7 @@ async def security_headers_middleware(request: Request, call_next):
         "font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net; "
         "img-src 'self' data: blob:; "
         "connect-src 'self' ws: wss: https://cdn.jsdelivr.net https://unpkg.com; "
-        "frame-ancestors 'none'"
+        "frame-ancestors 'self'"
     )
     # HSTS only when accessed via HTTPS (tunnel or reverse proxy)
     if request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https":
@@ -172,6 +173,9 @@ app.include_router(mission_control_router, prefix="/api/mission-control")
 # Mount Deep Work API router
 
 app.include_router(deep_work_router, prefix="/api/deep-work")
+
+# Mount AI UI router
+app.include_router(ai_ui_router)
 
 # Mount API v1 routers at /api/v1/ (canonical) — see api/v1/__init__.py
 mount_v1_routers(app)
