@@ -158,13 +158,18 @@ class MCTaskExecutor:
         # Initialize stop flag
         self._stop_flags[task_id] = False
 
-        # Build agent settings with the agent's backend.
-        # bypass_permissions is ALWAYS True for task execution because
-        # tasks run headlessly (no terminal for interactive prompts).
-        # The PreToolUse hook still blocks dangerous commands.
+        # Build agent settings.  Use the agent's explicit backend when it
+        # differs from the hardcoded model default; otherwise honour the
+        # user's global setting so agents created via the UI "just work"
+        # with whatever backend the user actually configured.
         base_settings = get_settings()
+        effective_backend = (
+            agent.backend
+            if agent.backend != "claude_agent_sdk"
+            else base_settings.agent_backend
+        )
         agent_settings = Settings(
-            agent_backend=agent.backend,
+            agent_backend=effective_backend,
             anthropic_api_key=base_settings.anthropic_api_key,
             anthropic_model=base_settings.anthropic_model,
             openai_api_key=base_settings.openai_api_key,
@@ -218,12 +223,11 @@ class MCTaskExecutor:
                     final_status = "stopped"
                     break
 
-                chunk_type = chunk.get("type", "")
-                content = chunk.get("content", "")
+                chunk_type = chunk.type
+                content = chunk.content or ""
 
                 if chunk_type == "message" and content:
                     output_chunks.append(content)
-                    # Broadcast output chunk
                     await self._broadcast_event(
                         "mc_task_output",
                         {
@@ -235,7 +239,7 @@ class MCTaskExecutor:
                     )
 
                 elif chunk_type == "tool_use":
-                    tool_name = chunk.get("metadata", {}).get("name", "unknown")
+                    tool_name = (chunk.metadata or {}).get("name", "unknown")
                     await self._broadcast_event(
                         "mc_task_output",
                         {
