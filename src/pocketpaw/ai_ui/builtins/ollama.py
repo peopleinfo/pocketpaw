@@ -1,39 +1,41 @@
-import asyncio
-import json
-import shutil
-from pathlib import Path
+"""Built-in: Ollama — run open-source LLMs locally."""
 
-OLLAMA_MANIFEST = {
+from pocketpaw.ai_ui.builtins._base import BuiltinDefinition
+
+_MANIFEST = {
     "name": "Ollama",
-    "description": "Run open-source LLMs locally — Llama, Mistral, Phi, and more. Self-contained 1-click install.",
+    "description": (
+        "Run open-source LLMs locally — Llama, Mistral, Phi, and more. "
+        "Self-contained 1-click install."
+    ),
     "icon": "brain",
     "version": "1.0.0",
     "start": "bash start.sh",
     "install": "uv run python install.py",
     "requires": ["uv"],
     "port": 11434,
-    "openapi": "openapi.json"
+    "openapi": "openapi.json",
 }
 
-OLLAMA_START_SH = '''#!/bin/bash
+_START_SH = """\
+#!/bin/bash
 export OLLAMA_ORIGINS="*"
 
-# 1. Start Ollama's local server in the background
+# Start Ollama's local server in the background
 ./ollama serve &
 SERVER_PID=$!
 
-# Wait for the API socket to initialize
 sleep 2
 
-# 2. Trigger pulling a tiny demo model (qwen2.5:0.5b) in the background 
+# Pull a tiny demo model in the background
 ./ollama pull qwen2.5:0.5b &
 
-# 3. Wait on the server process so PocketPaw tracks it as 'running'
 echo "Ollama is running on port 11434 (demo model is fetching in background)"
 wait $SERVER_PID
-'''
+"""
 
-OLLAMA_INSTALL_PY = '''import urllib.request
+_INSTALL_PY = """\
+import urllib.request
 import zipfile
 import shutil
 import os
@@ -65,7 +67,6 @@ def install_ollama():
         with urllib.request.urlopen(req) as response, open("ollama", "wb") as out_file:
             shutil.copyfileobj(response, out_file)
     else:
-        # Windows
         url = "https://ollama.com/download/ollama-windows-amd64.zip"
         req = urllib.request.Request(url, headers=headers)
         with urllib.request.urlopen(req) as response, open("ollama.zip", "wb") as out_file:
@@ -74,18 +75,18 @@ def install_ollama():
             z.extract("ollama.exe")
         os.remove("ollama.zip")
 
-    # Make executable
     if os.path.exists("ollama"):
         st = os.stat("ollama")
         os.chmod("ollama", st.st_mode | stat.S_IEXEC)
-    
+
     print("Ollama downloaded successfully!")
 
 if __name__ == "__main__":
     install_ollama()
-'''
+"""
 
-OLLAMA_OPENAPI_JSON = '''{
+_OPENAPI_JSON = """\
+{
   "openapi": "3.0.3",
   "info": {
     "title": "Ollama Local REST API",
@@ -104,9 +105,7 @@ OLLAMA_OPENAPI_JSON = '''{
         "summary": "List Models",
         "description": "List models that are available locally.",
         "responses": {
-          "200": {
-            "description": "A list of models."
-          }
+          "200": { "description": "A list of models." }
         }
       }
     },
@@ -130,9 +129,7 @@ OLLAMA_OPENAPI_JSON = '''{
           }
         },
         "responses": {
-          "200": {
-            "description": "Successful generation."
-          }
+          "200": { "description": "Successful generation." }
         }
       }
     },
@@ -165,57 +162,31 @@ OLLAMA_OPENAPI_JSON = '''{
           }
         },
         "responses": {
-          "200": {
-            "description": "Successful chat completion."
-          }
+          "200": { "description": "Successful chat completion." }
         }
       }
     }
   }
-}'''
+}"""
 
-BUILTINS = {
-    "ollama": {
-        "manifest": OLLAMA_MANIFEST,
-        "files": {
-            "start.sh": OLLAMA_START_SH,
-            "install.py": OLLAMA_INSTALL_PY,
-            "openapi.json": OLLAMA_OPENAPI_JSON
-        }
-    }
+DEFINITION: BuiltinDefinition = {
+    "id": "ollama",
+    "manifest": _MANIFEST,
+    "files": {
+        "start.sh": _START_SH,
+        "install.py": _INSTALL_PY,
+        "openapi.json": _OPENAPI_JSON,
+    },
+    "gallery": {
+        "id": "ollama",
+        "name": "Ollama (Built-in)",
+        "description": (
+            "Run open-source LLMs locally — Llama, Mistral, Phi, and more. "
+            "Self-contained 1-click install."
+        ),
+        "icon": "brain",
+        "source": "builtin:ollama",
+        "stars": "Native Wrapper",
+        "category": "Curated / Built-in",
+    },
 }
-
-async def install_builtin(app_id: str, plugins_dir: Path) -> dict:
-    if app_id not in BUILTINS:
-        raise ValueError(f"Unknown built-in app: {app_id}")
-        
-    app_def = BUILTINS[app_id]
-    plugin_id = app_id
-    
-    dest = plugins_dir / plugin_id
-    if dest.exists():
-        shutil.rmtree(dest)
-    dest.mkdir(parents=True, exist_ok=True)
-    
-    # Write manifest
-    (dest / "pocketpaw.json").write_text(json.dumps(app_def["manifest"], indent=2), encoding="utf-8")
-    
-    # Write files
-    for filename, content in app_def["files"].items():
-        (dest / filename).write_text(content, encoding="utf-8")
-        
-    # Run install command if present
-    install_cmd = app_def["manifest"].get("install")
-    if install_cmd:
-        proc = await asyncio.create_subprocess_shell(
-            f"cd {dest} && {install_cmd}",
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        _, stderr_out = await asyncio.wait_for(proc.communicate(), timeout=300)
-        
-        if proc.returncode != 0:
-            err = stderr_out.decode(errors="replace").strip()
-            raise RuntimeError(f"Failed to setup builtin {app_id} app: {err}")
-            
-    return {"status": "ok", "message": f"{app_def['manifest']['name']} has been added!", "plugin_id": plugin_id}

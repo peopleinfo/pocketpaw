@@ -155,7 +155,8 @@ async def security_headers_middleware(request: Request, call_next):
         "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; "
         "font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net; "
         "img-src 'self' data: blob:; "
-        "connect-src 'self' ws: wss: https://cdn.jsdelivr.net https://unpkg.com; "
+        "connect-src 'self' ws: wss: http://localhost:* http://127.0.0.1:* "
+        "https://cdn.jsdelivr.net https://unpkg.com; "
         "frame-ancestors 'self'"
     )
     # HSTS only when accessed via HTTPS (tunnel or reverse proxy)

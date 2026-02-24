@@ -136,18 +136,75 @@ async def remove_plugin_endpoint(plugin_id: str):
 
 @router.get("/plugins/{plugin_id}/logs")
 async def get_plugin_logs(plugin_id: str):
-    """Get recent logs for a running plugin (stub for now)."""
-    return {"logs": [], "plugin_id": plugin_id}
+    """Get recent logs for a running plugin."""
+    from pocketpaw.ai_ui.plugins import get_plugins_dir
+
+    log_path = get_plugins_dir() / plugin_id / ".pocketpaw.log"
+    if not log_path.exists():
+        return {"logs": [], "plugin_id": plugin_id}
+
+    try:
+        text = log_path.read_text(encoding="utf-8", errors="replace")
+        lines = text.strip().splitlines()[-200:]
+        return {"logs": lines, "plugin_id": plugin_id}
+    except OSError:
+        return {"logs": [], "plugin_id": plugin_id}
 
 
 @router.get("/plugins/{plugin_id}/docs", include_in_schema=False)
 async def plugin_swagger(plugin_id: str):
-    """Render a Swagger UI iframe pointing at a specific plugin's OpenAPI JSON."""
-    from fastapi.openapi.docs import get_swagger_ui_html
-    return get_swagger_ui_html(
-        openapi_url=f"/api/ai-ui/plugins/{plugin_id}/openapi.json",
-        title=f"Plugin API: {plugin_id}"
-    )
+    """Render a self-contained Swagger UI page with the spec embedded inline.
+
+    Embedding the spec avoids the secondary fetch() that fails inside
+    sandboxed iframes (CORS / scheme errors).
+    """
+    import json as _json
+
+    from fastapi.responses import HTMLResponse
+
+    from pocketpaw.ai_ui.plugins import get_plugins_dir
+
+    plugins_dir = get_plugins_dir()
+    plugin_path = plugins_dir / plugin_id
+    manifest_path = plugin_path / "pocketpaw.json"
+    if not manifest_path.exists():
+        raise HTTPException(status_code=404, detail="Plugin not found")
+
+    manifest = _json.loads(manifest_path.read_text(encoding="utf-8"))
+    openapi_file = manifest.get("openapi")
+    if not openapi_file:
+        raise HTTPException(status_code=404, detail="Plugin has no OpenAPI spec")
+
+    spec_path = plugin_path / openapi_file
+    if not spec_path.exists():
+        raise HTTPException(status_code=404, detail="OpenAPI spec file not found")
+
+    spec_json = spec_path.read_text(encoding="utf-8")
+    title = f"Plugin API: {manifest.get('name', plugin_id)}"
+
+    html = f"""\
+<!DOCTYPE html>
+<html>
+<head>
+<title>{title}</title>
+<meta charset="utf-8"/>
+<link rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css">
+</head>
+<body>
+<div id="swagger-ui"></div>
+<script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+<script>
+SwaggerUIBundle({{
+    spec: {spec_json},
+    dom_id: '#swagger-ui',
+    presets: [SwaggerUIBundle.presets.apis, SwaggerUIBundle.SwaggerUIStandalonePreset],
+    layout: 'BaseLayout'
+}});
+</script>
+</body>
+</html>"""
+    return HTMLResponse(content=html)
 
 @router.get("/plugins/{plugin_id}/{filename:path}")
 async def serve_plugin_file(plugin_id: str, filename: str):
@@ -195,15 +252,6 @@ async def shell_endpoint(request: Request):
 @router.get("/gallery")
 async def get_gallery():
     """Get discovery gallery of curated built-in apps."""
-    gallery = [
-        {
-            "id": "ollama",
-            "name": "Ollama (Built-in)",
-            "description": "Run open-source LLMs locally — Llama, Mistral, Phi, and more. Self-contained 1-click install.",
-            "icon": "brain",
-            "source": "builtin:ollama",
-            "stars": "Native Wrapper",
-            "category": "Curated / Built-in",
-        }
-    ]
-    return {"apps": gallery}
+    from pocketpaw.ai_ui.builtins import get_gallery as builtin_gallery
+
+    return {"apps": builtin_gallery()}
