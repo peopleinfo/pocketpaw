@@ -120,11 +120,35 @@ User request: {args if args else "(no additional input)"}
 
             logger.debug(f"Skill prompt: {full_prompt[:200]}...")
 
-            # Execute through agent
+            # Execute through agent — track if any text content was produced.
+            # agent.run() yields AgentEvent dataclass objects; convert each to
+            # a plain dict before passing to send_json.
             agent = self._get_agent_router()
+            has_content = False
 
-            async for chunk in agent.run(full_prompt):
+            async for event in agent.run(full_prompt):
+                # Build a JSON-serialisable dict from the AgentEvent dataclass.
+                chunk: dict = {
+                    "type": event.type,
+                    "content": event.content,
+                }
+                if event.metadata:
+                    chunk["metadata"] = event.metadata
+
+                # Track whether any visible text was produced.
+                if event.type == "message" and isinstance(event.content, str) and event.content.strip():
+                    has_content = True
+
                 yield chunk
+
+            # If the agent produced no visible text, emit a fallback so the
+            # chat isn't left silently blank (e.g. skill body is empty or the
+            # agent only ran tools without generating a text reply).
+            if not has_content:
+                yield {
+                    "type": "message",
+                    "content": f"✅ Skill `/{skill.name}` completed.",
+                }
 
             # Notify completion
             yield {
