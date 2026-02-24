@@ -50,6 +50,17 @@ def find_uv() -> str | None:
         local_uv = UV_DIR / "uv"
     if local_uv.exists():
         return str(local_uv)
+
+    # Check standard Windows uv install location (LOCALAPPDATA\uv\bin)
+    if platform.system() == "Windows":
+        import os
+
+        local_app = os.environ.get("LOCALAPPDATA", "")
+        if local_app:
+            win_uv = Path(local_app) / "uv" / "bin" / "uv.exe"
+            if win_uv.exists():
+                return str(win_uv)
+
     return shutil.which("uv")
 
 
