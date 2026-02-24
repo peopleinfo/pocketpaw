@@ -20,4 +20,15 @@ echo "Installing dependencies into isolated .venv..."
 # hardlinked — no duplicate downloads, no wasted disk.
 uv pip install --python .venv/bin/python -r requirements.txt
 
+echo "Generating OpenAPI spec from FastAPI routes..."
+.venv/bin/python -c "
+from app.main import create_app
+import json
+app = create_app()
+spec = app.openapi()
+with open('openapi.json', 'w') as f:
+    json.dump(spec, f, indent=2)
+print(f'  Generated openapi.json ({len(spec.get(\"paths\", {}))} endpoints)')
+"
+
 echo "AI Fast API installed successfully!"

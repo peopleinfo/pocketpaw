@@ -276,6 +276,12 @@ def list_plugins() -> list[dict[str, Any]]:
         plugin_id = item.name
         running = _is_plugin_running(plugin_id, item)
 
+        openapi_file = manifest.get("openapi")
+        has_openapi = (
+            (running and manifest.get("port"))
+            or (openapi_file and (item / openapi_file).exists())
+        )
+
         plugins.append({
             "id": plugin_id,
             "name": manifest.get("name", plugin_id),
@@ -292,7 +298,7 @@ def list_plugins() -> list[dict[str, Any]]:
             ),
             "requires": manifest.get("requires", []),
             "env": manifest.get("env", {}),
-            "openapi": manifest.get("openapi"),
+            "openapi": openapi_file if has_openapi else None,
         })
 
     return plugins
@@ -308,6 +314,12 @@ def get_plugin(plugin_id: str) -> dict | None:
         return None
 
     running = _is_plugin_running(plugin_id, plugin_dir)
+
+    openapi_file = manifest.get("openapi")
+    has_openapi = (
+        (running and manifest.get("port"))
+        or (openapi_file and (plugin_dir / openapi_file).exists())
+    )
 
     return {
         "id": plugin_id,
@@ -325,6 +337,7 @@ def get_plugin(plugin_id: str) -> dict | None:
         ),
         "requires": manifest.get("requires", []),
         "env": manifest.get("env", {}),
+        "openapi": openapi_file if has_openapi else None,
         "readme": _read_readme(plugin_dir),
     }
 

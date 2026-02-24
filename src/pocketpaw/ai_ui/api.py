@@ -153,18 +153,20 @@ async def get_plugin_logs(plugin_id: str):
 
 @router.get("/plugins/{plugin_id}/docs", include_in_schema=False)
 async def plugin_swagger(plugin_id: str):
-    """Render a self-contained Swagger UI page with the spec embedded inline.
+    """Serve API docs for a plugin.
 
-    Embedding the spec avoids the secondary fetch() that fails inside
-    sandboxed iframes (CORS / scheme errors).  The external validator is
-    disabled (validatorUrl: null) to prevent CSP-blocked fetches that
-    cause the "Failed to fetch" error.
+    When the plugin is **running** and exposes a port, we load the live
+    OpenAPI spec straight from the running FastAPI server — this always
+    reflects the real routes, models, and parameters.
+
+    When the plugin is **stopped**, we fall back to the static
+    ``openapi.json`` that was generated at install time.
     """
     import json as _json
 
     from fastapi.responses import HTMLResponse
 
-    from pocketpaw.ai_ui.plugins import get_plugins_dir
+    from pocketpaw.ai_ui.plugins import get_plugins_dir, _is_plugin_running
 
     plugins_dir = get_plugins_dir()
     plugin_path = plugins_dir / plugin_id
@@ -173,19 +175,13 @@ async def plugin_swagger(plugin_id: str):
         raise HTTPException(status_code=404, detail="Plugin not found")
 
     manifest = _json.loads(manifest_path.read_text(encoding="utf-8"))
-    openapi_file = manifest.get("openapi")
-    if not openapi_file:
-        raise HTTPException(status_code=404, detail="Plugin has no OpenAPI spec")
-
-    spec_path = plugin_path / openapi_file
-    if not spec_path.exists():
-        raise HTTPException(status_code=404, detail="OpenAPI spec file not found")
-
-    spec_json = spec_path.read_text(encoding="utf-8")
+    port = manifest.get("port")
     title = f"Plugin API: {manifest.get('name', plugin_id)}"
-    port = manifest.get("port", 8000)
+    running = port and _is_plugin_running(plugin_id, plugin_path)
 
-    html = f"""\
+    if running:
+        spec_url = f"http://localhost:{port}/openapi.json"
+        html = f"""\
 <!DOCTYPE html>
 <html>
 <head>
@@ -199,8 +195,54 @@ async def plugin_swagger(plugin_id: str):
 <div id="swagger-ui"></div>
 <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
 <script>
+SwaggerUIBundle({{
+    url: '{spec_url}',
+    dom_id: '#swagger-ui',
+    presets: [SwaggerUIBundle.presets.apis, SwaggerUIBundle.SwaggerUIStandalonePreset],
+    layout: 'BaseLayout',
+    validatorUrl: null,
+    persistAuthorization: true
+}});
+</script>
+</body>
+</html>"""
+        return HTMLResponse(content=html)
+
+    openapi_file = manifest.get("openapi")
+    if not openapi_file:
+        raise HTTPException(
+            status_code=404, detail="Plugin has no OpenAPI spec (start the plugin to generate one)"
+        )
+
+    spec_path = plugin_path / openapi_file
+    if not spec_path.exists():
+        raise HTTPException(
+            status_code=404,
+            detail="OpenAPI spec not found — start and stop the plugin once to generate it",
+        )
+
+    spec_json = spec_path.read_text(encoding="utf-8")
+
+    html = f"""\
+<!DOCTYPE html>
+<html>
+<head>
+<title>{title} (offline)</title>
+<meta charset="utf-8"/>
+<link rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css">
+<style>body {{ margin: 0; }} .swagger-ui .topbar {{ display: none; }}</style>
+</head>
+<body>
+<div style="background:#fffbe6;color:#856404;padding:8px 16px;font-size:13px;
+            border-bottom:1px solid #ffc107;font-family:sans-serif">
+  Plugin is stopped — showing spec from last install. Start the plugin for live docs.
+</div>
+<div id="swagger-ui"></div>
+<script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+<script>
 var spec = {spec_json};
-spec.servers = [{{ url: 'http://localhost:{port}', description: 'Local plugin server' }}];
+spec.servers = [{{ url: 'http://localhost:{port or 8000}', description: 'Local plugin server' }}];
 SwaggerUIBundle({{
     spec: spec,
     dom_id: '#swagger-ui',
