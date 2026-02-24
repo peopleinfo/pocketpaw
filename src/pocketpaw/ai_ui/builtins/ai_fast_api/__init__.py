@@ -1,0 +1,54 @@
+"""Built-in: AI Fast API — OpenAI-compatible server powered by G4F.
+
+The full upstream source from https://github.com/next-dev-team/ai-fast-api
+is bundled in the ``source/`` directory so the plugin works offline and can
+be freely customised.  No git clone is needed at install time.
+"""
+
+from pathlib import Path
+
+from pocketpaw.ai_ui.builtins._base import BuiltinDefinition
+
+_SOURCE_DIR = Path(__file__).resolve().parent / "source"
+
+_MANIFEST = {
+    "name": "AI Fast API",
+    "description": (
+        "OpenAI-compatible API server powered by GPT4Free (G4F). "
+        "Chat completions, image generation, multiple AI providers — "
+        "all through a unified local endpoint."
+    ),
+    "icon": "zap",
+    "version": "1.0.0",
+    "start": "bash start.sh",
+    "install": "bash install.sh",
+    "requires": ["uv", "python"],
+    "port": 8000,
+    "env": {
+        "HOST": "0.0.0.0",
+        "PORT": "8000",
+        "DEBUG": "true",
+        "G4F_PROVIDER": "auto",
+        "G4F_MODEL": "gpt-4o-mini",
+    },
+    "openapi": "openapi.json",
+}
+
+DEFINITION: BuiltinDefinition = {
+    "id": "ai-fast-api",
+    "manifest": _MANIFEST,
+    "source_dir": str(_SOURCE_DIR),
+    "files": {},
+    "gallery": {
+        "id": "ai-fast-api",
+        "name": "AI Fast API",
+        "description": (
+            "OpenAI-compatible API server powered by GPT4Free. "
+            "Chat, images, multiple providers — zero API keys needed."
+        ),
+        "icon": "zap",
+        "source": "builtin:ai-fast-api",
+        "stars": "G4F / Multi-Provider",
+        "category": "Curated / Built-in",
+    },
+}

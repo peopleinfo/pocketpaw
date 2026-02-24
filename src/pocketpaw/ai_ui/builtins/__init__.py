@@ -69,9 +69,12 @@ async def install_builtin(app_id: str, plugins_dir: Path) -> dict:
     defn = _REGISTRY[app_id]
     dest = plugins_dir / app_id
 
+    source_dir = defn.get("source_dir")
     git_source = defn.get("git_source")
 
-    if git_source:
+    if source_dir:
+        _copy_source(Path(source_dir), dest)
+    elif git_source:
         await _clone_source(git_source, dest)
     else:
         if dest.exists():
@@ -112,6 +115,13 @@ async def install_builtin(app_id: str, plugins_dir: Path) -> dict:
 
     name = defn["manifest"].get("name", app_id)
     return {"status": "ok", "message": f"{name} has been added!", "plugin_id": app_id}
+
+
+def _copy_source(source: Path, dest: Path) -> None:
+    """Copy a local source directory into *dest*, replacing any existing content."""
+    if dest.exists():
+        shutil.rmtree(dest)
+    shutil.copytree(source, dest)
 
 
 async def _clone_source(git_url: str, dest: Path) -> None:

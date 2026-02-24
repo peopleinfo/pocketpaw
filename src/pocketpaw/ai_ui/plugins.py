@@ -51,6 +51,10 @@ PLUGINS_DIR = _PROJECT_ROOT / "plugins"
 
 _running_processes: dict[str, asyncio.subprocess.Process] = {}
 
+# Shared uv cache — all plugins hardlink from here so identical
+# packages are stored only once on disk (like pnpm for Python).
+_SHARED_UV_CACHE = PLUGINS_DIR / ".uv-cache"
+
 # Minimal system paths needed for basic operation (git, bash, etc.)
 _SYSTEM_PATHS = (
     "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
@@ -70,7 +74,10 @@ def _sandbox_env(plugin_dir: Path, manifest: dict) -> dict[str, str]:
       TMPDIR    -> plugin_dir/.tmp     (temp files stay inside)
       XDG_*     -> plugin_dir/.cache   (caches stay inside)
       PATH      -> .venv/bin + system  (only plugin's own tools)
-      PIP_*     -> plugin_dir          (pip installs stay inside)
+
+    Python deps are fully isolated in each plugin's own ``.venv``.
+    The uv cache is **shared** across all plugins so identical wheels
+    are stored on disk only once (hardlinked into each venv).
 
     Only explicit vars from the manifest's "env" dict are passed through.
     Nothing from the host os.environ leaks in.
@@ -83,7 +90,10 @@ def _sandbox_env(plugin_dir: Path, manifest: dict) -> dict[str, str]:
     cache_dir = plugin_dir / ".cache"
     cache_dir.mkdir(exist_ok=True)
 
-    venv_bin = plugin_dir / ".venv" / "bin"
+    _SHARED_UV_CACHE.mkdir(parents=True, exist_ok=True)
+
+    venv_dir = plugin_dir / ".venv"
+    venv_bin = venv_dir / "bin"
     local_bin = plugin_dir / "bin"
     path_parts = []
     if venv_bin.is_dir():
@@ -109,15 +119,21 @@ def _sandbox_env(plugin_dir: Path, manifest: dict) -> dict[str, str]:
         # PATH — plugin venv + minimal system
         "PATH": os.pathsep.join(path_parts),
 
-        # Python — isolate pip/venv to plugin dir
-        "PIP_TARGET": plugin_str,
-        "VIRTUAL_ENV": str(plugin_dir / ".venv"),
+        # Python — each plugin gets its own .venv for full isolation
+        "VIRTUAL_ENV": str(venv_dir),
         "PYTHONDONTWRITEBYTECODE": "1",
         "PYTHONUNBUFFERED": "1",
         "PYTHONUSERBASE": plugin_str,
 
-        # Ensure UV/pip don't touch host dirs
-        "UV_CACHE_DIR": str(cache_dir / "uv"),
+        # uv — shared cache across all plugins so identical packages
+        # are stored once on disk and hardlinked into each venv.
+        # APFS/btrfs get copy-on-write clones; other FS get hardlinks.
+        "UV_CACHE_DIR": str(_SHARED_UV_CACHE),
+        "UV_LINK_MODE": "hardlink",
+
+        # pip — install into the venv, not arbitrary dirs
+        "PIP_PREFIX": str(venv_dir),
+        "PIP_DISABLE_PIP_VERSION_CHECK": "1",
 
         # Locale
         "LANG": "en_US.UTF-8",
@@ -141,6 +157,10 @@ def _sandbox_install_env(plugin_dir: Path, manifest: dict) -> dict[str, str]:
 
     During install we need git, curl, uv from the host PATH so deps can
     be fetched.  Once installed, the runtime sandbox is tighter.
+
+    The shared uv cache lets ``uv pip install`` hardlink packages that
+    were already downloaded for other plugins — no re-download, no
+    extra disk space.
     """
     env = _sandbox_env(plugin_dir, manifest)
 

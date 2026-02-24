@@ -156,7 +156,9 @@ async def plugin_swagger(plugin_id: str):
     """Render a self-contained Swagger UI page with the spec embedded inline.
 
     Embedding the spec avoids the secondary fetch() that fails inside
-    sandboxed iframes (CORS / scheme errors).
+    sandboxed iframes (CORS / scheme errors).  The external validator is
+    disabled (validatorUrl: null) to prevent CSP-blocked fetches that
+    cause the "Failed to fetch" error.
     """
     import json as _json
 
@@ -181,6 +183,7 @@ async def plugin_swagger(plugin_id: str):
 
     spec_json = spec_path.read_text(encoding="utf-8")
     title = f"Plugin API: {manifest.get('name', plugin_id)}"
+    port = manifest.get("port", 8000)
 
     html = f"""\
 <!DOCTYPE html>
@@ -190,16 +193,21 @@ async def plugin_swagger(plugin_id: str):
 <meta charset="utf-8"/>
 <link rel="stylesheet"
       href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css">
+<style>body {{ margin: 0; }} .swagger-ui .topbar {{ display: none; }}</style>
 </head>
 <body>
 <div id="swagger-ui"></div>
 <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
 <script>
+var spec = {spec_json};
+spec.servers = [{{ url: 'http://localhost:{port}', description: 'Local plugin server' }}];
 SwaggerUIBundle({{
-    spec: {spec_json},
+    spec: spec,
     dom_id: '#swagger-ui',
     presets: [SwaggerUIBundle.presets.apis, SwaggerUIBundle.SwaggerUIStandalonePreset],
-    layout: 'BaseLayout'
+    layout: 'BaseLayout',
+    validatorUrl: null,
+    persistAuthorization: true
 }});
 </script>
 </body>

@@ -1,0 +1,132 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "AI Fast API — G4F OpenAI-Compatible Server",
+    "version": "1.0.0",
+    "description": "OpenAI-compatible REST API powered by GPT4Free."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000",
+      "description": "Local AI Fast API server"
+    }
+  ],
+  "paths": {
+    "/v1/chat/completions": {
+      "post": {
+        "summary": "Chat Completion",
+        "description": "Create a chat completion (streaming and non-streaming).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "model": { "type": "string", "example": "gpt-4o-mini" },
+                  "messages": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "role": { "type": "string", "example": "user" },
+                        "content": { "type": "string", "example": "Hello!" }
+                      }
+                    }
+                  },
+                  "temperature": { "type": "number", "example": 0.7 },
+                  "max_tokens": { "type": "integer", "example": 150 },
+                  "stream": { "type": "boolean", "example": false },
+                  "provider": { "type": "string", "example": "auto" },
+                  "web_search": { "type": "boolean", "example": false }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Successful chat completion." }
+        }
+      }
+    },
+    "/v1/models": {
+      "get": {
+        "summary": "List Models",
+        "description": "List all available AI models.",
+        "responses": {
+          "200": { "description": "A list of available models." }
+        }
+      }
+    },
+    "/v1/models/{model_id}": {
+      "get": {
+        "summary": "Retrieve Model",
+        "description": "Get information about a specific model.",
+        "parameters": [
+          {
+            "name": "model_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Model information." }
+        }
+      }
+    },
+    "/v1/providers": {
+      "get": {
+        "summary": "List Providers",
+        "description": "List all available G4F providers.",
+        "responses": {
+          "200": { "description": "A list of available providers." }
+        }
+      }
+    },
+    "/v1/images/generate": {
+      "post": {
+        "summary": "Generate Image",
+        "description": "Generate images from a text prompt.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "prompt": { "type": "string", "example": "A sunset over mountains" },
+                  "model": { "type": "string", "example": "flux" },
+                  "n": { "type": "integer", "example": 1 },
+                  "size": { "type": "string", "example": "1024x1024" },
+                  "provider": { "type": "string", "example": "auto" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Generated image URLs." }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "summary": "Health Check",
+        "description": "Check server health status.",
+        "responses": {
+          "200": { "description": "Server is healthy." }
+        }
+      }
+    },
+    "/status": {
+      "get": {
+        "summary": "Detailed Status",
+        "description": "Get detailed status information about the API server.",
+        "responses": {
+          "200": { "description": "Detailed server status." }
+        }
+      }
+    }
+  }
+}

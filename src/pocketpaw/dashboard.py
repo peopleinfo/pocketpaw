@@ -120,6 +120,7 @@ app = FastAPI(
     docs_url="/api/v1/docs",
     redoc_url="/api/v1/redoc",
     openapi_url="/api/v1/openapi.json",
+    swagger_ui_parameters={"validatorUrl": None},
 )
 
 # CORS — localhost + Cloudflare tunnel + Tauri desktop + custom origins from config
@@ -157,6 +158,7 @@ async def security_headers_middleware(request: Request, call_next):
         "img-src 'self' data: blob:; "
         "connect-src 'self' ws: wss: http://localhost:* http://127.0.0.1:* "
         "https://cdn.jsdelivr.net https://unpkg.com; "
+        "frame-src 'self' http://localhost:* http://127.0.0.1:*; "
         "frame-ancestors 'self'"
     )
     # HSTS only when accessed via HTTPS (tunnel or reverse proxy)
