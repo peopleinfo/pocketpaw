@@ -25,6 +25,9 @@ window.PocketPaw.Skills = {
       // Two-view state
       skillsView: "installed", // 'installed' | 'library'
       skillSearchQuery: "", // filter installed skills
+      // Delete confirmation (inline, no native confirm())
+      skillPendingDelete: null, // skill.name awaiting confirmation
+      skillDeleting: null, // skill.name currently being deleted
       // Library state
       libraryQuery: "", // search skills.sh
       libraryResults: [], // skills.sh search results
@@ -221,7 +224,8 @@ window.PocketPaw.Skills = {
        * Remove an installed skill
        */
       async removeSkill(name) {
-        if (!confirm(`Remove skill "${name}"? This cannot be undone.`)) return;
+        // Confirmation is now inline — no native confirm() needed.
+        this.skillDeleting = name;
         try {
           const res = await fetch("/api/skills/remove", {
             method: "POST",
@@ -241,6 +245,8 @@ window.PocketPaw.Skills = {
         } catch (e) {
           this.showToast("Remove failed: " + e.message, "error");
         } finally {
+          this.skillDeleting = null;
+          this.skillPendingDelete = null;
           this.$nextTick(() => {
             if (window.refreshIcons) window.refreshIcons();
           });

@@ -456,6 +456,7 @@ async def list_installed_skills():
             "name": s.name,
             "description": s.description,
             "argument_hint": s.argument_hint,
+            "built_in": s.built_in,
         }
         for s in loader.get_invocable()
     ]
@@ -588,10 +589,21 @@ async def remove_skill(request: Request):
     if ".." in name or "/" in name or ";" in name or "|" in name or "&" in name:
         return JSONResponse({"error": "Invalid name format"}, status_code=400)
 
-    # Check both skill locations
-    for base in [Path.home() / ".agents" / "skills", Path.home() / ".pocketpaw" / "skills"]:
+    # Check all skill locations (must match SKILL_PATHS in loader.py)
+    for base in [
+        Path.home() / ".agents" / "skills",
+        Path.home() / ".claude" / "skills",   # CreateSkillTool writes here
+        Path.home() / ".pocketpaw" / "skills",
+    ]:
         skill_dir = base / name
         if skill_dir.is_dir() and (skill_dir / "SKILL.md").exists():
+            # Block deletion of built-in skills
+            skill = get_skill_loader().get(name)
+            if skill and skill.built_in:
+                return JSONResponse(
+                    {"error": f"Skill '{name}' is a built-in skill and cannot be deleted."},
+                    status_code=403,
+                )
             shutil.rmtree(skill_dir)
             loader = get_skill_loader()
             loader.reload()

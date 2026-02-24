@@ -42,6 +42,8 @@ class Skill:
     argument_hint: Optional[str] = None
     allowed_tools: list[str] = field(default_factory=list)
     metadata: dict = field(default_factory=dict)
+    # If True the skill cannot be deleted from the UI
+    built_in: bool = False
 
     def build_prompt(self, args: str = "") -> str:
         """
@@ -104,6 +106,19 @@ def parse_skill_md(skill_path: Path) -> Optional[Skill]:
     description = frontmatter.get("description", "")
 
     # Build skill object
+    # A skill is built-in if the frontmatter says so, OR if it lives under
+    # ~/.agents/skills (installed via skills.sh / npx) rather than being
+    # user-created via CreateSkillTool (~/.claude/skills) or placed manually
+    # (~/.pocketpaw/skills).
+    built_in_flag = frontmatter.get("built-in", False)
+    if not built_in_flag:
+        user_created_bases = [
+            Path.home() / ".claude" / "skills",
+            Path.home() / ".pocketpaw" / "skills",
+        ]
+        skill_base = skill_path.parent.parent  # grandparent = skills dir
+        built_in_flag = not any(skill_base == base for base in user_created_bases)
+
     return Skill(
         name=name,
         description=description,
@@ -114,6 +129,7 @@ def parse_skill_md(skill_path: Path) -> Optional[Skill]:
         argument_hint=frontmatter.get("argument-hint"),
         allowed_tools=frontmatter.get("allowed-tools", []),
         metadata=frontmatter.get("metadata", {}),
+        built_in=built_in_flag,
     )
 
 
