@@ -195,6 +195,15 @@ window.PocketPaw.AiUI = {
         );
       },
 
+      copyConfigValue(value, label = "Copied") {
+        const text = (value || "").toString().trim();
+        if (!text) return;
+        navigator.clipboard?.writeText(text).then(
+          () => this.showToast?.(`${label} copied`, "success"),
+          () => {}
+        );
+      },
+
       setPluginDetailTab(tab) {
         if (!["overview", "web", "api"].includes(tab)) return;
         this.aiUI.pluginDetailTab = tab;
@@ -561,20 +570,34 @@ window.PocketPaw.AiUI = {
             if (modelsRes.ok) {
               const data = await modelsRes.json();
               const models = data.models || [];
-              const curModel = this.aiUI.pluginConfigDraft.G4F_MODEL;
-              if (curModel && !models.some((m) => m.id === curModel)) {
-                models.unshift({ id: curModel });
+              const savedModel = this.aiUI.pluginConfig?.G4F_MODEL || this.aiUI.pluginConfigDraft.G4F_MODEL;
+              if (savedModel && !models.some((m) => m.id === savedModel)) {
+                models.unshift({ id: savedModel });
               }
               this.aiUI.configModels = models;
+              // Re-apply saved model so select binding picks it up after async options load
+              if (savedModel) {
+                this.aiUI.pluginConfigDraft.G4F_MODEL = savedModel;
+              }
+              this.$nextTick(() => {
+                if (savedModel) this.aiUI.pluginConfigDraft.G4F_MODEL = savedModel;
+              });
             }
             if (providersRes.ok) {
               const data = await providersRes.json();
               const providers = data.providers || [];
-              const curProvider = this.aiUI.pluginConfigDraft.G4F_PROVIDER;
-              if (curProvider && curProvider !== "auto" && !providers.some((p) => p.id === curProvider)) {
-                providers.unshift({ id: curProvider });
+              const savedProvider =
+                this.aiUI.pluginConfig?.G4F_PROVIDER || this.aiUI.pluginConfigDraft.G4F_PROVIDER;
+              if (savedProvider && savedProvider !== "auto" && !providers.some((p) => p.id === savedProvider)) {
+                providers.unshift({ id: savedProvider });
               }
               this.aiUI.configProviders = providers;
+              if (savedProvider) {
+                this.aiUI.pluginConfigDraft.G4F_PROVIDER = savedProvider;
+              }
+              this.$nextTick(() => {
+                if (savedProvider) this.aiUI.pluginConfigDraft.G4F_PROVIDER = savedProvider;
+              });
             }
           } catch (_e) {
             // Plugin may not be running
