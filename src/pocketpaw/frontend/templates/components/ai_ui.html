@@ -387,7 +387,7 @@
         <!-- Install Bar -->
         <div class="mb-6">
           <div
-            class="flex items-center gap-3 p-4 bg-black/20 border border-white/10 rounded-2xl"
+            class="flex flex-wrap items-center gap-3 p-4 bg-black/20 border border-white/10 rounded-2xl"
           >
             <div
               class="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center shrink-0"
@@ -397,10 +397,24 @@
             <input
               type="text"
               x-model="aiUI.installForm.url"
-              placeholder="Install from Git URL (e.g. user/repo or https://github.com/user/repo.git)"
-              class="flex-1 px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-sm text-white placeholder-white/30 focus:border-accent focus:outline-none transition-colors"
+              placeholder="Install from Git URL (e.g. user/repo) or upload .zip"
+              class="flex-1 min-w-0 px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-sm text-white placeholder-white/30 focus:border-accent focus:outline-none transition-colors"
               @keydown.enter="installAiUIPlugin()"
             />
+            <input
+              type="file"
+              accept=".zip"
+              class="hidden"
+              @change="installAiUIPluginFromZip($event)"
+            />
+            <button
+              class="px-4 py-2.5 bg-white/5 border border-white/10 text-white/70 hover:text-white hover:border-accent/40 rounded-xl text-sm font-medium flex items-center gap-2 transition-all disabled:opacity-50"
+              :disabled="aiUI.installForm.installing"
+              @click="$el.previousElementSibling.click()"
+            >
+              <i data-lucide="upload" class="w-4 h-4"></i>
+              <span>Upload .zip</span>
+            </button>
             <button
               class="px-5 py-2.5 bg-accent text-white rounded-xl hover:bg-accent/90 transition-all shadow-lg shadow-accent/20 text-sm font-semibold flex items-center gap-2 hover:scale-105 active:scale-95 disabled:opacity-50"
               :disabled="aiUI.installForm.installing || !aiUI.installForm.url.trim()"

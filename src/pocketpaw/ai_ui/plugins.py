@@ -37,6 +37,7 @@ web_view_path: path for iframe (default "/"); e.g. "/chat" for a /chat page.
 """
 
 import asyncio
+import io
 import json
 import logging
 import os
@@ -44,6 +45,7 @@ import platform
 import shutil
 import signal
 import socket
+import zipfile
 from pathlib import Path
 from typing import Any
 
@@ -508,6 +510,97 @@ async def install_plugin(source: str) -> dict:
         await asyncio.wait_for(proc.communicate(), timeout=300)
     elif install_cmd:
         logger.info("Running install command for '%s': %s", plugin_id, install_cmd)
+        proc = await asyncio.create_subprocess_shell(
+            install_cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            cwd=str(dest),
+            env=sandbox_env,
+        )
+        await asyncio.wait_for(proc.communicate(), timeout=300)
+
+    return {
+        "status": "ok",
+        "message": f"{manifest['name']} has been added!",
+        "plugin_id": plugin_id,
+    }
+
+
+async def install_plugin_from_zip(zip_bytes: bytes) -> dict:
+    """Install a plugin from an uploaded zip file.
+
+    The zip must contain either:
+      - A top-level folder with pocketpaw.json inside (e.g. my-app/pocketpaw.json)
+      - pocketpaw.json at the root of the zip
+    """
+    import tempfile
+
+    plugins_dir = get_plugins_dir()
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmp = Path(tmpdir)
+        try:
+            with zipfile.ZipFile(io.BytesIO(zip_bytes), "r") as zf:
+                zf.extractall(tmp)
+        except zipfile.BadZipFile as e:
+            raise ValueError(
+                "That doesn't look like a valid zip file. "
+                "Please upload a .zip containing a PocketPaw plugin."
+            ) from e
+
+        # Find plugin root: single top-level dir with manifest, or root with manifest
+        manifest = _read_manifest(tmp)
+        if manifest is not None:
+            plugin_root = tmp
+            plugin_id = manifest.get("name", "plugin")
+            # Sanitize: alphanumeric + hyphen
+            plugin_id = "".join(c if c.isalnum() or c == "-" else "_" for c in plugin_id)
+            if not plugin_id:
+                plugin_id = "uploaded-plugin"
+        else:
+            subdirs = [d for d in tmp.iterdir() if d.is_dir()]
+            if len(subdirs) != 1:
+                raise ValueError(
+                    "Zip must contain a single folder with pocketpaw.json, "
+                    "or pocketpaw.json at the root."
+                )
+            plugin_root = subdirs[0]
+            manifest = _read_manifest(plugin_root)
+            if manifest is None:
+                raise ValueError(
+                    "That folder is missing a pocketpaw.json config file. "
+                    "PocketPaw plugins need this file to know how to install and run the app."
+                )
+            plugin_id = plugin_root.name
+
+        if ".." in plugin_id or "/" in plugin_id or "\\" in plugin_id:
+            raise ValueError("Invalid plugin ID from zip")
+
+        dest = plugins_dir / plugin_id
+        if dest.exists():
+            shutil.rmtree(dest)
+        shutil.copytree(plugin_root, dest)
+        # Copy done while temp dir still exists
+
+    # Run install in sandboxed env
+    install_script = dest / "install.sh"
+    install_cmd = manifest.get("install")
+    sandbox_env = _sandbox_install_env(dest, manifest)
+
+    if install_script.exists():
+        logger.info("Running install script for '%s'", plugin_id)
+        proc = await asyncio.create_subprocess_shell(
+            "bash install.sh",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            cwd=str(dest),
+            env=sandbox_env,
+        )
+        await asyncio.wait_for(proc.communicate(), timeout=300)
+    elif install_cmd:
+        logger.info(
+            "Running install command for '%s': %s", plugin_id, install_cmd
+        )
         proc = await asyncio.create_subprocess_shell(
             install_cmd,
             stdout=asyncio.subprocess.PIPE,

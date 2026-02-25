@@ -224,6 +224,49 @@ window.PocketPaw.AiUI = {
         }
       },
 
+      async installAiUIPluginFromZip(event) {
+        const file = event?.target?.files?.[0];
+        if (!file || !file.name.toLowerCase().endsWith(".zip")) {
+          if (file) this.showToast("Please upload a .zip file", "error");
+          event.target.value = "";
+          return;
+        }
+
+        this.aiUI.installForm.installing = true;
+        try {
+          const formData = new FormData();
+          formData.append("file", file);
+          const res = await fetch("/api/ai-ui/plugins/install", {
+            method: "POST",
+            body: formData,
+          });
+          if (res.ok) {
+            const data = await res.json();
+            this.showToast(
+              data.message || "Plugin installed successfully!",
+              "success",
+            );
+            await this.fetchPlugins();
+            if (this.aiUI.selectedPlugin?.id === data.plugin_id) {
+              const plugin = this.aiUI.plugins.find((p) => p.id === data.plugin_id);
+              if (plugin) this.aiUI.selectedPlugin = plugin;
+            }
+            this.$nextTick(() => {
+              if (window.refreshIcons) window.refreshIcons();
+            });
+          } else {
+            const err = await res.json();
+            this.showToast(err.detail || "Installation failed", "error");
+          }
+        } catch (e) {
+          console.error("Plugin install from zip error:", e);
+          this.showToast("Installation failed", "error");
+        } finally {
+          this.aiUI.installForm.installing = false;
+          event.target.value = "";
+        }
+      },
+
       async launchAiUIPlugin(pluginId) {
         this.aiUI.launchingPlugin = pluginId;
         try {

@@ -69,8 +69,36 @@ async def get_plugin_detail(plugin_id: str):
 
 @router.post("/plugins/install")
 async def install_plugin_endpoint(request: Request):
-    """Install a plugin from a Git URL or local path."""
-    from pocketpaw.ai_ui.plugins import install_plugin
+    """Install a plugin from a Git URL, local path, or uploaded .zip file."""
+    from pocketpaw.ai_ui.plugins import install_plugin, install_plugin_from_zip
+
+    content_type = request.headers.get("content-type", "")
+
+    if "multipart/form-data" in content_type:
+        form = await request.form()
+        file = form.get("file")
+        if not file or file.filename == "":
+            raise HTTPException(
+                status_code=400, detail="No file provided. Upload a .zip plugin."
+            )
+        if not (file.filename or "").lower().endswith(".zip"):
+            raise HTTPException(
+                status_code=400,
+                detail="Please upload a .zip file containing a PocketPaw plugin.",
+            )
+        zip_bytes = await file.read()
+        if len(zip_bytes) > 100 * 1024 * 1024:
+            raise HTTPException(
+                status_code=400, detail="Zip file too large (max 100MB)."
+            )
+        try:
+            result = await install_plugin_from_zip(zip_bytes)
+            return result
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        except Exception as e:
+            logger.exception("Plugin install from zip failed")
+            raise HTTPException(status_code=500, detail=str(e))
 
     data = await request.json()
     source = data.get("source", "").strip()
