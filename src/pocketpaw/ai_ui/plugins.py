@@ -520,6 +520,129 @@ def test_plugin_connection(
         return {"ok": False, "message": str(e) or "Chat ping failed"}
 
 
+def fetch_plugin_models(
+    plugin_id: str, host: str | None = None, port: int | None = None
+) -> list[dict]:
+    """Fetch /v1/models from a running plugin. Returns list of { id, ... }. Empty if not running."""
+    if ".." in plugin_id or "/" in plugin_id or "\\" in plugin_id:
+        raise ValueError("Invalid plugin ID")
+
+    plugin_dir = get_plugins_dir() / plugin_id
+    manifest = _read_manifest(plugin_dir)
+    if manifest is None:
+        raise FileNotFoundError(f"Plugin '{plugin_id}' not found")
+
+    env = manifest.get("env", {})
+    h = host or env.get("HOST", "0.0.0.0")
+    if h in ("0.0.0.0", ""):
+        h = "127.0.0.1"
+    p = port if port is not None else int(env.get("PORT", "8000"))
+    url = f"http://{h}:{p}/v1/models"
+
+    try:
+        import httpx
+
+        with httpx.Client(timeout=10.0) as client:
+            resp = client.get(url)
+            resp.raise_for_status()
+            data = resp.json()
+            return data.get("data") or []
+    except Exception:
+        return []
+
+
+def fetch_plugin_providers(
+    plugin_id: str, host: str | None = None, port: int | None = None
+) -> list[dict]:
+    """Fetch /v1/providers from a running plugin. Returns list of { id, url, models, ... }. Empty if not running."""
+    if ".." in plugin_id or "/" in plugin_id or "\\" in plugin_id:
+        raise ValueError("Invalid plugin ID")
+
+    plugin_dir = get_plugins_dir() / plugin_id
+    manifest = _read_manifest(plugin_dir)
+    if manifest is None:
+        raise FileNotFoundError(f"Plugin '{plugin_id}' not found")
+
+    env = manifest.get("env", {})
+    h = host or env.get("HOST", "0.0.0.0")
+    if h in ("0.0.0.0", ""):
+        h = "127.0.0.1"
+    p = port if port is not None else int(env.get("PORT", "8000"))
+    url = f"http://{h}:{p}/v1/providers"
+
+    try:
+        import httpx
+
+        with httpx.Client(timeout=10.0) as client:
+            resp = client.get(url)
+            resp.raise_for_status()
+            data = resp.json()
+            return data.get("data") or []
+    except Exception:
+        return []
+
+
+def chat_completion_proxy(plugin_id: str, messages: list[dict]) -> dict:
+    """Forward chat completion request to the plugin. Returns OpenAI-format response."""
+    if ".." in plugin_id or "/" in plugin_id or "\\" in plugin_id:
+        raise ValueError("Invalid plugin ID")
+
+    plugin_dir = get_plugins_dir() / plugin_id
+    manifest = _read_manifest(plugin_dir)
+    if manifest is None:
+        raise FileNotFoundError(f"Plugin '{plugin_id}' not found")
+
+    env = manifest.get("env", {})
+    h = env.get("HOST", "0.0.0.0")
+    if h in ("0.0.0.0", ""):
+        h = "127.0.0.1"
+    p = int(env.get("PORT", "8000"))
+    url = f"http://{h}:{p}/v1/chat/completions"
+
+    payload = {
+        "model": env.get("G4F_MODEL", "gpt-4o-mini"),
+        "messages": messages,
+        "stream": False,
+    }
+
+    import httpx
+
+    with httpx.Client(timeout=60.0) as client:
+        resp = client.post(url, json=payload)
+        resp.raise_for_status()
+        return resp.json()
+
+
+def _chat_history_path(plugin_id: str) -> Path:
+    """Path to chat history file for a plugin."""
+    base = Path.home() / ".pocketpaw" / "ai-ui" / "chat"
+    base.mkdir(parents=True, exist_ok=True)
+    safe_id = "".join(c if c.isalnum() or c in "-_" else "_" for c in plugin_id)
+    return base / f"{safe_id}.json"
+
+
+def get_chat_history(plugin_id: str) -> list[dict]:
+    """Load chat history for a plugin. Returns list of {role, content}."""
+    if ".." in plugin_id or "/" in plugin_id or "\\" in plugin_id:
+        raise ValueError("Invalid plugin ID")
+    path = _chat_history_path(plugin_id)
+    if not path.exists():
+        return []
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        return data if isinstance(data, list) else []
+    except (json.JSONDecodeError, OSError):
+        return []
+
+
+def save_chat_history(plugin_id: str, messages: list[dict]) -> None:
+    """Save chat history for a plugin."""
+    if ".." in plugin_id or "/" in plugin_id or "\\" in plugin_id:
+        raise ValueError("Invalid plugin ID")
+    path = _chat_history_path(plugin_id)
+    path.write_text(json.dumps(messages, indent=2), encoding="utf-8")
+
+
 # ─── Install ─────────────────────────────────────────────────────────────
 
 

@@ -589,10 +589,7 @@
 
     <!-- ────────────────── PLUGIN DETAIL VIEW ────────────────── -->
     <template x-if="aiUI.view === 'plugin-detail' && aiUI.selectedPlugin">
-      <div
-        class="flex flex-col h-full w-full p-2 md:p-4 !pt-0 overflow-hidden"
-        x-data="{ tab: 'web' }"
-      >
+      <div class="flex flex-col h-full w-full p-2 md:p-4 !pt-0 overflow-hidden">
         <!-- Top Bar: Back + Name + Tabs + Actions -->
         <div
           class="flex items-center gap-1.5 py-1.5 px-2 rounded-md bg-white/[0.03] border border-white/10 mb-1.5 shrink-0 flex-wrap"
@@ -632,24 +629,27 @@
           <!-- Tabs at top -->
           <div class="flex items-center gap-0.5 shrink-0">
             <button
+              type="button"
               class="px-2 py-0.5 rounded text-[11px] font-semibold transition-colors"
-              :class="tab === 'overview' ? 'bg-accent/20 text-accent' : 'text-white/40 hover:text-white hover:bg-white/5'"
-              @click="tab = 'overview'"
+              :class="aiUI.pluginDetailTab === 'overview' ? 'bg-accent/20 text-accent' : 'text-white/40 hover:text-white hover:bg-white/5'"
+              @click="setPluginDetailTab('overview')"
             >
               Overview
             </button>
             <button
+              type="button"
               class="px-2 py-0.5 rounded text-[11px] font-semibold transition-colors"
-              :class="tab === 'web' ? 'bg-accent/20 text-accent' : 'text-white/40 hover:text-white hover:bg-white/5'"
-              @click="tab = 'web'"
+              :class="aiUI.pluginDetailTab === 'web' ? 'bg-accent/20 text-accent' : 'text-white/40 hover:text-white hover:bg-white/5'"
+              @click="setPluginDetailTab('web')"
             >
               Web View
             </button>
             <template x-if="aiUI.selectedPlugin.openapi">
               <button
+                type="button"
                 class="px-2 py-0.5 rounded text-[11px] font-semibold transition-colors flex items-center gap-1"
-                :class="tab === 'api' ? 'bg-accent/20 text-accent' : 'text-white/40 hover:text-white hover:bg-white/5'"
-                @click="tab = 'api'"
+                :class="aiUI.pluginDetailTab === 'api' ? 'bg-accent/20 text-accent' : 'text-white/40 hover:text-white hover:bg-white/5'"
+                @click="setPluginDetailTab('api')"
               >
                 API
                 <span class="text-[10px] opacity-70">API</span>
@@ -738,7 +738,7 @@
         </div>
 
         <!-- Overview Tab -->
-        <template x-if="tab === 'overview'">
+        <template x-if="aiUI.pluginDetailTab === 'overview'">
           <div class="flex-1 min-h-0 overflow-y-auto animate-fade-in">
             <!-- Info Cards -->
             <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
@@ -829,7 +829,7 @@
         </template>
 
         <!-- Web View Tab — Modular: native chat (web_view: native) or iframe (web_view: iframe) -->
-        <template x-if="tab === 'web'">
+        <template x-if="aiUI.pluginDetailTab === 'web'">
           <div
             class="flex-1 min-h-0 w-full rounded-2xl border border-white/10 overflow-hidden shadow-2xl relative animate-fade-in flex flex-col"
             x-init="$nextTick(() => { if (window.refreshIcons) window.refreshIcons(); })"
@@ -848,6 +848,7 @@
                     x-data="{
                       chatMessages: [],
                       chatInput: '',
+                      chatLoading: false,
                       chatConversations: [{ id: 'default', title: 'New chat' }],
                       activeConversationId: 'default',
                       suggestedPrompts: [
@@ -855,16 +856,52 @@
                         'Explain recursion in simple terms',
                         'What are the best practices for API design?',
                         'Help me debug a Python function'
-                      ]
+                      ],
+                      async sendChat(promptOverride) {
+                        const text = (promptOverride || this.chatInput || '').toString().trim();
+                        if (!text || this.chatLoading) return;
+                        this.chatMessages.push({ role: 'user', content: text });
+                        this.chatInput = '';
+                        this.chatLoading = true;
+                        const bridge = window._aiUiChatBridge;
+                        const pluginId = bridge?.getPluginId?.();
+                        if (!pluginId || !bridge?.send) {
+                          this.chatMessages.push({ role: 'assistant', content: 'Chat not available.' });
+                          this.chatLoading = false;
+                          return;
+                        }
+                        try {
+                          const res = await bridge.send(pluginId, this.chatMessages);
+                          this.chatMessages.push({ role: 'assistant', content: res.content });
+                          if (bridge?.save) {
+                            await bridge.save(pluginId, this.chatMessages);
+                          }
+                        } catch (e) {
+                          this.chatMessages.push({ role: 'assistant', content: 'Error: ' + (e.message || 'Failed to get response') });
+                        }
+                        this.chatLoading = false;
+                      }
                     }"
-                    x-init="$nextTick(() => { if (window.refreshIcons) window.refreshIcons(); })"
+                    x-init="
+                      $nextTick(async () => {
+                        if (window.refreshIcons) window.refreshIcons();
+                        const bridge = window._aiUiChatBridge;
+                        const pluginId = bridge?.getPluginId?.();
+                        if (pluginId && bridge?.load) {
+                          const msgs = await bridge.load(pluginId);
+                          if (msgs?.length) this.chatMessages = msgs;
+                        }
+                      });
+                    "
                   >
                 <!-- Left sidebar: conversations -->
                 <aside
                   class="w-[260px] flex-shrink-0 flex flex-col bg-white border-r border-gray-200"
                 >
                   <button
+                    type="button"
                     class="m-3 flex items-center gap-3 px-4 py-3 rounded-xl text-[14px] font-medium text-gray-800 hover:bg-gray-100 transition-colors border border-gray-200"
+                    @click="chatMessages = []; chatConversations = [{ id: 'default', title: 'New chat' }]; activeConversationId = 'default'"
                   >
                     <i data-lucide="plus" class="w-4 h-4 text-[#0078D4]"></i>
                     New chat
@@ -872,8 +909,10 @@
                   <div class="flex-1 overflow-y-auto px-2 pb-4">
                     <template x-for="conv in chatConversations" :key="conv.id">
                       <button
+                        type="button"
                         class="w-full text-left px-4 py-2.5 rounded-lg text-[13px] text-gray-700 hover:bg-gray-100 transition-colors mb-0.5 truncate"
                         :class="activeConversationId === conv.id ? 'bg-gray-100 font-medium' : ''"
+                        @click="activeConversationId = conv.id; if (conv.messages) chatMessages = [...conv.messages]; else chatMessages = []"
                       >
                         <i data-lucide="message-circle" class="w-3.5 h-3.5 inline-block mr-2 text-gray-500 align-middle"></i>
                         <span x-text="conv.title"></span>
@@ -881,7 +920,7 @@
                     </template>
                   </div>
                   <div class="p-3 border-t border-gray-100">
-                    <span class="text-[11px] text-gray-400" x-text="aiUI.selectedPlugin.name"></span>
+                    <span class="text-[11px] text-gray-400" x-text="window._aiUiChatBridge?.getPluginName?.() || 'Plugin'"></span>
                     <span class="text-[11px] text-green-600 ml-1" x-text="'●'"></span>
                   </div>
                 </aside>
@@ -905,7 +944,7 @@
                             <button
                               class="px-5 py-3.5 rounded-2xl text-left text-[13px] font-medium text-gray-700 bg-white border border-gray-200 hover:border-[#0078D4]/40 hover:bg-[#0078D4]/5 transition-all shadow-sm"
                               x-text="prompt"
-                              @click="chatInput = prompt"
+                              @click="sendChat(prompt)"
                             ></button>
                           </template>
                         </div>
@@ -929,6 +968,17 @@
                             </div>
                           </div>
                         </template>
+                        <template x-if="chatLoading">
+                          <div class="flex justify-start">
+                            <div class="max-w-[85%] rounded-2xl px-4 py-3 bg-white border border-gray-200 shadow-sm">
+                              <div class="flex gap-1">
+                                <span class="w-2 h-2 rounded-full bg-gray-400 animate-bounce" style="animation-delay: 0ms"></span>
+                                <span class="w-2 h-2 rounded-full bg-gray-400 animate-bounce" style="animation-delay: 150ms"></span>
+                                <span class="w-2 h-2 rounded-full bg-gray-400 animate-bounce" style="animation-delay: 300ms"></span>
+                              </div>
+                            </div>
+                          </div>
+                        </template>
                       </div>
                     </template>
                   </div>
@@ -943,12 +993,13 @@
                         placeholder="Ask me anything..."
                         rows="1"
                         class="flex-1 min-h-[44px] max-h-32 py-2.5 px-3 resize-none text-[14px] text-gray-800 placeholder-gray-400 bg-transparent border-none outline-none"
-                        @keydown.enter="if (!$event.shiftKey) { $event.preventDefault(); if (chatInput.trim()) { chatMessages.push({ role: 'user', content: chatInput }); chatInput = ''; } }"
+                        :disabled="chatLoading"
+                        @keydown.enter="if (!$event.shiftKey) { $event.preventDefault(); if (chatInput.trim() && !chatLoading) { sendChat(); } }"
                       ></textarea>
                       <button
                         class="flex-shrink-0 w-10 h-10 rounded-xl bg-[#0078D4] text-white flex items-center justify-center hover:bg-[#106ebe] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        :disabled="!chatInput.trim()"
-                        @click="chatMessages.push({ role: 'user', content: chatInput }); chatInput = ''"
+                        :disabled="!chatInput.trim() || chatLoading"
+                        @click="sendChat()"
                       >
                         <i data-lucide="send" class="w-4 h-4"></i>
                       </button>
@@ -1017,7 +1068,7 @@
         </template>
 
         <!-- API Tab Content -->
-        <template x-if="tab === 'api'">
+        <template x-if="aiUI.pluginDetailTab === 'api'">
           <div
             class="flex-1 min-h-0 bg-white rounded-2xl overflow-hidden shadow-2xl relative border border-white/5 animate-fade-in"
           >
@@ -1331,23 +1382,52 @@
             </div>
             <div>
               <label class="block text-[12px] font-semibold text-white/70 mb-1.5">G4F Provider</label>
-              <input
-                type="text"
-                x-model="aiUI.pluginConfigDraft.G4F_PROVIDER"
-                placeholder="auto"
-                class="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/30 text-[14px] focus:border-accent focus:outline-none"
-              />
-              <p class="text-[11px] text-white/40 mt-1">e.g. auto, Phind, OpenAI</p>
+              <template x-if="aiUI.configProviders.length > 0">
+                <select
+                  x-model="aiUI.pluginConfigDraft.G4F_PROVIDER"
+                  class="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-[14px] focus:border-accent focus:outline-none"
+                >
+                  <option value="auto">auto</option>
+                  <template x-for="p in aiUI.configProviders" :key="p.id">
+                    <option :value="p.id" x-text="p.id"></option>
+                  </template>
+                </select>
+              </template>
+              <template x-if="aiUI.configProviders.length === 0">
+                <div>
+                  <input
+                    type="text"
+                    x-model="aiUI.pluginConfigDraft.G4F_PROVIDER"
+                    placeholder="auto"
+                    class="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/30 text-[14px] focus:border-accent focus:outline-none"
+                  />
+                  <p class="text-[11px] text-white/40 mt-1">Start the plugin to load options from API</p>
+                </div>
+              </template>
             </div>
             <div>
               <label class="block text-[12px] font-semibold text-white/70 mb-1.5">G4F Model</label>
-              <input
-                type="text"
-                x-model="aiUI.pluginConfigDraft.G4F_MODEL"
-                placeholder="gpt-4o-mini"
-                class="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/30 text-[14px] focus:border-accent focus:outline-none"
-              />
-              <p class="text-[11px] text-white/40 mt-1">e.g. gpt-4o-mini, gpt-4o</p>
+              <template x-if="aiUI.configModels.length > 0">
+                <select
+                  x-model="aiUI.pluginConfigDraft.G4F_MODEL"
+                  class="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-[14px] focus:border-accent focus:outline-none"
+                >
+                  <template x-for="m in aiUI.configModels" :key="m.id">
+                    <option :value="m.id" x-text="m.id"></option>
+                  </template>
+                </select>
+              </template>
+              <template x-if="aiUI.configModels.length === 0">
+                <div>
+                  <input
+                    type="text"
+                    x-model="aiUI.pluginConfigDraft.G4F_MODEL"
+                    placeholder="gpt-4o-mini"
+                    class="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/30 text-[14px] focus:border-accent focus:outline-none"
+                  />
+                  <p class="text-[11px] text-white/40 mt-1">Start the plugin to load options from API</p>
+                </div>
+              </template>
             </div>
             <div>
               <label class="block text-[12px] font-semibold text-white/70 mb-1.5">Debug</label>

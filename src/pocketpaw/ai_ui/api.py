@@ -78,6 +78,92 @@ async def get_plugin_config(plugin_id: str):
     return {"config": config}
 
 
+@router.post("/plugins/{plugin_id}/chat")
+async def chat_completion_proxy_endpoint(plugin_id: str, request: Request):
+    """Proxy chat completion request to the plugin's /v1/chat/completions."""
+    from pocketpaw.ai_ui.plugins import chat_completion_proxy as _proxy
+
+    try:
+        body = await request.json()
+        messages = body.get("messages") or []
+        if not messages:
+            raise HTTPException(status_code=400, detail="messages required")
+        result = _proxy(plugin_id, messages)
+        return result
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Plugin '{plugin_id}' not found")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.exception("Chat proxy failed: %s", plugin_id)
+        raise HTTPException(
+            status_code=502,
+            detail=str(e) or "Plugin chat unavailable",
+        )
+
+
+@router.get("/plugins/{plugin_id}/chat-history")
+async def get_chat_history_endpoint(plugin_id: str):
+    """Get persisted chat history for a plugin."""
+    from pocketpaw.ai_ui.plugins import get_chat_history as _get
+
+    try:
+        messages = _get(plugin_id)
+        return {"messages": messages}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.put("/plugins/{plugin_id}/chat-history")
+async def save_chat_history_endpoint(plugin_id: str, request: Request):
+    """Save chat history for a plugin."""
+    from pocketpaw.ai_ui.plugins import save_chat_history as _save
+
+    try:
+        body = await request.json()
+        messages = body.get("messages") or []
+        _save(plugin_id, messages)
+        return {"status": "ok"}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/plugins/{plugin_id}/models")
+async def get_plugin_models_endpoint(plugin_id: str, request: Request):
+    """Fetch /v1/models from a running plugin. Returns { models: [...] }. Empty when plugin not running."""
+    from pocketpaw.ai_ui.plugins import fetch_plugin_models as _fetch
+
+    host = request.query_params.get("host")
+    port_str = request.query_params.get("port")
+    port = int(port_str) if port_str is not None else None
+
+    try:
+        models = _fetch(plugin_id, host=host or None, port=port)
+        return {"models": models}
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Plugin '{plugin_id}' not found")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/plugins/{plugin_id}/providers")
+async def get_plugin_providers_endpoint(plugin_id: str, request: Request):
+    """Fetch /v1/providers from a running plugin. Returns { providers: [...] }. Empty when plugin not running."""
+    from pocketpaw.ai_ui.plugins import fetch_plugin_providers as _fetch
+
+    host = request.query_params.get("host")
+    port_str = request.query_params.get("port")
+    port = int(port_str) if port_str is not None else None
+
+    try:
+        providers = _fetch(plugin_id, host=host or None, port=port)
+        return {"providers": providers}
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Plugin '{plugin_id}' not found")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 @router.post("/plugins/{plugin_id}/test-connection")
 async def test_plugin_connection_endpoint(plugin_id: str, request: Request):
     """Ping the plugin's /health endpoint. Optional body: { host?, port? }."""

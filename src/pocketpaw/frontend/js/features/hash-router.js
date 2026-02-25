@@ -132,6 +132,9 @@ window.PocketPaw.HashRouter = {
           if (parts[1] === "plugin" && parts[2]) {
             route.aiUIView = "plugin-detail";
             route.aiUIPluginId = parts[2];
+            if (["overview", "web", "api"].includes(parts[3])) {
+              route.aiUIPluginTab = parts[3];
+            }
           } else if (
             ["plugins", "discover", "shell", "api-docs"].includes(parts[1])
           ) {
@@ -183,6 +186,10 @@ window.PocketPaw.HashRouter = {
             this.fetchGallery();
           }
           if (route.aiUIPluginId) {
+            this.aiUI.pluginDetailTab =
+              route.aiUIPluginTab && ["overview", "web", "api"].includes(route.aiUIPluginTab)
+                ? route.aiUIPluginTab
+                : "web";
             this._selectAiUIPluginById(route.aiUIPluginId);
           }
         }
@@ -227,9 +234,13 @@ window.PocketPaw.HashRouter = {
       /**
        * Update hash for AI UI sub-navigation. Call from setAiUIView / selectAiUIPlugin.
        */
-      updateAiUIHash(subView, pluginId = null) {
+      updateAiUIHash(subView, pluginId = null, tab = null) {
         if (pluginId) {
-          this.updateHash(`#/ai-ui/plugin/${pluginId}`);
+          const t =
+            tab && ["overview", "web", "api"].includes(tab)
+              ? tab
+              : this.aiUI.pluginDetailTab || "web";
+          this.updateHash(`#/ai-ui/plugin/${pluginId}/${t}`);
         } else {
           const map = {
             home: "#/ai-ui",

@@ -61,11 +61,16 @@ window.PocketPaw.AiUI = {
         gallery: [],
         galleryLoading: false,
 
+        // Plugin detail tab (persisted in URL: overview | web | api)
+        pluginDetailTab: "web",
+
         // Plugin config modal (provider, model, etc.)
         configModalOpen: false,
         configModalPluginId: null,
         pluginConfig: {},
         pluginConfigDraft: {},
+        configModels: [], // from API when plugin running
+        configProviders: [], // from API when plugin running
         savingConfig: false,
         testingConnection: false,
         connectionTestResult: null,
@@ -80,6 +85,16 @@ window.PocketPaw.AiUI = {
       // ==================== Init ====================
 
       async initAiUI() {
+        // Bridge for nested native chat (set early so it exists before async work)
+        const self = this;
+        window._aiUiChatBridge = {
+          getPluginId: () => self.aiUI?.selectedPlugin?.id,
+          getPluginName: () => self.aiUI?.selectedPlugin?.name || 'Plugin',
+          send: (id, msgs) => self.sendAiUIChatMessage(id || self.aiUI?.selectedPlugin?.id, msgs),
+          load: (id) => self.loadAiUIChatHistory(id || self.aiUI?.selectedPlugin?.id),
+          save: (id, msgs) =>
+            self.saveAiUIChatHistory(id || self.aiUI?.selectedPlugin?.id, msgs),
+        };
         if (this.aiUI.requirements.length === 0) {
           await this.fetchRequirements();
         }
@@ -178,6 +193,14 @@ window.PocketPaw.AiUI = {
             p.name.toLowerCase().includes(q) ||
             (p.description || "").toLowerCase().includes(q),
         );
+      },
+
+      setPluginDetailTab(tab) {
+        if (!["overview", "web", "api"].includes(tab)) return;
+        this.aiUI.pluginDetailTab = tab;
+        if (this.updateAiUIHash && this.aiUI.selectedPlugin?.id) {
+          this.updateAiUIHash("plugin-detail", this.aiUI.selectedPlugin.id, tab);
+        }
       },
 
       async selectAiUIPlugin(plugin) {
@@ -495,6 +518,8 @@ window.PocketPaw.AiUI = {
       async openPluginConfigModal(pluginId) {
         this.aiUI.configModalPluginId = pluginId;
         this.aiUI.configModalOpen = true;
+        this.aiUI.configModels = [];
+        this.aiUI.configProviders = [];
         const aiFastApiDefaults = {
           LLM_BACKEND: "g4f",
           G4F_PROVIDER: "auto",
@@ -521,6 +546,40 @@ window.PocketPaw.AiUI = {
           this.aiUI.pluginConfig = {};
           this.aiUI.pluginConfigDraft = { ...aiFastApiDefaults };
         }
+        if (pluginId === "ai-fast-api") {
+          const host = this.aiUI.pluginConfigDraft.HOST || "0.0.0.0";
+          const port = this.aiUI.pluginConfigDraft.PORT || "8000";
+          const params = new URLSearchParams();
+          if (host && host !== "0.0.0.0") params.set("host", host);
+          if (port) params.set("port", String(port));
+          const qs = params.toString() ? "?" + params.toString() : "";
+          try {
+            const [modelsRes, providersRes] = await Promise.all([
+              fetch(`/api/ai-ui/plugins/${pluginId}/models${qs}`),
+              fetch(`/api/ai-ui/plugins/${pluginId}/providers${qs}`),
+            ]);
+            if (modelsRes.ok) {
+              const data = await modelsRes.json();
+              const models = data.models || [];
+              const curModel = this.aiUI.pluginConfigDraft.G4F_MODEL;
+              if (curModel && !models.some((m) => m.id === curModel)) {
+                models.unshift({ id: curModel });
+              }
+              this.aiUI.configModels = models;
+            }
+            if (providersRes.ok) {
+              const data = await providersRes.json();
+              const providers = data.providers || [];
+              const curProvider = this.aiUI.pluginConfigDraft.G4F_PROVIDER;
+              if (curProvider && curProvider !== "auto" && !providers.some((p) => p.id === curProvider)) {
+                providers.unshift({ id: curProvider });
+              }
+              this.aiUI.configProviders = providers;
+            }
+          } catch (_e) {
+            // Plugin may not be running
+          }
+        }
         this.$nextTick(() => {
           if (window.refreshIcons) window.refreshIcons();
         });
@@ -531,6 +590,8 @@ window.PocketPaw.AiUI = {
         this.aiUI.configModalPluginId = null;
         this.aiUI.pluginConfig = {};
         this.aiUI.pluginConfigDraft = {};
+        this.aiUI.configModels = [];
+        this.aiUI.configProviders = [];
         this.aiUI.connectionTestResult = null;
       },
 
@@ -638,6 +699,39 @@ window.PocketPaw.AiUI = {
 
       hasPluginConfig(plugin) {
         return plugin && plugin.id === "ai-fast-api";
+      },
+
+      // ==================== Plugin Chat (AI Fast API) ====================
+
+      async sendAiUIChatMessage(pluginId, messages) {
+        const res = await fetch(`/api/ai-ui/plugins/${pluginId}/chat`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ messages }),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.detail || `HTTP ${res.status}`);
+        }
+        const data = await res.json();
+        const content =
+          data?.choices?.[0]?.message?.content ?? "No response";
+        return { content };
+      },
+
+      async loadAiUIChatHistory(pluginId) {
+        const res = await fetch(`/api/ai-ui/plugins/${pluginId}/chat-history`);
+        if (!res.ok) return [];
+        const data = await res.json();
+        return data.messages || [];
+      },
+
+      async saveAiUIChatHistory(pluginId, messages) {
+        await fetch(`/api/ai-ui/plugins/${pluginId}/chat-history`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ messages }),
+        });
       },
     };
   },
