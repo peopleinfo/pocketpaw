@@ -8,17 +8,21 @@ from ..models import (
     ChatCompletionResponse,
     ErrorResponse,
 )
-from ..services.g4f_service import g4f_service
+from ..services import get_service
 from ..utils.logger import logger
-from ..utils.middleware import create_error_response
 from ..utils.sanitizer import sanitize_input
 
 
 router = APIRouter(prefix="/v1", tags=["Chat Completions"])
 
+IMAGE_MODEL_IDS = frozenset({
+    "flux", "flux-pro", "flux-dev", "flux-schnell",
+    "dall-e-3", "dall-e-2", "gpt-image", "sdxl-turbo",
+    "sd-3.5-large", "midjourney",
+})
+
 
 def _sanitize_request(request: ChatCompletionRequest) -> ChatCompletionRequest:
-    """Sanitize all user message content in the request."""
     for msg in request.messages:
         if msg.role.value in ("user", "system"):
             msg.content = sanitize_input(msg.content)
@@ -37,12 +41,12 @@ def _sanitize_request(request: ChatCompletionRequest) -> ChatCompletionRequest:
 async def create_chat_completion(
     request: ChatCompletionRequest,
 ) -> Union[ChatCompletionResponse, StreamingResponse]:
-    """Create a chat completion using G4F."""
     try:
         if not request.messages:
             raise HTTPException(status_code=400, detail="Messages cannot be empty")
 
         request = _sanitize_request(request)
+        svc = get_service()
 
         logger.info(
             f"Chat completion request: model={request.model}, "
@@ -52,7 +56,7 @@ async def create_chat_completion(
 
         if request.stream:
             return StreamingResponse(
-                g4f_service.create_chat_completion_stream(request),
+                svc.create_chat_completion_stream(request),
                 media_type="text/plain",
                 headers={
                     "Cache-Control": "no-cache",
@@ -61,7 +65,7 @@ async def create_chat_completion(
                 },
             )
         else:
-            response = await g4f_service.create_chat_completion(request)
+            response = await svc.create_chat_completion(request)
             logger.info(f"Chat completion successful: {response.id}")
             return response
 
@@ -84,14 +88,10 @@ async def create_chat_completion(
     description="List available models for chat completions",
 )
 async def list_chat_models():
-    """List available chat models."""
     try:
-        models = await g4f_service.get_models()
-        chat_models = [
-            model
-            for model in models
-            if model.id not in ["flux", "dall-e-3", "dall-e-2", "midjourney"]
-        ]
+        svc = get_service()
+        models = await svc.get_models()
+        chat_models = [m for m in models if m.id not in IMAGE_MODEL_IDS]
         return {"object": "list", "data": chat_models}
     except Exception as e:
         logger.error(f"Error listing chat models: {e}")

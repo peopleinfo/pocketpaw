@@ -1,3 +1,5 @@
+"""G4F (GPT4Free) backend — implements BaseLLMService."""
+
 import inspect
 import json
 import time
@@ -24,11 +26,38 @@ from ..models import (
     ProviderInfo,
 )
 from ..utils.logger import logger
-from ..utils.sanitizer import sanitize_response, sanitize_stream_chunk
+from ..utils.sanitizer import StreamSanitizer, sanitize_response, sanitize_stream_chunk
+from . import BaseLLMService
 
 
-class G4FService:
-    """Service for handling G4F operations via the v7 AsyncClient API."""
+def _force_headless_browser() -> None:
+    """Patch g4f's browser launcher to always run headless.
+
+    g4f calls ``nodriver.start(headless=False)`` by default which opens
+    a visible Chrome window.  We wrap ``get_nodriver`` so that
+    ``headless=True`` is always injected — the browser still works for
+    providers like OpenaiChat/Copilot but stays invisible.
+    """
+    try:
+        import g4f.requests as g4f_req
+
+        _original = g4f_req.get_nodriver
+
+        async def _headless_get_nodriver(*args, **kwargs):
+            kwargs.setdefault("headless", True)
+            return await _original(*args, **kwargs)
+
+        g4f_req.get_nodriver = _headless_get_nodriver
+        logger.info("Patched g4f browser to headless mode")
+    except Exception as e:
+        logger.warning(f"Could not patch g4f for headless: {e}")
+
+
+_force_headless_browser()
+
+
+class G4FService(BaseLLMService):
+    """LLM service backed by the G4F (GPT4Free) library."""
 
     def __init__(self):
         self._models_cache: Optional[List[ModelInfo]] = None
@@ -124,6 +153,7 @@ class G4FService:
             ]
             completion_id = f"chatcmpl-{uuid.uuid4().hex[:29]}"
 
+            # g4f may return a coroutine OR an async generator depending on version
             stream_or_coro = self._client.chat.completions.create(
                 model=request.model,
                 messages=messages,
@@ -131,13 +161,17 @@ class G4FService:
                 web_search=request.web_search,
             )
             stream = (
-                (await stream_or_coro) if inspect.isawaitable(stream_or_coro) else stream_or_coro
+                (await stream_or_coro)
+                if inspect.isawaitable(stream_or_coro)
+                else stream_or_coro
             )
+
+            sanitizer = StreamSanitizer()
 
             async for chunk in stream:
                 if chunk.choices and chunk.choices[0].delta.content:
-                    content = sanitize_stream_chunk(chunk.choices[0].delta.content)
-                    if not content:
+                    safe = sanitizer.feed(chunk.choices[0].delta.content)
+                    if not safe:
                         continue
                     stream_response = ChatCompletionStreamResponse(
                         id=completion_id,
@@ -147,12 +181,30 @@ class G4FService:
                         choices=[
                             ChatCompletionStreamChoice(
                                 index=0,
-                                delta={"role": "assistant", "content": content},
+                                delta={"role": "assistant", "content": safe},
                                 finish_reason=None,
                             )
                         ],
                     )
                     yield f"data: {stream_response.model_dump_json()}\n\n"
+
+            # Flush any remaining buffered text
+            remaining = sanitizer.flush()
+            if remaining:
+                stream_response = ChatCompletionStreamResponse(
+                    id=completion_id,
+                    object="chat.completion.chunk",
+                    created=int(time.time()),
+                    model=request.model,
+                    choices=[
+                        ChatCompletionStreamChoice(
+                            index=0,
+                            delta={"role": "assistant", "content": remaining},
+                            finish_reason=None,
+                        )
+                    ],
+                )
+                yield f"data: {stream_response.model_dump_json()}\n\n"
 
             final_response = ChatCompletionStreamResponse(
                 id=completion_id,
@@ -246,39 +298,122 @@ class G4FService:
             logger.error(f"Error fetching providers: {e}")
             return self._get_default_providers()
 
-    def _get_default_models(self) -> List[ModelInfo]:
+    @staticmethod
+    def _get_default_models() -> List[ModelInfo]:
         now = int(time.time())
         return [
-            ModelInfo(id="gpt-4o", created=now, owned_by="g4f"),
-            ModelInfo(id="gpt-4o-mini", created=now, owned_by="g4f"),
-            ModelInfo(id="gpt-4", created=now, owned_by="g4f"),
-            ModelInfo(id="gpt-3.5-turbo", created=now, owned_by="g4f"),
-            ModelInfo(id="claude-3.5-sonnet", created=now, owned_by="g4f"),
-            ModelInfo(id="gemini-pro", created=now, owned_by="g4f"),
-            ModelInfo(id="llama-3.1-70b", created=now, owned_by="g4f"),
+            ModelInfo(id=name, created=now, owned_by=owner)
+            for name, owner in [
+                # OpenAI
+                ("gpt-4.1", "OpenAI"),
+                ("gpt-4.1-mini", "OpenAI"),
+                ("gpt-4.1-nano", "OpenAI"),
+                ("gpt-4.5", "OpenAI"),
+                ("gpt-4o", "OpenAI"),
+                ("gpt-4o-mini", "OpenAI"),
+                ("o4-mini", "OpenAI"),
+                ("o3-mini", "OpenAI"),
+                # Meta Llama
+                ("llama-4-scout", "Meta"),
+                ("llama-4-maverick", "Meta"),
+                ("llama-3.3-70b", "Meta"),
+                ("llama-3.1-405b", "Meta"),
+                # Google
+                ("gemini-2.5-pro", "Google"),
+                ("gemini-2.5-flash", "Google"),
+                ("gemini-2.0-flash", "Google"),
+                # DeepSeek
+                ("deepseek-r1", "DeepSeek"),
+                ("deepseek-v3", "DeepSeek"),
+                # Qwen
+                ("qwen-3-235b", "Qwen"),
+                ("qwen-3-32b", "Qwen"),
+                ("qwq-32b", "Qwen"),
+                # x.ai
+                ("grok-3", "x.ai"),
+                ("grok-3-r1", "x.ai"),
+                # Mistral
+                ("mistral-small-3.1-24b", "Mistral"),
+                # Cohere
+                ("command-a", "Cohere"),
+                # Image
+                ("flux", "Black Forest Labs"),
+                ("flux-pro", "Black Forest Labs"),
+                ("dall-e-3", "OpenAI"),
+            ]
         ]
 
-    def _get_default_providers(self) -> List[ProviderInfo]:
+    @staticmethod
+    def _get_default_providers() -> List[ProviderInfo]:
         return [
             ProviderInfo(
                 id="Auto",
                 url=None,
-                models=["gpt-4o", "gpt-4o-mini", "gpt-4", "gpt-3.5-turbo"],
-                params={"supports_stream": True},
+                models=["gpt-4o-mini", "gpt-4.1", "llama-4-scout", "deepseek-r1"],
+                params={"supports_stream": True, "no_auth": True},
             ),
             ProviderInfo(
-                id="Bing",
-                url="https://www.bing.com",
-                models=["gpt-4", "gpt-4o"],
-                params={"supports_stream": True},
+                id="PollinationsAI",
+                url="https://pollinations.ai",
+                models=[
+                    "gpt-4.1-nano", "mistral-small-3.1-24b", "deepseek-r1",
+                    "llama-4-scout",
+                ],
+                params={"supports_stream": True, "no_auth": True},
             ),
             ProviderInfo(
-                id="ChatGPT",
-                url="https://chatgpt.com",
-                models=["gpt-4o", "gpt-4o-mini"],
-                params={"supports_stream": True},
+                id="Together",
+                url="https://together.ai",
+                models=[
+                    "llama-4-scout", "llama-4-maverick", "llama-3.3-70b",
+                    "deepseek-r1", "deepseek-v3", "qwen-3-235b", "qwen-3-32b",
+                    "gemma-3-27b",
+                ],
+                params={"supports_stream": True, "no_auth": False},
+            ),
+            ProviderInfo(
+                id="Cloudflare",
+                url="https://cloudflare.com",
+                models=["llama-3.2-1b", "llama-3.1-8b", "llama-4-scout"],
+                params={"supports_stream": True, "no_auth": True},
+            ),
+            ProviderInfo(
+                id="HuggingChat",
+                url="https://huggingface.co/chat",
+                models=[
+                    "llama-3.3-70b", "qwen-2.5-coder-32b", "qwq-32b",
+                    "deepseek-r1", "mistral-nemo",
+                ],
+                params={"supports_stream": True, "no_auth": False},
+            ),
+            ProviderInfo(
+                id="DeepInfra",
+                url="https://deepinfra.com",
+                models=["llama-3.3-70b", "qwen-2.5-72b"],
+                params={"supports_stream": True, "no_auth": True},
+            ),
+            ProviderInfo(
+                id="LambdaChat",
+                url="https://lambda.chat",
+                models=["llama-3.3-70b", "qwen-3-32b"],
+                params={"supports_stream": True, "no_auth": True},
+            ),
+            ProviderInfo(
+                id="Grok",
+                url="https://grok.x.ai",
+                models=["grok-2", "grok-3", "grok-3-r1"],
+                params={"supports_stream": True, "no_auth": False},
+            ),
+            ProviderInfo(
+                id="Gemini",
+                url="https://gemini.google.com",
+                models=["gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.0-flash"],
+                params={"supports_stream": True, "no_auth": False},
+            ),
+            ProviderInfo(
+                id="Perplexity",
+                url="https://perplexity.ai",
+                models=["sonar", "sonar-pro", "sonar-reasoning", "r1-1776"],
+                params={"supports_stream": True, "no_auth": False},
             ),
         ]
-
-
-g4f_service = G4FService()

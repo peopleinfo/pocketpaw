@@ -42,6 +42,7 @@ async def status_check() -> Dict[str, Any]:
                 "debug": settings.debug,
                 "host": settings.host,
                 "port": settings.port,
+                "llm_backend": settings.llm_backend,
                 "rate_limit": {
                     "requests": settings.rate_limit_requests,
                     "window": settings.rate_limit_window,
@@ -78,6 +79,7 @@ async def root() -> Dict[str, Any]:
         "name": settings.api_title,
         "description": settings.api_description,
         "version": __version__,
+        "llm_backend": settings.llm_backend,
         "docs_url": "/docs",
         "openapi_url": "/openapi.json",
         "endpoints": {
@@ -90,12 +92,13 @@ async def root() -> Dict[str, Any]:
         },
         "features": [
             "OpenAI-compatible API",
-            "Multiple AI providers via G4F",
+            "Pluggable LLM backends (G4F, Ollama, etc.)",
             "Streaming responses",
             "Image generation",
             "Web search integration",
             "Rate limiting",
             "Request logging",
+            "Response sanitization",
         ],
         "compatibility": "OpenAI API v1",
     }

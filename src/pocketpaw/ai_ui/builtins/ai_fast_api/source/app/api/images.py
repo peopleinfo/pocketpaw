@@ -6,11 +6,18 @@ from ..models import (
     ErrorResponse,
     ImageGenerationRequest,
     ImageGenerationResponse,
+    ModelInfo,
 )
-from ..services.g4f_service import g4f_service
+from ..services import get_service
 from ..utils.logger import logger
 
 router = APIRouter(prefix="/v1", tags=["Images"])
+
+IMAGE_MODEL_IDS = frozenset({
+    "flux", "flux-pro", "flux-dev", "flux-schnell",
+    "dall-e-3", "dall-e-2", "gpt-image", "sdxl-turbo",
+    "sd-3.5-large", "midjourney",
+})
 
 
 @router.post(
@@ -22,7 +29,6 @@ router = APIRouter(prefix="/v1", tags=["Images"])
 async def create_image_generation(
     request: ImageGenerationRequest,
 ) -> ImageGenerationResponse:
-    """Generate images using G4F."""
     try:
         if not request.prompt or not request.prompt.strip():
             raise HTTPException(status_code=400, detail="Prompt cannot be empty")
@@ -44,7 +50,8 @@ async def create_image_generation(
             f"provider={request.provider}"
         )
 
-        response = await g4f_service.create_image_generation(request)
+        svc = get_service()
+        response = await svc.create_image_generation(request)
         logger.info(f"Image generation successful: {len(response.data)} image(s)")
         return response
 
@@ -67,25 +74,18 @@ async def create_image_generation(
     description="List available models for image generation",
 )
 async def list_image_models():
-    """List available image generation models."""
     try:
-        models = await g4f_service.get_models()
-        image_models = [
-            model
-            for model in models
-            if model.id in ["flux", "dall-e-3", "dall-e-2", "midjourney", "stable-diffusion"]
-        ]
+        svc = get_service()
+        models = await svc.get_models()
+        image_models = [m for m in models if m.id in IMAGE_MODEL_IDS]
 
         if not image_models:
             import time as _time
 
-            from ..models import ModelInfo
-
-            default_names = ["flux", "dall-e-3", "dall-e-2"]
             created = int(_time.time())
             image_models = [
                 ModelInfo(id=name, created=created, owned_by="g4f")
-                for name in default_names
+                for name in ["flux", "flux-pro", "dall-e-3", "gpt-image"]
             ]
 
         return {"object": "list", "data": image_models}

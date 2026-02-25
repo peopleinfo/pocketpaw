@@ -8,7 +8,7 @@ from ..models import (
     ModelsResponse,
     ProvidersResponse,
 )
-from ..services.g4f_service import g4f_service
+from ..services import get_service
 from ..utils.logger import logger
 
 router = APIRouter(prefix="/v1", tags=["Models & Providers"])
@@ -23,7 +23,8 @@ router = APIRouter(prefix="/v1", tags=["Models & Providers"])
 async def list_models() -> ModelsResponse:
     try:
         logger.info("Fetching available models")
-        models = await g4f_service.get_models()
+        svc = get_service()
+        models = await svc.get_models()
         response = ModelsResponse(data=models)
         logger.info(f"Retrieved {len(models)} models")
         return response
@@ -41,7 +42,8 @@ async def list_models() -> ModelsResponse:
 async def retrieve_model(model_id: str) -> ModelInfo:
     try:
         logger.info(f"Fetching model: {model_id}")
-        models = await g4f_service.get_models()
+        svc = get_service()
+        models = await svc.get_models()
         for model in models:
             if model.id == model_id:
                 return model
@@ -59,12 +61,13 @@ async def retrieve_model(model_id: str) -> ModelInfo:
     "/providers",
     response_model=Union[ProvidersResponse, ErrorResponse],
     summary="List providers",
-    description="Lists the currently available G4F providers.",
+    description="Lists the currently available providers.",
 )
 async def list_providers() -> ProvidersResponse:
     try:
         logger.info("Fetching available providers")
-        providers = await g4f_service.get_providers()
+        svc = get_service()
+        providers = await svc.get_providers()
         response = ProvidersResponse(data=providers)
         logger.info(f"Retrieved {len(providers)} providers")
         return response
@@ -76,12 +79,13 @@ async def list_providers() -> ProvidersResponse:
 @router.get(
     "/providers/{provider_id}",
     summary="Retrieve provider",
-    description="Retrieves detailed information about a specific G4F provider.",
+    description="Retrieves detailed information about a specific provider.",
 )
 async def retrieve_provider(provider_id: str) -> dict:
     try:
         logger.info(f"Fetching provider: {provider_id}")
-        providers = await g4f_service.get_providers()
+        svc = get_service()
+        providers = await svc.get_providers()
         for provider in providers:
             if provider.id == provider_id:
                 return {

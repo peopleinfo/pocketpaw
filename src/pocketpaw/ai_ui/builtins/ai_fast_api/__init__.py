@@ -14,12 +14,12 @@ _SOURCE_DIR = Path(__file__).resolve().parent / "source"
 _MANIFEST = {
     "name": "AI Fast API",
     "description": (
-        "OpenAI-compatible API server powered by GPT4Free (G4F). "
-        "Chat completions, image generation, multiple AI providers — "
+        "OpenAI-compatible API with pluggable LLM backends (G4F, Ollama, etc.). "
+        "Chat completions, image generation, streaming — "
         "all through a unified local endpoint."
     ),
     "icon": "zap",
-    "version": "1.0.0",
+    "version": "2.0.0",
     "start": "bash start.sh",
     "install": "bash install.sh",
     "requires": ["uv", "python"],
@@ -43,8 +43,8 @@ DEFINITION: BuiltinDefinition = {
         "id": "ai-fast-api",
         "name": "AI Fast API",
         "description": (
-            "OpenAI-compatible API server powered by GPT4Free. "
-            "Chat, images, multiple providers — zero API keys needed."
+            "OpenAI-compatible API with pluggable backends (G4F default). "
+            "Chat, images, streaming — zero API keys needed."
         ),
         "icon": "zap",
         "source": "builtin:ai-fast-api",

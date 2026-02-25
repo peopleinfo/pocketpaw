@@ -1,16 +1,35 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import uvicorn
 
 from .config import settings
+from .services import get_service
 from .utils.logger import logger
-from .utils.middleware import (
-    ErrorHandlingMiddleware,
-    LoggingMiddleware,
-)
+from .utils.middleware import ErrorHandlingMiddleware, LoggingMiddleware
 from .api import chat, images, models, health
 from . import __version__
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    logger.info(f"Starting {settings.api_title} v{__version__}")
+    logger.info(f"LLM backend: {settings.llm_backend}")
+    try:
+        svc = get_service()
+        await svc.initialize()
+        logger.info("LLM service initialized successfully")
+    except Exception as e:
+        logger.error(f"Failed to initialize LLM service: {e}")
+    yield
+    logger.info(f"Shutting down {settings.api_title}")
+    try:
+        svc = get_service()
+        await svc.cleanup()
+    except Exception as e:
+        logger.error(f"Error during service cleanup: {e}")
 
 
 app = FastAPI(
@@ -20,6 +39,7 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_url="/openapi.json",
+    lifespan=lifespan,
 )
 
 if settings.cors_enabled:
@@ -54,28 +74,6 @@ async def global_exception_handler(request: Request, exc: Exception):
             }
         },
     )
-
-
-@app.on_event("startup")
-async def startup_event():
-    logger.info(f"Starting {settings.api_title} v{__version__}")
-    logger.info(f"G4F provider: {settings.g4f_provider}")
-    try:
-        from .services.g4f_service import g4f_service
-        await g4f_service.initialize()
-        logger.info("G4F service initialized successfully")
-    except Exception as e:
-        logger.error(f"Failed to initialize G4F service: {e}")
-
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    logger.info(f"Shutting down {settings.api_title}")
-    try:
-        from .services.g4f_service import g4f_service
-        await g4f_service.cleanup()
-    except Exception as e:
-        logger.error(f"Error during G4F service cleanup: {e}")
 
 
 def create_app() -> FastAPI:
