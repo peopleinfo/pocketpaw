@@ -447,6 +447,103 @@ class ClaudeSDKBackend:
             logger.error("Fast-path API error: %s", e)
             yield AgentEvent(type="error", content=llm.format_api_error(e))
 
+    async def _openai_compatible_chat(
+        self,
+        message: str,
+        *,
+        system_prompt: str,
+        history: list[dict] | None = None,
+        model: str,
+        max_tokens: int = 0,
+    ) -> AsyncIterator[AgentEvent]:
+        """Direct OpenAI-compatible API path.
+
+        Bypasses the Claude CLI subprocess entirely because the CLI only
+        speaks the Anthropic Messages protocol and cannot communicate
+        with OpenAI-compatible endpoints.  Uses the OpenAI Python SDK
+        for streaming chat completions.
+        """
+        from pocketpaw.llm.client import resolve_llm_client
+
+        provider = self.settings.claude_sdk_provider or "openai_compatible"
+        llm = resolve_llm_client(self.settings, force_provider=provider)
+
+        try:
+            import time
+
+            t0 = time.monotonic()
+            client = llm.create_openai_client()
+            t1 = time.monotonic()
+            logger.info("OpenAI-compat path: client created in %.0fms", (t1 - t0) * 1000)
+
+            messages: list[dict[str, str]] = []
+            if system_prompt:
+                messages.append({"role": "system", "content": system_prompt})
+            if history:
+                for msg in history:
+                    role = msg.get("role", "user")
+                    content = msg.get("content", "")
+                    if role in ("user", "assistant", "system") and content:
+                        messages.append({"role": role, "content": content})
+            messages.append({"role": "user", "content": message})
+
+            logger.info(
+                "OpenAI-compat path: calling %s at %s (msgs=%d)",
+                model,
+                llm.openai_compatible_base_url,
+                len(messages),
+            )
+
+            create_kwargs: dict[str, Any] = {
+                "model": model,
+                "messages": messages,
+            }
+            if max_tokens > 0:
+                create_kwargs["max_tokens"] = max_tokens
+
+            # Try streaming first; some OpenAI-compatible servers don't
+            # support SSE streaming properly, so fall back to non-streaming.
+            streamed = False
+            try:
+                t2 = time.monotonic()
+                stream = await client.chat.completions.create(stream=True, **create_kwargs)
+                first_token = True
+                async for chunk in stream:
+                    delta = chunk.choices[0].delta if chunk.choices else None
+                    if delta and delta.content:
+                        if first_token:
+                            t3 = time.monotonic()
+                            logger.info(
+                                "OpenAI-compat path: first token in %.0fms",
+                                (t3 - t2) * 1000,
+                            )
+                            first_token = False
+                        if self._stop_flag:
+                            logger.info("OpenAI-compat path: stop flag set, breaking stream")
+                            break
+                        yield AgentEvent(type="message", content=delta.content)
+                streamed = True
+            except Exception as stream_err:
+                logger.warning(
+                    "OpenAI-compat streaming failed, falling back to non-streaming: %s",
+                    stream_err,
+                )
+
+            if not streamed:
+                t2 = time.monotonic()
+                response = await client.chat.completions.create(stream=False, **create_kwargs)
+                t3 = time.monotonic()
+                logger.info("OpenAI-compat path: non-stream response in %.0fms", (t3 - t2) * 1000)
+                content = response.choices[0].message.content if response.choices else ""
+                if content and not self._stop_flag:
+                    yield AgentEvent(type="message", content=content)
+
+            yield AgentEvent(type="done", content="")
+
+        except Exception as e:
+            logger.error("OpenAI-compat path error: %s", e)
+            yield AgentEvent(type="error", content=llm.format_api_error(e))
+
     async def _get_or_create_client(self, options: Any) -> Any:
         """Get or create a persistent ClaudeSDKClient.
 
@@ -504,6 +601,33 @@ class ClaudeSDKBackend:
 
         Yields AgentEvent objects as the agent responds.
         """
+        import os
+
+        self._stop_flag = False
+
+        # Resolve LLM provider early — needed for routing + env.
+        from pocketpaw.llm.client import resolve_llm_client
+
+        provider = self.settings.claude_sdk_provider or "anthropic"
+        llm = resolve_llm_client(self.settings, force_provider=provider)
+
+        # ── OpenAI-compatible / Gemini: bypass CLI entirely ──────────
+        # The Claude Code CLI only speaks the Anthropic Messages protocol
+        # and cannot communicate with OpenAI-compatible endpoints.
+        # Route these providers through a direct OpenAI SDK path.
+        if llm.is_openai_compatible or llm.is_gemini:
+            identity = system_prompt or _DEFAULT_IDENTITY
+            max_tokens = self.settings.openai_compatible_max_tokens
+            async for event in self._openai_compatible_chat(
+                message,
+                system_prompt=identity,
+                history=history,
+                model=llm.model,
+                max_tokens=max_tokens,
+            ):
+                yield event
+            return
+
         if not self._sdk_available:
             yield AgentEvent(
                 type="error",
@@ -528,25 +652,11 @@ class ClaudeSDKBackend:
             )
             return
 
-        import os
-
-        self._stop_flag = False
-
         try:
-            # Resolve LLM provider early — needed for routing + env.
-            # Use per-backend provider setting (defaults to "anthropic").
-            # An API key is REQUIRED for Anthropic provider — OAuth tokens from
-            # Claude Free/Pro/Max plans are not permitted for third-party use.
-            # See: https://code.claude.com/docs/en/legal-and-compliance
-            from pocketpaw.llm.client import resolve_llm_client
-
-            provider = self.settings.claude_sdk_provider or "anthropic"
-            llm = resolve_llm_client(self.settings, force_provider=provider)
-
             # ── API key enforcement for Anthropic provider ──────────────
             # Anthropic's policy prohibits using OAuth tokens from Free/Pro/Max
             # plans in third-party products. PocketPaw must use API key auth.
-            if not (llm.is_ollama or llm.is_openai_compatible or llm.is_gemini):
+            if not llm.is_ollama:
                 has_api_key = bool(
                     llm.api_key or os.environ.get("ANTHROPIC_API_KEY")
                 )
@@ -575,12 +685,7 @@ class ClaudeSDKBackend:
             # the fast-path (direct API) for simple queries.
             is_simple = False
             selection = None
-            if (
-                self.settings.smart_routing_enabled
-                and not llm.is_ollama
-                and not llm.is_openai_compatible
-                and not llm.is_gemini
-            ):
+            if self.settings.smart_routing_enabled and not llm.is_ollama:
                 from pocketpaw.agents.model_router import ModelRouter, TaskComplexity
 
                 model_router = ModelRouter(self.settings)

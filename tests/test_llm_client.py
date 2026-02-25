@@ -6,7 +6,7 @@ from unittest.mock import patch
 import pytest
 
 from pocketpaw.config import Settings
-from pocketpaw.llm.client import LLMClient, resolve_llm_client
+from pocketpaw.llm.client import LLMClient, _normalize_openai_base_url, resolve_llm_client
 
 # ---------------------------------------------------------------------------
 # resolve_llm_client
@@ -268,3 +268,63 @@ class TestFrozen:
         )
         with pytest.raises(dataclasses.FrozenInstanceError):
             llm.provider = "ollama"  # type: ignore[misc]
+
+
+# ---------------------------------------------------------------------------
+# _normalize_openai_base_url
+# ---------------------------------------------------------------------------
+
+
+class TestNormalizeOpenAIBaseURL:
+    def test_strips_chat_completions(self):
+        url = "http://localhost:8000/v1/chat/completions"
+        assert _normalize_openai_base_url(url) == "http://localhost:8000/v1"
+
+    def test_strips_completions(self):
+        url = "http://localhost:8000/v1/completions"
+        assert _normalize_openai_base_url(url) == "http://localhost:8000/v1"
+
+    def test_strips_embeddings(self):
+        url = "http://localhost:8000/v1/embeddings"
+        assert _normalize_openai_base_url(url) == "http://localhost:8000/v1"
+
+    def test_strips_trailing_slash(self):
+        url = "http://localhost:8000/v1/chat/completions/"
+        assert _normalize_openai_base_url(url) == "http://localhost:8000/v1"
+
+    def test_no_op_for_clean_url(self):
+        url = "http://localhost:8000/v1"
+        assert _normalize_openai_base_url(url) == "http://localhost:8000/v1"
+
+    def test_no_op_for_base_only(self):
+        url = "http://localhost:8000"
+        assert _normalize_openai_base_url(url) == "http://localhost:8000"
+
+    def test_preserves_port_and_path(self):
+        url = "https://api.example.com:9090/proxy/v1/chat/completions"
+        assert _normalize_openai_base_url(url) == "https://api.example.com:9090/proxy/v1"
+
+    def test_empty_string(self):
+        assert _normalize_openai_base_url("") == ""
+
+
+class TestResolveOpenAICompatibleNormalization:
+    """Verify resolve_llm_client applies URL normalization."""
+
+    def test_full_endpoint_url_normalized(self):
+        settings = Settings(
+            llm_provider="openai_compatible",
+            openai_compatible_base_url="http://localhost:8000/v1/chat/completions",
+            openai_compatible_model="gpt-4o-mini",
+        )
+        llm = resolve_llm_client(settings)
+        assert llm.openai_compatible_base_url == "http://localhost:8000/v1"
+
+    def test_clean_url_unchanged(self):
+        settings = Settings(
+            llm_provider="openai_compatible",
+            openai_compatible_base_url="http://localhost:8000/v1",
+            openai_compatible_model="gpt-4o-mini",
+        )
+        llm = resolve_llm_client(settings)
+        assert llm.openai_compatible_base_url == "http://localhost:8000/v1"

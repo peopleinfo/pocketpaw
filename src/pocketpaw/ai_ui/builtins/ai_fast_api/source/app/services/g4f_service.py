@@ -1,3 +1,4 @@
+import inspect
 import json
 import time
 import uuid
@@ -23,6 +24,7 @@ from ..models import (
     ProviderInfo,
 )
 from ..utils.logger import logger
+from ..utils.sanitizer import sanitize_response, sanitize_stream_chunk
 
 
 class G4FService:
@@ -84,7 +86,8 @@ class G4FService:
             )
 
             completion_id = f"chatcmpl-{uuid.uuid4().hex[:29]}"
-            content = response.choices[0].message.content if response.choices else ""
+            raw_content = response.choices[0].message.content if response.choices else ""
+            content = sanitize_response(raw_content)
 
             return ChatCompletionResponse(
                 id=completion_id,
@@ -121,16 +124,21 @@ class G4FService:
             ]
             completion_id = f"chatcmpl-{uuid.uuid4().hex[:29]}"
 
-            stream = await self._client.chat.completions.create(
+            stream_or_coro = self._client.chat.completions.create(
                 model=request.model,
                 messages=messages,
                 stream=True,
                 web_search=request.web_search,
             )
+            stream = (
+                (await stream_or_coro) if inspect.isawaitable(stream_or_coro) else stream_or_coro
+            )
 
             async for chunk in stream:
                 if chunk.choices and chunk.choices[0].delta.content:
-                    content = chunk.choices[0].delta.content
+                    content = sanitize_stream_chunk(chunk.choices[0].delta.content)
+                    if not content:
+                        continue
                     stream_response = ChatCompletionStreamResponse(
                         id=completion_id,
                         object="chat.completion.chunk",

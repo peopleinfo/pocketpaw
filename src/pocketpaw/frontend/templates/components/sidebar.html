@@ -548,6 +548,12 @@
         </button>
         <button
           class="flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-white/60 hover:text-white hover:bg-white/5 transition-colors"
+          @click="navigateToView('ai-ui'); sidebarOpen = false"
+        >
+          <i data-lucide="rocket" class="w-3.5 h-3.5"></i> AI UI
+        </button>
+        <button
+          class="flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-white/60 hover:text-white hover:bg-white/5 transition-colors"
           @click="openMCP(); sidebarOpen = false"
         >
           <i data-lucide="plug" class="w-3.5 h-3.5"></i> MCP

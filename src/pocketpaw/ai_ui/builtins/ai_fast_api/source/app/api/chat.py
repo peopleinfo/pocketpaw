@@ -11,9 +11,18 @@ from ..models import (
 from ..services.g4f_service import g4f_service
 from ..utils.logger import logger
 from ..utils.middleware import create_error_response
+from ..utils.sanitizer import sanitize_input
 
 
 router = APIRouter(prefix="/v1", tags=["Chat Completions"])
+
+
+def _sanitize_request(request: ChatCompletionRequest) -> ChatCompletionRequest:
+    """Sanitize all user message content in the request."""
+    for msg in request.messages:
+        if msg.role.value in ("user", "system"):
+            msg.content = sanitize_input(msg.content)
+    return request
 
 
 @router.post(
@@ -32,6 +41,8 @@ async def create_chat_completion(
     try:
         if not request.messages:
             raise HTTPException(status_code=400, detail="Messages cannot be empty")
+
+        request = _sanitize_request(request)
 
         logger.info(
             f"Chat completion request: model={request.model}, "

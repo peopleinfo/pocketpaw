@@ -220,6 +220,22 @@ class LLMClient:
         return f"❌ API Error: {error_str}"
 
 
+def _normalize_openai_base_url(url: str) -> str:
+    """Normalize an OpenAI-compatible base URL.
+
+    Users often paste the full endpoint path (e.g.
+    ``http://localhost:8000/v1/chat/completions``).  The OpenAI SDK
+    expects just the versioned prefix (``http://localhost:8000/v1``),
+    so we strip the ``/chat/completions`` suffix if present.
+    """
+    url = url.rstrip("/")
+    for suffix in ("/chat/completions", "/completions", "/embeddings"):
+        if url.endswith(suffix):
+            url = url[: -len(suffix)]
+            break
+    return url
+
+
 def resolve_llm_client(
     settings: Settings,
     *,
@@ -271,7 +287,9 @@ def resolve_llm_client(
             model=settings.openai_compatible_model,
             api_key=settings.openai_compatible_api_key,
             ollama_host=settings.ollama_host,
-            openai_compatible_base_url=settings.openai_compatible_base_url,
+            openai_compatible_base_url=_normalize_openai_base_url(
+                settings.openai_compatible_base_url
+            ),
         )
 
     if provider == "gemini":

@@ -2,6 +2,7 @@
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from pocketpaw.agents.protocol import AgentEvent
 from pocketpaw.llm.client import resolve_llm_client
 
 # ---------------------------------------------------------------------------
@@ -288,6 +289,305 @@ class TestClaudeSDKOpenAICompatibleLogic:
 # ---------------------------------------------------------------------------
 # check_openai_compatible CLI
 # ---------------------------------------------------------------------------
+
+
+# ---------------------------------------------------------------------------
+# Claude SDK backend — OpenAI-compatible routing & streaming
+# ---------------------------------------------------------------------------
+
+
+def _make_openai_settings(**overrides):
+    """Create a Settings-like mock configured for openai_compatible."""
+    defaults = {
+        "agent_backend": "claude_agent_sdk",
+        "claude_sdk_provider": "openai_compatible",
+        "claude_sdk_model": "",
+        "claude_sdk_max_turns": 100,
+        "tool_profile": "full",
+        "tools_allow": [],
+        "tools_deny": [],
+        "smart_routing_enabled": False,
+        "llm_provider": "openai_compatible",
+        "openai_compatible_base_url": "http://localhost:8000/v1",
+        "openai_compatible_api_key": "test-key",
+        "openai_compatible_model": "gpt-4o-mini",
+        "openai_compatible_max_tokens": 0,
+        "anthropic_api_key": "",
+        "anthropic_model": "claude-sonnet-4-6",
+        "openai_api_key": "",
+        "openai_model": "",
+        "ollama_model": "",
+        "ollama_host": "http://localhost:11434",
+        "bypass_permissions": False,
+        "file_jail_path": "/tmp",
+    }
+    defaults.update(overrides)
+    mock = MagicMock()
+    for k, v in defaults.items():
+        setattr(mock, k, v)
+    return mock
+
+
+def _make_claude_sdk(settings=None):
+    """Create a ClaudeSDKBackend with mocked SDK imports."""
+    from pocketpaw.agents.claude_sdk import ClaudeSDKBackend
+
+    s = settings or _make_openai_settings()
+    with patch("pocketpaw.agents.claude_sdk.ClaudeSDKBackend._initialize"):
+        sdk = ClaudeSDKBackend(s)
+    sdk._sdk_available = True
+    sdk._cli_available = True
+    return sdk
+
+
+class _FakeChunk:
+    """Simulates an OpenAI streaming chunk."""
+
+    def __init__(self, text):
+        choice = MagicMock()
+        choice.delta.content = text
+        self.choices = [choice]
+
+
+class _FakeAsyncStream:
+    """Async iterator that yields chunks."""
+
+    def __init__(self, chunks):
+        self._chunks = list(chunks)
+
+    def __aiter__(self):
+        return self
+
+    async def __anext__(self):
+        if not self._chunks:
+            raise StopAsyncIteration
+        return self._chunks.pop(0)
+
+
+class TestClaudeSDKOpenAICompatibleRouting:
+    """Verify openai_compatible provider bypasses CLI and uses OpenAI SDK."""
+
+    async def test_routes_through_openai_path(self):
+        """openai_compatible provider should NOT touch the Claude CLI."""
+        sdk = _make_claude_sdk()
+        chunks = [_FakeChunk("Hello"), _FakeChunk(" world")]
+        mock_client = MagicMock()
+        mock_client.chat.completions.create = AsyncMock(
+            return_value=_FakeAsyncStream(chunks)
+        )
+
+        fake_llm = MagicMock()
+        fake_llm.is_openai_compatible = True
+        fake_llm.is_ollama = False
+        fake_llm.is_gemini = False
+        fake_llm.model = "gpt-4o-mini"
+        fake_llm.create_openai_client.return_value = mock_client
+
+        with patch("pocketpaw.llm.client.resolve_llm_client", return_value=fake_llm):
+            events = []
+            async for ev in sdk.run("ping", system_prompt="You are helpful."):
+                events.append(ev)
+
+        types = [e.type for e in events]
+        assert "message" in types
+        assert "done" in types
+        texts = "".join(e.content for e in events if e.type == "message")
+        assert texts == "Hello world"
+
+    async def test_streams_all_chunks(self):
+        """All streamed chunks arrive as message events."""
+        sdk = _make_claude_sdk()
+        chunk_texts = ["A", "B", "C", "D"]
+        chunks = [_FakeChunk(t) for t in chunk_texts]
+        mock_client = MagicMock()
+        mock_client.chat.completions.create = AsyncMock(
+            return_value=_FakeAsyncStream(chunks)
+        )
+
+        fake_llm = MagicMock()
+        fake_llm.is_openai_compatible = True
+        fake_llm.is_ollama = False
+        fake_llm.is_gemini = False
+        fake_llm.model = "gpt-4o-mini"
+        fake_llm.create_openai_client.return_value = mock_client
+
+        with patch("pocketpaw.llm.client.resolve_llm_client", return_value=fake_llm):
+            events = []
+            async for ev in sdk.run("hello"):
+                events.append(ev)
+
+        msg_events = [e for e in events if e.type == "message"]
+        assert len(msg_events) == 4
+        assert [e.content for e in msg_events] == chunk_texts
+
+    async def test_stop_flag_breaks_stream(self):
+        """Setting stop flag mid-stream stops yielding."""
+        sdk = _make_claude_sdk()
+        chunks = [_FakeChunk("A"), _FakeChunk("B"), _FakeChunk("C")]
+        mock_client = MagicMock()
+        mock_client.chat.completions.create = AsyncMock(
+            return_value=_FakeAsyncStream(chunks)
+        )
+
+        fake_llm = MagicMock()
+        fake_llm.is_openai_compatible = True
+        fake_llm.is_ollama = False
+        fake_llm.is_gemini = False
+        fake_llm.model = "gpt-4o-mini"
+        fake_llm.create_openai_client.return_value = mock_client
+
+        with patch("pocketpaw.llm.client.resolve_llm_client", return_value=fake_llm):
+            events = []
+            async for ev in sdk.run("hello"):
+                events.append(ev)
+                if ev.type == "message" and ev.content == "A":
+                    sdk._stop_flag = True
+
+        msg_events = [e for e in events if e.type == "message"]
+        assert len(msg_events) == 1
+        assert msg_events[0].content == "A"
+
+    async def test_error_yields_error_event(self):
+        """API errors produce an error event, not a crash."""
+        sdk = _make_claude_sdk()
+        mock_client = MagicMock()
+        mock_client.chat.completions.create = AsyncMock(
+            side_effect=ConnectionError("Connection refused")
+        )
+
+        fake_llm = MagicMock()
+        fake_llm.is_openai_compatible = True
+        fake_llm.is_ollama = False
+        fake_llm.is_gemini = False
+        fake_llm.model = "gpt-4o-mini"
+        fake_llm.create_openai_client.return_value = mock_client
+        fake_llm.format_api_error.return_value = "❌ Connection refused"
+
+        with patch("pocketpaw.llm.client.resolve_llm_client", return_value=fake_llm):
+            events = []
+            async for ev in sdk.run("hello"):
+                events.append(ev)
+
+        error_events = [e for e in events if e.type == "error"]
+        assert len(error_events) == 1
+        assert "Connection refused" in error_events[0].content
+
+    async def test_history_passed_to_api(self):
+        """Conversation history is included in the messages list."""
+        sdk = _make_claude_sdk()
+        chunks = [_FakeChunk("reply")]
+        mock_client = MagicMock()
+        mock_client.chat.completions.create = AsyncMock(
+            return_value=_FakeAsyncStream(chunks)
+        )
+
+        fake_llm = MagicMock()
+        fake_llm.is_openai_compatible = True
+        fake_llm.is_ollama = False
+        fake_llm.is_gemini = False
+        fake_llm.model = "gpt-4o-mini"
+        fake_llm.create_openai_client.return_value = mock_client
+
+        history = [
+            {"role": "user", "content": "hi"},
+            {"role": "assistant", "content": "hello"},
+        ]
+
+        with patch("pocketpaw.llm.client.resolve_llm_client", return_value=fake_llm):
+            events = []
+            async for ev in sdk.run("ping", history=history):
+                events.append(ev)
+
+        call_kwargs = mock_client.chat.completions.create.call_args
+        messages = call_kwargs.kwargs.get("messages") or call_kwargs[1].get("messages")
+        roles = [m["role"] for m in messages]
+        assert roles == ["system", "user", "assistant", "user"]
+
+    async def test_max_tokens_forwarded(self):
+        """max_tokens from settings is forwarded to the API call."""
+        settings = _make_openai_settings(openai_compatible_max_tokens=512)
+        sdk = _make_claude_sdk(settings)
+        chunks = [_FakeChunk("ok")]
+        mock_client = MagicMock()
+        mock_client.chat.completions.create = AsyncMock(
+            return_value=_FakeAsyncStream(chunks)
+        )
+
+        fake_llm = MagicMock()
+        fake_llm.is_openai_compatible = True
+        fake_llm.is_ollama = False
+        fake_llm.is_gemini = False
+        fake_llm.model = "gpt-4o-mini"
+        fake_llm.create_openai_client.return_value = mock_client
+
+        with patch("pocketpaw.llm.client.resolve_llm_client", return_value=fake_llm):
+            events = []
+            async for ev in sdk.run("hi"):
+                events.append(ev)
+
+        call_kwargs = mock_client.chat.completions.create.call_args
+        assert call_kwargs.kwargs.get("max_tokens") == 512
+
+    async def test_no_max_tokens_when_zero(self):
+        """max_tokens=0 means don't send max_tokens to the API."""
+        settings = _make_openai_settings(openai_compatible_max_tokens=0)
+        sdk = _make_claude_sdk(settings)
+        chunks = [_FakeChunk("ok")]
+        mock_client = MagicMock()
+        mock_client.chat.completions.create = AsyncMock(
+            return_value=_FakeAsyncStream(chunks)
+        )
+
+        fake_llm = MagicMock()
+        fake_llm.is_openai_compatible = True
+        fake_llm.is_ollama = False
+        fake_llm.is_gemini = False
+        fake_llm.model = "gpt-4o-mini"
+        fake_llm.create_openai_client.return_value = mock_client
+
+        with patch("pocketpaw.llm.client.resolve_llm_client", return_value=fake_llm):
+            events = []
+            async for ev in sdk.run("hi"):
+                events.append(ev)
+
+        call_kwargs = mock_client.chat.completions.create.call_args
+        assert "max_tokens" not in call_kwargs.kwargs
+
+    async def test_fallback_to_non_streaming(self):
+        """When streaming fails, falls back to non-streaming."""
+        sdk = _make_claude_sdk()
+
+        mock_response = MagicMock()
+        mock_choice = MagicMock()
+        mock_choice.message.content = "non-stream reply"
+        mock_response.choices = [mock_choice]
+
+        async def _side_effect(**kwargs):
+            if kwargs.get("stream"):
+                raise RuntimeError("streaming not supported")
+            return mock_response
+
+        mock_client = MagicMock()
+        mock_client.chat.completions.create = AsyncMock(side_effect=_side_effect)
+
+        fake_llm = MagicMock()
+        fake_llm.is_openai_compatible = True
+        fake_llm.is_ollama = False
+        fake_llm.is_gemini = False
+        fake_llm.model = "gpt-4o-mini"
+        fake_llm.openai_compatible_base_url = "http://localhost:8000/v1"
+        fake_llm.create_openai_client.return_value = mock_client
+
+        with patch("pocketpaw.llm.client.resolve_llm_client", return_value=fake_llm):
+            events = []
+            async for ev in sdk.run("hi"):
+                events.append(ev)
+
+        types = [e.type for e in events]
+        assert "message" in types
+        assert "done" in types
+        texts = "".join(e.content for e in events if e.type == "message")
+        assert texts == "non-stream reply"
 
 
 class TestCheckOpenAICompatible:
