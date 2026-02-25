@@ -24,6 +24,8 @@ _MANIFEST = {
     "install": "bash install.sh",
     "requires": ["uv", "python"],
     "port": 8000,
+    "web_view": "native",
+    "web_view_path": "/",
     "env": {
         "HOST": "0.0.0.0",
         "PORT": "8000",

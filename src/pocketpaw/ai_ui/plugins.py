@@ -27,8 +27,13 @@ pocketpaw.json manifest:
   "stop": "stop.sh",
   "port": 7860,
   "env": {},
-  "requires": ["python", "git"]
+  "requires": ["python", "git"],
+  "web_view": "iframe",
+  "web_view_path": "/"
 }
+
+web_view: "native" = integrated Copilot-style chat UI; "iframe" = embed plugin URL.
+web_view_path: path for iframe (default "/"); e.g. "/chat" for a /chat page.
 """
 
 import asyncio
@@ -38,6 +43,7 @@ import os
 import platform
 import shutil
 import signal
+import socket
 from pathlib import Path
 from typing import Any
 
@@ -107,7 +113,6 @@ def _sandbox_env(plugin_dir: Path, manifest: dict) -> dict[str, str]:
         "HOME": plugin_str,
         "USER": "pocketpaw",
         "SHELL": "/bin/bash",
-
         # Temp / cache — stays in plugin folder
         "TMPDIR": str(tmp_dir),
         "TEMP": str(tmp_dir),
@@ -115,26 +120,21 @@ def _sandbox_env(plugin_dir: Path, manifest: dict) -> dict[str, str]:
         "XDG_CACHE_HOME": str(cache_dir),
         "XDG_CONFIG_HOME": plugin_str,
         "XDG_DATA_HOME": plugin_str,
-
         # PATH — plugin venv + minimal system
         "PATH": os.pathsep.join(path_parts),
-
         # Python — each plugin gets its own .venv for full isolation
         "VIRTUAL_ENV": str(venv_dir),
         "PYTHONDONTWRITEBYTECODE": "1",
         "PYTHONUNBUFFERED": "1",
         "PYTHONUSERBASE": plugin_str,
-
         # uv — shared cache across all plugins so identical packages
         # are stored once on disk and hardlinked into each venv.
         # APFS/btrfs get copy-on-write clones; other FS get hardlinks.
         "UV_CACHE_DIR": str(_SHARED_UV_CACHE),
         "UV_LINK_MODE": "hardlink",
-
         # pip — install into the venv, not arbitrary dirs
         "PIP_PREFIX": str(venv_dir),
         "PIP_DISABLE_PIP_VERSION_CHECK": "1",
-
         # Locale
         "LANG": "en_US.UTF-8",
         "LC_ALL": "en_US.UTF-8",
@@ -198,6 +198,31 @@ def _read_manifest(plugin_dir: Path) -> dict | None:
         return None
 
 
+def _get_effective_manifest(plugin_id: str, manifest: dict) -> dict:
+    """Merge builtin manifest over disk manifest for web_view fields.
+
+    Builtins may have newer manifest fields (e.g. web_view) in code than
+    on disk. This ensures builtins always get the latest web_view config
+    without requiring re-install.
+    """
+    try:
+        from pocketpaw.ai_ui.builtins import get_registry
+
+        registry = get_registry()
+        builtin_def = registry.get(plugin_id)
+        if builtin_def and "manifest" in builtin_def:
+            bm = builtin_def["manifest"]
+            merged = dict(manifest)
+            if "web_view" in bm:
+                merged["web_view"] = bm["web_view"]
+            if "web_view_path" in bm:
+                merged["web_view_path"] = bm["web_view_path"]
+            return merged
+    except Exception:
+        pass
+    return manifest
+
+
 # ─── PID persistence ────────────────────────────────────────────────────
 
 
@@ -231,8 +256,23 @@ def _is_pid_alive(pid: int) -> bool:
         return False
 
 
+def _is_port_listening(port: int) -> bool:
+    """Check if something is listening on localhost:port (e.g. after uvicorn reload)."""
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.settimeout(0.5)
+            s.connect(("127.0.0.1", port))
+            return True
+    except (OSError, TypeError, ValueError):
+        return False
+
+
 def _is_plugin_running(plugin_id: str, plugin_dir: Path) -> bool:
-    """Check running state: in-memory process first, then PID file fallback."""
+    """Check running state: in-memory process, PID file, then port fallback.
+
+    Port fallback handles uvicorn --reload: the tracked PID exits when uvicorn
+    restarts, but a new process listens on the same port.
+    """
     proc = _running_processes.get(plugin_id)
     if proc is not None and proc.returncode is None:
         return True
@@ -243,6 +283,18 @@ def _is_plugin_running(plugin_id: str, plugin_dir: Path) -> bool:
 
     if pid is not None:
         _clear_pid(plugin_dir)
+
+    # Fallback: PID dead but port may be in use (e.g. uvicorn reload respawned)
+    manifest = _read_manifest(plugin_dir)
+    if manifest:
+        port = manifest.get("port")
+        try:
+            p = int(port) if port is not None else 0
+            if p > 0 and _is_port_listening(p):
+                return True
+        except (TypeError, ValueError):
+            pass
+
     return False
 
 
@@ -274,32 +326,33 @@ def list_plugins() -> list[dict[str, Any]]:
             continue
 
         plugin_id = item.name
+        manifest = _get_effective_manifest(plugin_id, manifest)
         running = _is_plugin_running(plugin_id, item)
 
         openapi_file = manifest.get("openapi")
-        has_openapi = (
-            (running and manifest.get("port"))
-            or (openapi_file and (item / openapi_file).exists())
+        has_openapi = (running and manifest.get("port")) or (
+            openapi_file and (item / openapi_file).exists()
         )
 
-        plugins.append({
-            "id": plugin_id,
-            "name": manifest.get("name", plugin_id),
-            "description": manifest.get("description", ""),
-            "icon": manifest.get("icon", "package"),
-            "version": manifest.get("version", "0.0.0"),
-            "port": manifest.get("port"),
-            "status": "running" if running else "stopped",
-            "path": str(item),
-            "start_cmd": manifest.get("start", ""),
-            "has_install": (
-                (item / "install.sh").exists()
-                or bool(manifest.get("install"))
-            ),
-            "requires": manifest.get("requires", []),
-            "env": manifest.get("env", {}),
-            "openapi": openapi_file if has_openapi else None,
-        })
+        plugins.append(
+            {
+                "id": plugin_id,
+                "name": manifest.get("name", plugin_id),
+                "description": manifest.get("description", ""),
+                "icon": manifest.get("icon", "package"),
+                "version": manifest.get("version", "0.0.0"),
+                "port": manifest.get("port"),
+                "status": "running" if running else "stopped",
+                "path": str(item),
+                "start_cmd": manifest.get("start", ""),
+                "has_install": ((item / "install.sh").exists() or bool(manifest.get("install"))),
+                "requires": manifest.get("requires", []),
+                "env": manifest.get("env", {}),
+                "openapi": openapi_file if has_openapi else None,
+                "web_view": manifest.get("web_view", "iframe"),
+                "web_view_path": manifest.get("web_view_path", "/"),
+            }
+        )
 
     return plugins
 
@@ -313,12 +366,12 @@ def get_plugin(plugin_id: str) -> dict | None:
     if manifest is None:
         return None
 
+    manifest = _get_effective_manifest(plugin_id, manifest)
     running = _is_plugin_running(plugin_id, plugin_dir)
 
     openapi_file = manifest.get("openapi")
-    has_openapi = (
-        (running and manifest.get("port"))
-        or (openapi_file and (plugin_dir / openapi_file).exists())
+    has_openapi = (running and manifest.get("port")) or (
+        openapi_file and (plugin_dir / openapi_file).exists()
     )
 
     return {
@@ -331,14 +384,13 @@ def get_plugin(plugin_id: str) -> dict | None:
         "status": "running" if running else "stopped",
         "path": str(plugin_dir),
         "start_cmd": manifest.get("start", ""),
-        "has_install": (
-            (plugin_dir / "install.sh").exists()
-            or bool(manifest.get("install"))
-        ),
+        "has_install": ((plugin_dir / "install.sh").exists() or bool(manifest.get("install"))),
         "requires": manifest.get("requires", []),
         "env": manifest.get("env", {}),
         "openapi": openapi_file if has_openapi else None,
         "readme": _read_readme(plugin_dir),
+        "web_view": manifest.get("web_view", "iframe"),
+        "web_view_path": manifest.get("web_view_path", "/"),
     }
 
 
@@ -356,10 +408,7 @@ async def install_plugin(source: str) -> dict:
     plugins_dir = get_plugins_dir()
 
     if ".." in source or ";" in source or "|" in source or "&" in source:
-        raise ValueError(
-            "That doesn't look like a valid app URL. "
-            "Try something like: user/repo"
-        )
+        raise ValueError("That doesn't look like a valid app URL. Try something like: user/repo")
 
     # Built-in curated plugins
     if source.startswith("builtin:"):
@@ -405,23 +454,21 @@ async def install_plugin(source: str) -> dict:
 
     with tempfile.TemporaryDirectory() as tmpdir:
         proc = await asyncio.create_subprocess_exec(
-            "git", "clone", "--depth=1", git_url, tmpdir,
+            "git",
+            "clone",
+            "--depth=1",
+            git_url,
+            tmpdir,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
-        _, stderr_out = await asyncio.wait_for(
-            proc.communicate(), timeout=300
-        )
+        _, stderr_out = await asyncio.wait_for(proc.communicate(), timeout=300)
         if proc.returncode != 0:
             err = stderr_out.decode(errors="replace").strip()
             if "not found" in err.lower() or "404" in err:
-                raise RuntimeError(
-                    "Couldn't find that app. "
-                    "Double-check the URL and try again."
-                )
+                raise RuntimeError("Couldn't find that app. Double-check the URL and try again.")
             raise RuntimeError(
-                "Couldn't download the app. "
-                "Please check your internet connection and try again."
+                "Couldn't download the app. Please check your internet connection and try again."
             )
 
         tmp = Path(tmpdir)
@@ -460,9 +507,7 @@ async def install_plugin(source: str) -> dict:
         )
         await asyncio.wait_for(proc.communicate(), timeout=300)
     elif install_cmd:
-        logger.info(
-            "Running install command for '%s': %s", plugin_id, install_cmd
-        )
+        logger.info("Running install command for '%s': %s", plugin_id, install_cmd)
         proc = await asyncio.create_subprocess_shell(
             install_cmd,
             stdout=asyncio.subprocess.PIPE,
@@ -494,9 +539,7 @@ async def launch_plugin(plugin_id: str) -> dict:
 
     manifest = _read_manifest(plugin_dir)
     if manifest is None:
-        raise ValueError(
-            f"Plugin '{plugin_id}' not found or missing manifest"
-        )
+        raise ValueError(f"Plugin '{plugin_id}' not found or missing manifest")
 
     start_cmd = manifest.get("start")
     if not start_cmd:
@@ -506,7 +549,9 @@ async def launch_plugin(plugin_id: str) -> dict:
 
     logger.info(
         "Launching plugin '%s': %s (sandboxed in %s)",
-        plugin_id, start_cmd, plugin_dir,
+        plugin_id,
+        start_cmd,
+        plugin_dir,
     )
 
     log_path = plugin_dir / _LOG_FILENAME
@@ -666,9 +711,7 @@ async def run_shell(command: str, cwd: str | None = None) -> dict:
             cwd=work_dir,
             env=clean_env,
         )
-        stdout, stderr = await asyncio.wait_for(
-            proc.communicate(), timeout=120
-        )
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=120)
         output = (stdout or b"").decode(errors="replace")
         if stderr:
             output += "\n" + stderr.decode(errors="replace")
