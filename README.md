@@ -1,12 +1,14 @@
 <p align="center">
-  <img src="paw.png" alt="PocketPaw" width="100">
+  <img src="paw.png" alt="PocketPawExtra" width="100">
 </p>
 
-<h1 align="center">🐾 PocketPaw</h1>
+<h1 align="center">🐾 PocketPawExtra</h1>
 
 <p align="center">
   <strong>An AI agent that runs on your machine, not someone else's.</strong>
 </p>
+
+> **PocketPawExtra** — A community fork of [PocketPaw](https://github.com/pocketpaw/pocketpaw) with extra features (e.g. Anti-Detect Browser, AI UI plugins). We stay close to upstream while adding enhancements.
 
 <p align="center">
   <a href="https://pypi.org/project/pocketpaw/"><img src="https://img.shields.io/pypi/v/pocketpaw.svg" alt="PyPI version"></a>
