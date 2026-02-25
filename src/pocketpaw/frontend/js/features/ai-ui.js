@@ -172,6 +172,9 @@ window.PocketPaw.AiUI = {
       async selectAiUIPlugin(plugin) {
         this.aiUI.selectedPlugin = plugin;
         this.aiUI.view = "plugin-detail";
+        if (this.updateAiUIHash) {
+          this.updateAiUIHash("plugin-detail", plugin.id);
+        }
         // Fetch latest plugin details
         try {
           const res = await fetch(`/api/ai-ui/plugins/${plugin.id}`);
@@ -282,6 +285,9 @@ window.PocketPaw.AiUI = {
             if (this.aiUI.selectedPlugin?.id === pluginId) {
               this.aiUI.selectedPlugin = null;
               this.aiUI.view = "plugins";
+              if (this.updateAiUIHash) {
+                this.updateAiUIHash("plugins");
+              }
             }
           } else {
             const err = await res.json();
@@ -391,6 +397,21 @@ window.PocketPaw.AiUI = {
       setAiUIView(v) {
         this.aiUI.view = v;
         if (v === "plugins") this.fetchPlugins();
+        if (this.updateAiUIHash) {
+          this.updateAiUIHash(v);
+        }
+        this.$nextTick(() => {
+          if (window.refreshIcons) window.refreshIcons();
+        });
+      },
+
+      backToAiUIPlugins() {
+        this.aiUI.view = "plugins";
+        this.aiUI.selectedPlugin = null;
+        if (this.updateAiUIHash) {
+          this.updateAiUIHash("plugins");
+        }
+        this.fetchPlugins();
         this.$nextTick(() => {
           if (window.refreshIcons) window.refreshIcons();
         });

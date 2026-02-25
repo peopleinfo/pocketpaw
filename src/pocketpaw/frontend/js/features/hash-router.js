@@ -12,6 +12,12 @@
  *   #/crew           → view = 'missions', crewTab = 'tasks'
  *   #/crew/projects  → view = 'missions', crewTab = 'projects'
  *   #/project/{id}   → view = 'missions', crewTab = 'projects', selectProject(id)
+ *   #/ai-ui          → view = 'ai-ui', aiUI.view = 'home'
+ *   #/ai-ui/plugins  → view = 'ai-ui', aiUI.view = 'plugins'
+ *   #/ai-ui/discover → view = 'ai-ui', aiUI.view = 'discover'
+ *   #/ai-ui/shell    → view = 'ai-ui', aiUI.view = 'shell'
+ *   #/ai-ui/api-docs → view = 'ai-ui', aiUI.view = 'api-docs'
+ *   #/ai-ui/plugin/{id} → view = 'ai-ui', aiUI.view = 'plugin-detail', selectAiUIPlugin(id)
  *
  * State:
  *   _hashRouterInitialized, _suppressHashChange
@@ -77,7 +83,7 @@ window.PocketPaw.HashRouter = {
           this.initAiUI();
         }
 
-        // Map view names to hash routes
+        // Map view names to hash routes (ai-ui uses base hash; sub-routes via updateAiUIHash)
         const hashMap = {
           chat: "#/chat",
           activity: "#/activity",
@@ -86,7 +92,7 @@ window.PocketPaw.HashRouter = {
           "anti-browser": "#/anti-browser",
           "ai-ui": "#/ai-ui",
         };
-        this.updateHash(hashMap[viewName] || "#/chat");
+        this.updateHash(hashMap[viewName] ?? "#/chat");
       },
 
       /**
@@ -122,6 +128,15 @@ window.PocketPaw.HashRouter = {
           route.view = "anti-browser";
         } else if (parts[0] === "ai-ui") {
           route.view = "ai-ui";
+          route.aiUIView = parts[1] || "home";
+          if (parts[1] === "plugin" && parts[2]) {
+            route.aiUIView = "plugin-detail";
+            route.aiUIPluginId = parts[2];
+          } else if (
+            ["plugins", "discover", "shell", "api-docs"].includes(parts[1])
+          ) {
+            route.aiUIView = parts[1];
+          }
         } else if (parts[0] === "crew") {
           route.view = "missions";
           route.crewTab = parts[1] === "projects" ? "projects" : "tasks";
@@ -163,11 +178,68 @@ window.PocketPaw.HashRouter = {
           if (this.initAiUI) {
             this.initAiUI();
           }
+          this.aiUI.view = route.aiUIView || "home";
+          if (route.aiUIView === "discover" && this.fetchGallery) {
+            this.fetchGallery();
+          }
+          if (route.aiUIPluginId) {
+            this._selectAiUIPluginById(route.aiUIPluginId);
+          }
         }
 
         this.$nextTick(() => {
           if (window.refreshIcons) window.refreshIcons();
         });
+      },
+
+      /**
+       * Select an AI UI plugin by ID, waiting for plugins to load if needed.
+       */
+      async _selectAiUIPluginById(pluginId) {
+        let plugin = this.aiUI.plugins.find((p) => p.id === pluginId);
+        if (plugin) {
+          this.selectAiUIPlugin(plugin);
+          return;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        plugin = this.aiUI.plugins.find((p) => p.id === pluginId);
+        if (plugin) {
+          this.selectAiUIPlugin(plugin);
+          return;
+        }
+        try {
+          const res = await fetch(`/api/ai-ui/plugins/${pluginId}`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data.plugin) {
+              this.aiUI.selectedPlugin = data.plugin;
+              this.aiUI.view = "plugin-detail";
+              this.$nextTick(() => {
+                if (window.refreshIcons) window.refreshIcons();
+              });
+            }
+          }
+        } catch (e) {
+          console.error("Failed to load plugin from hash:", e);
+        }
+      },
+
+      /**
+       * Update hash for AI UI sub-navigation. Call from setAiUIView / selectAiUIPlugin.
+       */
+      updateAiUIHash(subView, pluginId = null) {
+        if (pluginId) {
+          this.updateHash(`#/ai-ui/plugin/${pluginId}`);
+        } else {
+          const map = {
+            home: "#/ai-ui",
+            plugins: "#/ai-ui/plugins",
+            discover: "#/ai-ui/discover",
+            shell: "#/ai-ui/shell",
+            "api-docs": "#/ai-ui/api-docs",
+          };
+          this.updateHash(map[subView] ?? "#/ai-ui");
+        }
       },
 
       /**

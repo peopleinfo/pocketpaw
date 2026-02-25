@@ -579,7 +579,7 @@
         <!-- Back Button -->
         <button
           class="flex items-center gap-2 text-[13px] text-white/50 hover:text-white transition-colors mb-6"
-          @click="aiUI.view = 'plugins'; aiUI.selectedPlugin = null; $nextTick(() => window.refreshIcons && window.refreshIcons())"
+          @click="backToAiUIPlugins()"
         >
           <i data-lucide="arrow-left" class="w-4 h-4"></i>
           Back to My Apps
