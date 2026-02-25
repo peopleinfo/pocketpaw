@@ -67,6 +67,65 @@ async def get_plugin_detail(plugin_id: str):
     return {"plugin": plugin}
 
 
+@router.get("/plugins/{plugin_id}/config")
+async def get_plugin_config(plugin_id: str):
+    """Get a plugin's config (env vars passed at launch)."""
+    from pocketpaw.ai_ui.plugins import get_plugin_config as _get_config
+
+    config = _get_config(plugin_id)
+    if config is None:
+        raise HTTPException(status_code=404, detail=f"Plugin '{plugin_id}' not found")
+    return {"config": config}
+
+
+@router.post("/plugins/{plugin_id}/test-connection")
+async def test_plugin_connection_endpoint(plugin_id: str, request: Request):
+    """Ping the plugin's /health endpoint. Optional body: { host?, port? }."""
+    from pocketpaw.ai_ui.plugins import test_plugin_connection as _test
+
+    host = None
+    port = None
+    try:
+        body = await request.json()
+        if isinstance(body, dict):
+            host = body.get("host")
+            port_val = body.get("port")
+            if port_val is not None:
+                port = int(port_val)
+    except Exception:
+        pass
+
+    try:
+        result = _test(plugin_id, host=host, port=port)
+        return result
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Plugin '{plugin_id}' not found")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.put("/plugins/{plugin_id}/config")
+async def update_plugin_config_endpoint(plugin_id: str, request: Request):
+    """Update a plugin's config (env vars). Restart required for changes to apply."""
+    from pocketpaw.ai_ui.plugins import update_plugin_config as _update_config
+
+    data = await request.json()
+    if not isinstance(data, dict):
+        raise HTTPException(status_code=400, detail="Expected JSON object")
+    # Accept { "config": { ... } } or flat { "KEY": "value" }
+    raw = data.get("config", data)
+    if not isinstance(raw, dict):
+        raise HTTPException(status_code=400, detail="Expected config object")
+    config = {k: str(v) if v is not None else "" for k, v in raw.items()}
+    try:
+        result = _update_config(plugin_id, config)
+        return result
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Plugin '{plugin_id}' not found")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 @router.post("/plugins/install")
 async def install_plugin_endpoint(request: Request):
     """Install a plugin from a Git URL, local path, or uploaded .zip file."""
@@ -194,7 +253,7 @@ async def plugin_swagger(plugin_id: str):
 
     from fastapi.responses import HTMLResponse
 
-    from pocketpaw.ai_ui.plugins import get_plugins_dir, _is_plugin_running
+    from pocketpaw.ai_ui.plugins import _is_plugin_running, get_plugins_dir
 
     plugins_dir = get_plugins_dir()
     plugin_path = plugins_dir / plugin_id
@@ -287,8 +346,9 @@ SwaggerUIBundle({{
 @router.get("/plugins/{plugin_id}/{filename:path}")
 async def serve_plugin_file(plugin_id: str, filename: str):
     """Serve arbitrary files from the plugin's directory (e.g. openapi.json)."""
-    from pocketpaw.ai_ui.plugins import get_plugins_dir
     from fastapi.responses import FileResponse
+
+    from pocketpaw.ai_ui.plugins import get_plugins_dir
     
     plugins_dir = get_plugins_dir()
     plugin_path = plugins_dir / plugin_id

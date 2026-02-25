@@ -60,6 +60,17 @@ window.PocketPaw.AiUI = {
         // Discover / gallery
         gallery: [],
         galleryLoading: false,
+
+        // Plugin config modal (provider, model, etc.)
+        configModalOpen: false,
+        configModalPluginId: null,
+        pluginConfig: {},
+        pluginConfigDraft: {},
+        savingConfig: false,
+        testingConnection: false,
+        connectionTestResult: null,
+        detailTestResult: null,
+        testingDetailConnection: false,
       },
     };
   },
@@ -170,6 +181,7 @@ window.PocketPaw.AiUI = {
       },
 
       async selectAiUIPlugin(plugin) {
+        this.aiUI.detailTestResult = null;
         this.aiUI.selectedPlugin = plugin;
         this.aiUI.view = "plugin-detail";
         if (this.updateAiUIHash) {
@@ -449,6 +461,7 @@ window.PocketPaw.AiUI = {
       },
 
       backToAiUIPlugins() {
+        this.aiUI.detailTestResult = null;
         this.aiUI.view = "plugins";
         this.aiUI.selectedPlugin = null;
         if (this.updateAiUIHash) {
@@ -475,6 +488,156 @@ window.PocketPaw.AiUI = {
         } finally {
           this.aiUI.galleryLoading = false;
         }
+      },
+
+      // ==================== Plugin Config ====================
+
+      async openPluginConfigModal(pluginId) {
+        this.aiUI.configModalPluginId = pluginId;
+        this.aiUI.configModalOpen = true;
+        const aiFastApiDefaults = {
+          LLM_BACKEND: "g4f",
+          G4F_PROVIDER: "auto",
+          G4F_MODEL: "gpt-4o-mini",
+          DEBUG: "true",
+          HOST: "0.0.0.0",
+          PORT: "8000",
+        };
+        try {
+          const res = await fetch(`/api/ai-ui/plugins/${pluginId}/config`);
+          if (res.ok) {
+            const data = await res.json();
+            this.aiUI.pluginConfig = data.config || {};
+            this.aiUI.pluginConfigDraft = {
+              ...aiFastApiDefaults,
+              ...this.aiUI.pluginConfig,
+            };
+          } else {
+            this.aiUI.pluginConfig = {};
+            this.aiUI.pluginConfigDraft = { ...aiFastApiDefaults };
+          }
+        } catch (e) {
+          console.error("Failed to load plugin config:", e);
+          this.aiUI.pluginConfig = {};
+          this.aiUI.pluginConfigDraft = { ...aiFastApiDefaults };
+        }
+        this.$nextTick(() => {
+          if (window.refreshIcons) window.refreshIcons();
+        });
+      },
+
+      closePluginConfigModal() {
+        this.aiUI.configModalOpen = false;
+        this.aiUI.configModalPluginId = null;
+        this.aiUI.pluginConfig = {};
+        this.aiUI.pluginConfigDraft = {};
+        this.aiUI.connectionTestResult = null;
+      },
+
+      async testPluginConnection() {
+        const pluginId = this.aiUI.configModalPluginId;
+        if (!pluginId) return;
+        this.aiUI.testingConnection = true;
+        this.aiUI.connectionTestResult = null;
+        try {
+          const host = this.aiUI.pluginConfigDraft.HOST;
+          const port = this.aiUI.pluginConfigDraft.PORT;
+          const body = {};
+          if (host) body.host = host;
+          if (port) body.port = parseInt(port, 10) || port;
+          const res = await fetch(`/api/ai-ui/plugins/${pluginId}/test-connection`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          });
+          const data = await res.json();
+          this.aiUI.connectionTestResult = data;
+          if (data.ok) {
+            this.showToast(data.message || "Connection OK", "success");
+          } else {
+            this.showToast(data.message || "Connection failed", "error");
+          }
+        } catch (e) {
+          console.error("Test connection error:", e);
+          this.aiUI.connectionTestResult = { ok: false, message: "Request failed" };
+          this.showToast("Test failed", "error");
+        } finally {
+          this.aiUI.testingConnection = false;
+          this.$nextTick(() => {
+            if (window.refreshIcons) window.refreshIcons();
+          });
+        }
+      },
+
+      async testPluginConnectionFromDetail() {
+        const pluginId = this.aiUI.selectedPlugin?.id;
+        if (!pluginId || pluginId !== "ai-fast-api") return;
+        this.aiUI.testingDetailConnection = true;
+        this.aiUI.detailTestResult = null;
+        try {
+          const res = await fetch(`/api/ai-ui/plugins/${pluginId}/test-connection`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: "{}",
+          });
+          const data = await res.json();
+          this.aiUI.detailTestResult = data;
+          if (data.ok) {
+            this.showToast(data.message || "LLM connection OK", "success");
+          } else {
+            this.showToast(data.message || "LLM connection failed", "error");
+          }
+        } catch (e) {
+          console.error("Test connection error:", e);
+          this.aiUI.detailTestResult = { ok: false, message: "Request failed" };
+          this.showToast("Test failed", "error");
+        } finally {
+          this.aiUI.testingDetailConnection = false;
+          this.$nextTick(() => {
+            if (window.refreshIcons) window.refreshIcons();
+          });
+        }
+      },
+
+      async savePluginConfig() {
+        const pluginId = this.aiUI.configModalPluginId;
+        if (!pluginId) return;
+        this.aiUI.savingConfig = true;
+        try {
+          const res = await fetch(`/api/ai-ui/plugins/${pluginId}/config`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(this.aiUI.pluginConfigDraft),
+          });
+          if (res.ok) {
+            const data = await res.json();
+            this.aiUI.pluginConfig = data.config || this.aiUI.pluginConfigDraft;
+            this.showToast(
+              "Config saved. Restart the plugin for changes to take effect.",
+              "success",
+            );
+            this.closePluginConfigModal();
+            // Refresh selected plugin env
+            if (this.aiUI.selectedPlugin?.id === pluginId) {
+              const p = this.aiUI.plugins.find((x) => x.id === pluginId);
+              if (p) {
+                this.aiUI.selectedPlugin = { ...this.aiUI.selectedPlugin, env: data.config };
+              }
+            }
+          } else {
+            const err = await res.json();
+            this.showToast(err.detail || "Failed to save config", "error");
+          }
+        } catch (e) {
+          console.error("Config save error:", e);
+          this.showToast("Failed to save config", "error");
+        } finally {
+          this.aiUI.savingConfig = false;
+        }
+      },
+
+      hasPluginConfig(plugin) {
+        return plugin && plugin.id === "ai-fast-api";
       },
     };
   },

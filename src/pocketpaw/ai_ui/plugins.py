@@ -45,6 +45,7 @@ import platform
 import shutil
 import signal
 import socket
+import subprocess
 import zipfile
 from pathlib import Path
 from typing import Any
@@ -269,6 +270,39 @@ def _is_port_listening(port: int) -> bool:
         return False
 
 
+def _get_pid_on_port(port: int) -> int | None:
+    """Return PID of process listening on port, or None."""
+    if platform.system() == "Windows":
+        try:
+            proc = subprocess.run(
+                ["netstat", "-ano"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            for line in proc.stdout.splitlines():
+                if f":{port}" in line and "LISTENING" in line.upper():
+                    parts = line.split()
+                    if parts:
+                        return int(parts[-1])
+        except (ValueError, subprocess.TimeoutExpired, OSError):
+            pass
+        return None
+    try:
+        proc = subprocess.run(
+            ["lsof", "-t", f"-iTCP:{port}", "-sTCP:LISTEN"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        out = (proc.stdout or "").strip()
+        if out:
+            return int(out.splitlines()[0].strip())
+    except (ValueError, subprocess.TimeoutExpired, OSError):
+        pass
+    return None
+
+
 def _is_plugin_running(plugin_id: str, plugin_dir: Path) -> bool:
     """Check running state: in-memory process, PID file, then port fallback.
 
@@ -394,6 +428,96 @@ def get_plugin(plugin_id: str) -> dict | None:
         "web_view": manifest.get("web_view", "iframe"),
         "web_view_path": manifest.get("web_view_path", "/"),
     }
+
+
+def get_plugin_config(plugin_id: str) -> dict[str, Any] | None:
+    """Get a plugin's config (env) from pocketpaw.json."""
+    if ".." in plugin_id or "/" in plugin_id or "\\" in plugin_id:
+        raise ValueError("Invalid plugin ID")
+
+    plugin_dir = get_plugins_dir() / plugin_id
+    if not plugin_dir.is_dir():
+        return None
+    manifest = _read_manifest(plugin_dir)
+    if manifest is None:
+        return None
+    return dict(manifest.get("env", {}))
+
+
+def update_plugin_config(plugin_id: str, config: dict[str, str]) -> dict:
+    """Update a plugin's config (env) in pocketpaw.json.
+
+    Merges config into manifest.env. Restart required for changes to apply.
+    """
+    if ".." in plugin_id or "/" in plugin_id or "\\" in plugin_id:
+        raise ValueError("Invalid plugin ID")
+
+    plugin_dir = get_plugins_dir() / plugin_id
+    manifest_path = plugin_dir / "pocketpaw.json"
+    if not manifest_path.exists():
+        raise FileNotFoundError(f"Plugin '{plugin_id}' not found")
+
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    env = manifest.get("env", {})
+    for key, val in config.items():
+        if val is None or val == "":
+            env.pop(key, None)
+        else:
+            env[key] = str(val)
+    manifest["env"] = env
+    manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+    return {"status": "ok", "config": dict(env)}
+
+
+def test_plugin_connection(
+    plugin_id: str, host: str | None = None, port: int | None = None
+) -> dict:
+    """Call POST /v1/chat/completions with a ping message. Returns { ok: bool, message: str }."""
+    if ".." in plugin_id or "/" in plugin_id or "\\" in plugin_id:
+        raise ValueError("Invalid plugin ID")
+
+    plugin_dir = get_plugins_dir() / plugin_id
+    manifest = _read_manifest(plugin_dir)
+    if manifest is None:
+        raise FileNotFoundError(f"Plugin '{plugin_id}' not found")
+
+    env = manifest.get("env", {})
+    h = host or env.get("HOST", "0.0.0.0")
+    # Use 127.0.0.1 for connect; 0.0.0.0 is bind-only
+    if h in ("0.0.0.0", ""):
+        h = "127.0.0.1"
+    p = port if port is not None else int(env.get("PORT", "8000"))
+    url = f"http://{h}:{p}/v1/chat/completions"
+
+    payload = {
+        "model": env.get("G4F_MODEL", "gpt-4o-mini"),
+        "messages": [{"role": "user", "content": "Hi"}],
+        "stream": False,
+    }
+
+    try:
+        import httpx
+
+        with httpx.Client(timeout=15.0) as client:
+            resp = client.post(url, json=payload)
+            if resp.status_code == 200:
+                data = resp.json()
+                choices = data.get("choices") or []
+                if choices and choices[0].get("message"):
+                    return {"ok": True, "message": "Chat OK"}
+                return {"ok": False, "message": "Empty chat response"}
+            # Capture 4xx/5xx body for debugging
+            try:
+                err = resp.json()
+                msg = err.get("detail") or err.get("error", {}).get("message") or str(err)
+            except Exception:
+                msg = resp.text[:200] if resp.text else ""
+            return {
+                "ok": False,
+                "message": f"HTTP {resp.status_code}: {msg}" if msg else f"HTTP {resp.status_code}",
+            }
+    except Exception as e:
+        return {"ok": False, "message": str(e) or "Chat ping failed"}
 
 
 # ─── Install ─────────────────────────────────────────────────────────────
@@ -676,6 +800,7 @@ async def launch_plugin(plugin_id: str) -> dict:
 async def stop_plugin(plugin_id: str) -> dict:
     """Stop a running plugin (handles both in-memory and orphaned processes)."""
     plugin_dir = get_plugins_dir() / plugin_id
+    manifest = _read_manifest(plugin_dir)
 
     proc = _running_processes.get(plugin_id)
     pid_from_file = _read_pid(plugin_dir)
@@ -686,6 +811,16 @@ async def stop_plugin(plugin_id: str) -> dict:
     elif pid_from_file is not None and _is_pid_alive(pid_from_file):
         pid = pid_from_file
 
+    # Fallback: PID stale but port in use (e.g. uvicorn --reload respawned worker)
+    if pid is None and manifest:
+        port = manifest.get("port")
+        try:
+            p = int(port) if port is not None else 0
+            if p > 0 and _is_port_listening(p):
+                pid = _get_pid_on_port(p)
+        except (TypeError, ValueError):
+            pass
+
     if pid is None:
         _running_processes.pop(plugin_id, None)
         _clear_pid(plugin_dir)
@@ -694,7 +829,6 @@ async def stop_plugin(plugin_id: str) -> dict:
             "message": f"Plugin '{plugin_id}' was not running",
         }
 
-    manifest = _read_manifest(plugin_dir)
     stop_cmd = manifest.get("stop") if manifest else None
 
     if stop_cmd:
@@ -711,10 +845,13 @@ async def stop_plugin(plugin_id: str) -> dict:
         except Exception:
             pass
 
-    # Terminate the process group
+    # Terminate the process group (or single process on Windows)
     try:
-        os.killpg(os.getpgid(pid), signal.SIGTERM)
-    except (ProcessLookupError, PermissionError):
+        if hasattr(os, "killpg") and hasattr(os, "getpgid"):
+            os.killpg(os.getpgid(pid), signal.SIGTERM)
+        else:
+            os.kill(pid, signal.SIGTERM)
+    except (ProcessLookupError, PermissionError, OSError, AttributeError):
         try:
             os.kill(pid, signal.SIGTERM)
         except (ProcessLookupError, PermissionError):
@@ -728,8 +865,11 @@ async def stop_plugin(plugin_id: str) -> dict:
 
     if _is_pid_alive(pid):
         try:
-            os.killpg(os.getpgid(pid), signal.SIGKILL)
-        except (ProcessLookupError, PermissionError):
+            if hasattr(os, "killpg") and hasattr(os, "getpgid"):
+                os.killpg(os.getpgid(pid), signal.SIGKILL)
+            else:
+                os.kill(pid, signal.SIGKILL)
+        except (ProcessLookupError, PermissionError, OSError, AttributeError):
             try:
                 os.kill(pid, signal.SIGKILL)
             except (ProcessLookupError, PermissionError):
