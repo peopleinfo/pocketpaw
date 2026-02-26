@@ -1103,11 +1103,16 @@ class PocketPawInstaller:
         # Install package
         upgrade = self.system_info is not None and self.system_info.existing_version is not None
         if not pkg_installer.install(self.extras, upgrade=upgrade):
-            print("  Installation failed. Check the errors above.\n")
-            print("  Suggestions:")
+            log_path = Path.home() / ".pocketpaw" / "logs" / "launcher.log"
+            print("  Installation failed.\n")
+            print("  Troubleshooting:")
+            print(f"    - Log file: {log_path}")
             print(f"    - Try: {self.pip_cmd} install --upgrade pip")
             print(f"    - Try: {self.pip_cmd} install {PACKAGE}")
-            print("    - Check your internet connection\n")
+            print("    - Check your internet connection")
+            if platform.system() == "Windows":
+                print("    - On Windows, run PowerShell as Administrator")
+            print()
             return 1
 
         # Install Playwright browsers if selected
@@ -1165,15 +1170,31 @@ class PocketPawInstaller:
     def _launch(self) -> None:
         """Launch pocketpaw."""
         print("  Starting PocketPaw...\n")
-        try:
-            os.execvp("pocketpaw", ["pocketpaw"])
-        except FileNotFoundError:
-            # Might not be on PATH yet, try python -m
+        # Try binary locations (uv tool installs to ~/.local/bin/ or uv tools dir)
+        for bin_path in self._find_pocketpaw_binaries():
             try:
-                os.execvp(sys.executable, [sys.executable, "-m", "pocketpaw"])
-            except Exception as exc:
-                print(f"  Could not launch: {exc}")
-                print("  Try running 'pocketpaw' manually.\n")
+                os.execvp(bin_path, [bin_path])
+            except FileNotFoundError:
+                continue
+        # Fallback: python -m
+        try:
+            os.execvp(sys.executable, [sys.executable, "-m", "pocketpaw"])
+        except Exception as exc:
+            print(f"  Could not launch: {exc}")
+            print("  Try running 'pocketpaw' manually.\n")
+
+    def _find_pocketpaw_binaries(self) -> list[str]:
+        """Find candidate pocketpaw binary paths."""
+        candidates: list[str] = ["pocketpaw"]
+        if self.pip_cmd and "uv" in self.pip_cmd:
+            home = Path.home()
+            for p in [
+                home / ".local" / "bin" / "pocketpaw",
+                home / ".local" / "share" / "uv" / "tools" / "pocketpaw" / "bin" / "pocketpaw",
+            ]:
+                if p.exists():
+                    candidates.insert(0, str(p))
+        return candidates
 
 
 # ── CLI Argument Parsing ───────────────────────────────────────────────
