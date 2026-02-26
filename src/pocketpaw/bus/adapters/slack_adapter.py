@@ -84,6 +84,8 @@ class SlackAdapter(BaseChannelAdapter):
             "/backends",
             "/model",
             "/tools",
+            "/plugins",
+            "/stop",
             "/help",
         ):
 

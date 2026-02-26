@@ -30,6 +30,22 @@ _GENERATED_PATH_RE = re.compile(
     r"(?:/[^\s`*]+/\.pocketpaw/generated/[^\s`*\)]+)"  # absolute path under generated/
     r")"
 )
+_AI_UI_MARKER_RE = re.compile(
+    r"\bai[\s-]?ui\b",
+    re.IGNORECASE,
+)
+_PLUGIN_WORD_RE = re.compile(
+    r"\b(plugin|plugins|app|apps)\b",
+    re.IGNORECASE,
+)
+_AI_UI_PLUGIN_LIST_INTENT_RE = re.compile(
+    r"\b(list|show|check|what|which|installed|all)\b",
+    re.IGNORECASE,
+)
+_AI_UI_PLUGIN_STOP_INTENT_RE = re.compile(
+    r"^\s*stop(?:\s+plugin)?\s+([a-z0-9][a-z0-9_-]*)\s*$",
+    re.IGNORECASE,
+)
 
 
 def _extract_media_paths(text: str) -> list[str]:
@@ -148,6 +164,29 @@ class AgentLoop:
 
     _WELCOME_EXCLUDED = frozenset({Channel.WEBSOCKET, Channel.CLI, Channel.SYSTEM})
 
+    @staticmethod
+    def _is_ai_ui_plugins_query(text: str) -> bool:
+        """Heuristic intent check for AI UI plugin listing queries."""
+        if not text:
+            return False
+        # Require explicit AI UI context to avoid hijacking unrelated plugin questions.
+        if not _AI_UI_MARKER_RE.search(text):
+            return False
+        if not _PLUGIN_WORD_RE.search(text):
+            return False
+        # Require explicit list/check intent to avoid hijacking generic plugin questions.
+        return bool(_AI_UI_PLUGIN_LIST_INTENT_RE.search(text))
+
+    @staticmethod
+    def _extract_ai_ui_plugin_stop_target(text: str) -> str | None:
+        """Extract plugin id from a plain-language stop request, if present."""
+        if not text:
+            return None
+        m = _AI_UI_PLUGIN_STOP_INTENT_RE.match(text)
+        if not m:
+            return None
+        return m.group(1).strip().lower() or None
+
     async def _process_message_inner(self, message: InboundMessage, session_key: str) -> None:
         """Inner message processing (called under concurrency guards)."""
         # Keep context_builder in sync if memory manager was hot-reloaded
@@ -172,6 +211,65 @@ class AgentLoop:
                     )
                 )
                 return
+
+        # Lightweight local intent: list installed AI UI plugins.
+        # This ensures plugin listing works even on provider modes where tool
+        # use is unavailable (e.g., openai-compatible direct chat path).
+        if self._is_ai_ui_plugins_query(message.content):
+            try:
+                from pocketpaw.ai_ui.summary import get_plugins_summary
+
+                content = get_plugins_summary()
+            except Exception as exc:
+                logger.exception("Failed to build AI UI plugin summary")
+                content = f"Could not list AI UI plugins: {exc}"
+
+            await self.bus.publish_outbound(
+                OutboundMessage(
+                    channel=message.channel,
+                    chat_id=message.chat_id,
+                    content=content,
+                )
+            )
+            await self.bus.publish_outbound(
+                OutboundMessage(
+                    channel=message.channel,
+                    chat_id=message.chat_id,
+                    content="",
+                    is_stream_end=True,
+                )
+            )
+            return
+
+        # Lightweight local intent: stop an installed AI UI plugin.
+        # Enables plain-language "stop <plugin-id>" in dashboard chat.
+        stop_target = self._extract_ai_ui_plugin_stop_target(message.content)
+        if stop_target:
+            try:
+                from pocketpaw.ai_ui.plugins import list_plugins, stop_plugin
+
+                installed_ids = {str(p.get("id", "")).lower() for p in list_plugins()}
+                if stop_target in installed_ids:
+                    result = await stop_plugin(stop_target)
+                    content = result.get("message") or f"Plugin '{stop_target}' stop requested."
+                    await self.bus.publish_outbound(
+                        OutboundMessage(
+                            channel=message.channel,
+                            chat_id=message.chat_id,
+                            content=content,
+                        )
+                    )
+                    await self.bus.publish_outbound(
+                        OutboundMessage(
+                            channel=message.channel,
+                            chat_id=message.chat_id,
+                            content="",
+                            is_stream_end=True,
+                        )
+                    )
+                    return
+            except Exception:
+                logger.exception("Failed to stop AI UI plugin via local intent")
 
         # Welcome hint — one-time message on first interaction in a channel
         if self.settings.welcome_hint_enabled and message.channel not in self._WELCOME_EXCLUDED:

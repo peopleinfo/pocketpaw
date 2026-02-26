@@ -53,6 +53,7 @@ _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
     "SpotifyPlaylistTool": (".spotify", "SpotifyPlaylistTool"),
     "OCRTool": (".ocr", "OCRTool"),
     "TranslateTool": (".translate", "TranslateTool"),
+    "AIUIPluginsTool": (".ai_ui_plugins", "AIUIPluginsTool"),
     "RedditSearchTool": (".reddit", "RedditSearchTool"),
     "RedditReadTool": (".reddit", "RedditReadTool"),
     "RedditTrendingTool": (".reddit", "RedditTrendingTool"),

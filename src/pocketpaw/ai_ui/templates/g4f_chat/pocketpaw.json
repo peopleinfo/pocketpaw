@@ -1,0 +1,16 @@
+{
+  "name": "Gf4 Chat",
+  "description": "Standalone g4f web chat UI template for AI UI.",
+  "icon": "message-circle",
+  "version": "1.0.0",
+  "start": "bash start.sh",
+  "install": "bash install.sh",
+  "requires": ["uv", "python"],
+  "port": 8080,
+  "web_view": "iframe",
+  "web_view_path": "/chat/",
+  "env": {
+    "PORT": "8080",
+    "HOST": "0.0.0.0"
+  }
+}

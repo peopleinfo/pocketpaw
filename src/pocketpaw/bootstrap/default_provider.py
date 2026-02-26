@@ -68,6 +68,11 @@ directly — never use a tool to look up what you already know.
 ### Skills
 - `create_skill '{"skill_name": "my-skill", "description": "...", "prompt_template": "..."}'`
 
+### AI UI
+- `ai_ui_plugins '{"action": "list"}'` — list installed + discoverable AI UI plugins
+- `ai_ui_plugins '{"action": "list_installed"}'` — list only installed AI UI plugins
+- `ai_ui_plugins '{"action": "get", "plugin_id": "ai-fast-api"}'` — inspect one plugin
+
 ### Google Drive (requires OAuth)
 - `drive_list '{"query": "name contains \\'report\\'"}'` — list/search files
 - `drive_download '{"file_id": "FILE_ID"}'` — download a file

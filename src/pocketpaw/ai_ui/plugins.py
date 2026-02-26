@@ -303,6 +303,29 @@ def _get_pid_on_port(port: int) -> int | None:
     return None
 
 
+def _is_port_unique_to_plugin(plugin_id: str, port: int) -> bool:
+    """Return True when only this plugin is configured to use ``port``."""
+    plugins_dir = get_plugins_dir()
+    seen_self = False
+    for item in plugins_dir.iterdir():
+        if not item.is_dir():
+            continue
+        manifest = _read_manifest(item)
+        if not manifest:
+            continue
+        try:
+            plugin_port = int(manifest.get("port") or 0)
+        except (TypeError, ValueError):
+            continue
+        if plugin_port != port:
+            continue
+        if item.name == plugin_id:
+            seen_self = True
+            continue
+        return False
+    return seen_self
+
+
 def _is_plugin_running(plugin_id: str, plugin_dir: Path) -> bool:
     """Check running state: in-memory process, PID file, then port fallback.
 
@@ -326,7 +349,7 @@ def _is_plugin_running(plugin_id: str, plugin_dir: Path) -> bool:
         port = manifest.get("port")
         try:
             p = int(port) if port is not None else 0
-            if p > 0 and _is_port_listening(p):
+            if p > 0 and _is_port_unique_to_plugin(plugin_id, p) and _is_port_listening(p):
                 return True
         except (TypeError, ValueError):
             pass
@@ -554,7 +577,10 @@ def fetch_plugin_models(
 def fetch_plugin_providers(
     plugin_id: str, host: str | None = None, port: int | None = None
 ) -> list[dict]:
-    """Fetch /v1/providers from a running plugin. Returns list of { id, url, models, ... }. Empty if not running."""
+    """Fetch /v1/providers from a running plugin.
+
+    Returns list of { id, url, models, ... }. Empty if not running.
+    """
     if ".." in plugin_id or "/" in plugin_id or "\\" in plugin_id:
         raise ValueError("Invalid plugin ID")
 
@@ -940,7 +966,16 @@ async def stop_plugin(plugin_id: str) -> dict:
         try:
             p = int(port) if port is not None else 0
             if p > 0 and _is_port_listening(p):
-                pid = _get_pid_on_port(p)
+                if _is_port_unique_to_plugin(plugin_id, p):
+                    pid = _get_pid_on_port(p)
+                else:
+                    return {
+                        "status": "ambiguous",
+                        "message": (
+                            f"Plugin '{plugin_id}' shares port {p} with another plugin. "
+                            "Cannot safely determine which process to stop."
+                        ),
+                    }
         except (TypeError, ValueError):
             pass
 

@@ -18,6 +18,7 @@ import json
 import sys
 
 from pocketpaw.tools.builtin import (
+    AIUIPluginsTool,
     CalendarCreateTool,
     CalendarListTool,
     CalendarPrepTool,
@@ -115,6 +116,7 @@ _TOOLS = {
         RedditSearchTool(),
         RedditReadTool(),
         RedditTrendingTool(),
+        AIUIPluginsTool(),
         HealthCheckTool(),
         ErrorLogTool(),
         ConfigDoctorTool(),

@@ -30,6 +30,8 @@ _COMMANDS = frozenset(
         "/backends",
         "/model",
         "/tools",
+        "/plugins",
+        "/stop",
     }
 )
 
@@ -121,6 +123,10 @@ class CommandHandler:
             return self._cmd_model(message, args)
         elif cmd == "/tools":
             return self._cmd_tools(message, args)
+        elif cmd == "/plugins":
+            return self._cmd_plugins(message)
+        elif cmd == "/stop":
+            return await self._cmd_stop(message, args)
         elif cmd == "/help":
             return self._cmd_help(message)
         return None
@@ -569,6 +575,55 @@ class CommandHandler:
         )
 
     # ------------------------------------------------------------------
+    # /plugins
+    # ------------------------------------------------------------------
+
+    def _cmd_plugins(self, message: InboundMessage) -> OutboundMessage:
+        """List installed and discoverable AI UI plugins."""
+        try:
+            from pocketpaw.ai_ui.summary import get_plugins_summary
+
+            content = get_plugins_summary()
+        except Exception as exc:
+            logger.exception("Failed to list AI UI plugins")
+            content = f"Could not list AI UI plugins: {exc}"
+
+        return OutboundMessage(
+            channel=message.channel,
+            chat_id=message.chat_id,
+            content=content,
+        )
+
+    # ------------------------------------------------------------------
+    # /stop
+    # ------------------------------------------------------------------
+
+    async def _cmd_stop(self, message: InboundMessage, args: str) -> OutboundMessage:
+        """Stop a running AI UI plugin by id."""
+        plugin_id = args.strip()
+        if not plugin_id:
+            return OutboundMessage(
+                channel=message.channel,
+                chat_id=message.chat_id,
+                content="Usage: /stop <plugin_id> (example: /stop counter-template)",
+            )
+
+        try:
+            from pocketpaw.ai_ui.plugins import stop_plugin
+
+            result = await stop_plugin(plugin_id)
+            content = result.get("message") or f"Plugin '{plugin_id}' stop requested."
+        except Exception as exc:
+            logger.exception("Failed to stop AI UI plugin '%s'", plugin_id)
+            content = f"Could not stop plugin '{plugin_id}': {exc}"
+
+        return OutboundMessage(
+            channel=message.channel,
+            chat_id=message.chat_id,
+            content=content,
+        )
+
+    # ------------------------------------------------------------------
     # /help
     # ------------------------------------------------------------------
 
@@ -588,6 +643,8 @@ class CommandHandler:
             "/backends — List all available backends\n"
             "/model — Show or switch model for current backend\n"
             "/tools — Show or switch tool profile\n"
+            "/plugins — List installed + discoverable AI UI plugins\n"
+            "/stop <plugin_id> — Stop an AI UI plugin\n"
             "/help — Show this help message\n\n"
             "_Tip: Use !command instead of /command on channels"
             " where / is intercepted (e.g. Matrix)._"

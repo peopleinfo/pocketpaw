@@ -2,13 +2,14 @@
 Tests for the Skills module.
 """
 
-import pytest
 from pathlib import Path
+
+import pytest
+
 from pocketpaw.skills.loader import (
     Skill,
     SkillLoader,
     parse_skill_md,
-    SKILL_PATHS,
 )
 
 
@@ -228,3 +229,9 @@ class TestSkillLoaderIntegration:
 
         # Should find at least one skill if the directory exists
         assert len(skills) >= 0  # May be empty but shouldn't error
+
+    def test_package_builtin_skill_is_loadable(self):
+        """Built-in package skills should be discoverable."""
+        loader = SkillLoader(extra_paths=[])
+        skills = loader.load(force=True)
+        assert "create-ai-ui-plugin" in skills

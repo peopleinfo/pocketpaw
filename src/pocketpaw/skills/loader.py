@@ -2,8 +2,9 @@
 SkillLoader - Load and parse skills from the AgentSkills ecosystem.
 
 Skills are loaded from:
-1. ~/.agents/skills/ - Central location (installed via `npx skills add`)
-2. ~/.pocketpaw/skills/ - PocketPaw-specific skills
+1. Built-in package skills (shipped with PocketPaw)
+2. ~/.agents/skills/ - Central location (installed via `npx skills add`)
+3. ~/.pocketpaw/skills/ - PocketPaw-specific skills
 
 Skills follow the AgentSkills spec: a directory with SKILL.md containing
 YAML frontmatter and markdown instructions.
@@ -13,7 +14,6 @@ import logging
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
 
 import yaml
 
@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 
 # Skill search paths in priority order (later overrides earlier)
 SKILL_PATHS = [
+    Path(__file__).resolve().parent / "builtin",  # Package-shipped built-ins
     Path.home() / ".agents" / "skills",  # From skills.sh (central)
     Path.home() / ".claude" / "skills",  # Claude Code / SDK standard
     Path.home() / ".pocketpaw" / "skills",  # PocketPaw-specific
@@ -39,7 +40,7 @@ class Skill:
     # Optional frontmatter fields
     user_invocable: bool = True
     disable_model_invocation: bool = False
-    argument_hint: Optional[str] = None
+    argument_hint: str | None = None
     allowed_tools: list[str] = field(default_factory=list)
     metadata: dict = field(default_factory=dict)
     # If True the skill cannot be deleted from the UI
@@ -67,7 +68,7 @@ class Skill:
         return prompt
 
 
-def parse_skill_md(skill_path: Path) -> Optional[Skill]:
+def parse_skill_md(skill_path: Path) -> Skill | None:
     """
     Parse a SKILL.md file into a Skill object.
 
@@ -140,7 +141,7 @@ class SkillLoader:
     Supports hot-reloading when skills change on disk.
     """
 
-    def __init__(self, extra_paths: Optional[list[Path]] = None):
+    def __init__(self, extra_paths: list[Path] | None = None):
         """
         Initialize the skill loader.
 
@@ -199,7 +200,7 @@ class SkillLoader:
         """Force reload all skills."""
         return self.load(force=True)
 
-    def get(self, name: str) -> Optional[Skill]:
+    def get(self, name: str) -> Skill | None:
         """
         Get a skill by name.
 
@@ -253,7 +254,7 @@ class SkillLoader:
 
 
 # Singleton instance
-_skill_loader: Optional[SkillLoader] = None
+_skill_loader: SkillLoader | None = None
 
 
 def get_skill_loader() -> SkillLoader:

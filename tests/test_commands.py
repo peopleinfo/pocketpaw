@@ -444,7 +444,58 @@ class TestHelpCommand:
         assert "/backends" in response.content
         assert "/model" in response.content
         assert "/tools" in response.content
+        assert "/plugins" in response.content
+        assert "/stop" in response.content
         assert "/help" in response.content
+
+
+# =========================================================================
+# /plugins command
+# =========================================================================
+
+
+class TestPluginsCommand:
+    def setup_method(self):
+        from pocketpaw.bus.commands import CommandHandler
+
+        self.handler = CommandHandler()
+
+    @patch("pocketpaw.ai_ui.summary.get_plugins_summary")
+    async def test_plugins_lists_ai_ui_plugins(self, mock_summary):
+        mock_summary.return_value = "AI UI plugins (1):\n- `demo` — Demo Plugin (running)"
+
+        msg = _make_msg("/plugins")
+        response = await self.handler.handle(msg)
+
+        assert response is not None
+        assert "AI UI plugins (1)" in response.content
+        mock_summary.assert_called_once()
+
+
+# =========================================================================
+# /stop command
+# =========================================================================
+
+
+class TestStopCommand:
+    def setup_method(self):
+        from pocketpaw.bus.commands import CommandHandler
+
+        self.handler = CommandHandler()
+
+    async def test_stop_requires_plugin_id(self):
+        msg = _make_msg("/stop")
+        response = await self.handler.handle(msg)
+        assert "usage" in response.content.lower()
+        assert "/stop <plugin_id>" in response.content
+
+    @patch("pocketpaw.ai_ui.plugins.stop_plugin")
+    async def test_stop_plugin(self, mock_stop):
+        mock_stop.return_value = {"status": "ok", "message": "Plugin 'counter-template' stopped"}
+        msg = _make_msg("/stop counter-template")
+        response = await self.handler.handle(msg)
+        assert "counter-template" in response.content
+        mock_stop.assert_awaited_once_with("counter-template")
 
 
 # =========================================================================
@@ -714,6 +765,12 @@ class TestIsCommandNewCommands:
     def test_recognises_delete(self):
         assert self.handler.is_command("/delete")
 
+    def test_recognises_plugins(self):
+        assert self.handler.is_command("/plugins")
+
+    def test_recognises_stop(self):
+        assert self.handler.is_command("/stop counter-template")
+
 
 # =========================================================================
 # ! prefix fallback
@@ -751,6 +808,12 @@ class TestBangPrefixFallback:
 
     def test_recognises_bang_delete(self):
         assert self.handler.is_command("!delete")
+
+    def test_recognises_bang_plugins(self):
+        assert self.handler.is_command("!plugins")
+
+    def test_recognises_bang_stop(self):
+        assert self.handler.is_command("!stop counter-template")
 
     def test_rejects_bang_unknown(self):
         assert not self.handler.is_command("!foobar")
@@ -870,7 +933,7 @@ class TestSlackSlashCommands:
         assert meta["thread_ts"] == "1234567890.123456"
 
     async def test_all_commands_registered(self):
-        """All 12 commands should be in the registration loop."""
+        """All commands should be in the registration loop."""
         import ast
 
         from pocketpaw.bus.adapters import slack_adapter
@@ -890,6 +953,8 @@ class TestSlackSlashCommands:
             "/backends",
             "/model",
             "/tools",
+            "/plugins",
+            "/stop",
             "/help",
         }
         found = set()

@@ -223,6 +223,111 @@ async def test_agent_loop_emits_tool_events(
 @patch("pocketpaw.agents.loop.get_message_bus")
 @patch("pocketpaw.agents.loop.get_memory_manager")
 @patch("pocketpaw.agents.loop.AgentContextBuilder")
+@patch("pocketpaw.agents.loop.get_command_handler")
+@patch("pocketpaw.agents.loop.get_settings")
+@pytest.mark.asyncio
+async def test_agent_loop_ai_ui_plugins_local_intent(
+    mock_get_settings,
+    mock_get_cmd_handler,
+    mock_builder_cls,
+    mock_get_memory,
+    mock_get_bus,
+    mock_bus,
+    mock_memory,
+):
+    """Natural-language AI UI plugin list queries should be handled locally."""
+    settings = MagicMock()
+    settings.agent_backend = "claude_agent_sdk"
+    settings.max_concurrent_conversations = 5
+    settings.injection_scan_enabled = False
+    settings.welcome_hint_enabled = False
+    mock_get_settings.return_value = settings
+
+    cmd_handler = MagicMock()
+    cmd_handler._on_settings_changed = None
+    cmd_handler.is_command.return_value = False
+    mock_get_cmd_handler.return_value = cmd_handler
+
+    mock_get_bus.return_value = mock_bus
+    mock_get_memory.return_value = mock_memory
+    mock_builder_cls.return_value.build_system_prompt = AsyncMock(return_value="System Prompt")
+
+    loop = AgentLoop()
+
+    with patch("pocketpaw.ai_ui.summary.get_plugins_summary") as mock_summary:
+        mock_summary.return_value = "AI UI plugins (1):\n- `demo` — Demo Plugin (running)"
+        msg = InboundMessage(
+            channel=Channel.WEBSOCKET,
+            sender_id="user1",
+            chat_id="chat1",
+            content="check all ai ui plugins?",
+        )
+        await loop._process_message(msg)
+
+    # First outbound is the local summary, second is stream_end marker.
+    first = mock_bus.publish_outbound.call_args_list[0][0][0]
+    second = mock_bus.publish_outbound.call_args_list[1][0][0]
+    assert "AI UI plugins (1)" in first.content
+    assert second.is_stream_end is True
+
+
+@patch("pocketpaw.agents.loop.get_message_bus")
+@patch("pocketpaw.agents.loop.get_memory_manager")
+@patch("pocketpaw.agents.loop.AgentContextBuilder")
+@patch("pocketpaw.agents.loop.get_command_handler")
+@patch("pocketpaw.agents.loop.get_settings")
+@pytest.mark.asyncio
+async def test_agent_loop_ai_ui_stop_local_intent(
+    mock_get_settings,
+    mock_get_cmd_handler,
+    mock_builder_cls,
+    mock_get_memory,
+    mock_get_bus,
+    mock_bus,
+    mock_memory,
+):
+    """Plain-language stop requests should stop installed AI UI plugins locally."""
+    settings = MagicMock()
+    settings.agent_backend = "claude_agent_sdk"
+    settings.max_concurrent_conversations = 5
+    settings.injection_scan_enabled = False
+    settings.welcome_hint_enabled = False
+    mock_get_settings.return_value = settings
+
+    cmd_handler = MagicMock()
+    cmd_handler._on_settings_changed = None
+    cmd_handler.is_command.return_value = False
+    mock_get_cmd_handler.return_value = cmd_handler
+
+    mock_get_bus.return_value = mock_bus
+    mock_get_memory.return_value = mock_memory
+    mock_builder_cls.return_value.build_system_prompt = AsyncMock(return_value="System Prompt")
+
+    loop = AgentLoop()
+
+    with patch("pocketpaw.ai_ui.plugins.list_plugins") as mock_list, patch(
+        "pocketpaw.ai_ui.plugins.stop_plugin"
+    ) as mock_stop:
+        mock_list.return_value = [{"id": "counter-template"}]
+        mock_stop.return_value = {"status": "ok", "message": "Plugin 'counter-template' stopped"}
+        msg = InboundMessage(
+            channel=Channel.WEBSOCKET,
+            sender_id="user1",
+            chat_id="chat1",
+            content="stop counter-template",
+        )
+        await loop._process_message(msg)
+
+    first = mock_bus.publish_outbound.call_args_list[0][0][0]
+    second = mock_bus.publish_outbound.call_args_list[1][0][0]
+    assert "counter-template" in first.content
+    assert second.is_stream_end is True
+    mock_stop.assert_awaited_once_with("counter-template")
+
+
+@patch("pocketpaw.agents.loop.get_message_bus")
+@patch("pocketpaw.agents.loop.get_memory_manager")
+@patch("pocketpaw.agents.loop.AgentContextBuilder")
 @patch("pocketpaw.agents.loop.AgentRouter")
 @pytest.mark.asyncio
 async def test_agent_loop_builds_context_and_passes_to_router(
