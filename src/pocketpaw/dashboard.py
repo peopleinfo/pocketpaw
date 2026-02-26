@@ -27,6 +27,7 @@ import io
 import json
 import logging
 from pathlib import Path
+from fastapi.responses import JSONResponse
 
 try:
     import qrcode
@@ -1100,7 +1101,14 @@ async def get_identity():
 @app.put("/api/identity")
 async def save_identity(request: Request):
     """Save edits to agent identity files. Changes take effect on the next message."""
-    data = await request.json()
+    try:
+        data = await request.json()
+    except Exception:
+        return JSONResponse(
+        status_code=400,
+        content={"error": "Invalid JSON body"},
+        )
+    
     identity_dir = get_config_path().parent / "identity"
     identity_dir.mkdir(parents=True, exist_ok=True)
 
