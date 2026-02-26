@@ -663,7 +663,7 @@
                 <button
                   type="button"
                   class="px-2 py-0.5 bg-white/5 text-white hover:bg-white/10 rounded text-[11px] font-medium transition-all border border-white/10 flex items-center gap-1 disabled:opacity-50"
-                  :title="'Test LLM (' + (aiUI.selectedPlugin?.env?.G4F_MODEL || 'gpt-4o-mini') + ')'"
+                  :title="'Test LLM (' + (aiUI.selectedPlugin?.env?.LLM_BACKEND || 'g4f') + ' - ' + (aiUI.selectedPlugin?.env?.G4F_MODEL || 'gpt-4o-mini') + ')'"
                   :disabled="aiUI.testingDetailConnection"
                   @click="testPluginConnectionFromDetail()"
                 >
@@ -675,24 +675,31 @@
                   </template>
                   <template x-if="aiUI.testingDetailConnection">
                     <span class="flex items-center gap-1">
-                      <div class="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                      <div
+                        class="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"
+                      ></div>
                       Testing...
                     </span>
                   </template>
                 </button>
                 <span
-                  class="text-[10px] text-white/40 font-mono truncate max-w-[120px]"
-                  :title="aiUI.selectedPlugin?.env?.G4F_MODEL || 'gpt-4o-mini'"
-                  x-text="aiUI.selectedPlugin?.env?.G4F_MODEL || 'gpt-4o-mini'"
+                  class="text-[10px] text-white/40 font-mono truncate max-w-[150px]"
+                  :title="(aiUI.selectedPlugin?.env?.LLM_BACKEND || 'g4f') + ' - ' + (aiUI.selectedPlugin?.env?.G4F_MODEL || 'gpt-4o-mini')"
+                  x-text="(aiUI.selectedPlugin?.env?.LLM_BACKEND || 'g4f') + ' - ' + (aiUI.selectedPlugin?.env?.G4F_MODEL || 'gpt-4o-mini')"
                 ></span>
               </div>
             </template>
-            <template x-if="aiUI.selectedPlugin?.id === 'ai-fast-api' && aiUI.detailTestResult">
+            <template
+              x-if="aiUI.selectedPlugin?.id === 'ai-fast-api' && aiUI.detailTestResult"
+            >
               <span
                 class="text-[10px] flex items-center gap-1"
                 :class="aiUI.detailTestResult.ok ? 'text-green-400' : 'text-red-400'"
               >
-                <i :data-lucide="aiUI.detailTestResult.ok ? 'check-circle' : 'x-circle'" class="w-3 h-3"></i>
+                <i
+                  :data-lucide="aiUI.detailTestResult.ok ? 'check-circle' : 'x-circle'"
+                  class="w-3 h-3"
+                ></i>
                 <span x-text="aiUI.detailTestResult.message"></span>
               </span>
             </template>
@@ -902,122 +909,176 @@
                       });
                     "
                   >
-                <!-- Left sidebar: conversations -->
-                <aside
-                  class="w-[260px] flex-shrink-0 flex flex-col bg-white border-r border-gray-200"
-                >
-                  <button
-                    type="button"
-                    class="m-3 flex items-center gap-3 px-4 py-3 rounded-xl text-[14px] font-medium text-gray-800 hover:bg-gray-100 transition-colors border border-gray-200"
-                    @click="chatMessages = []; chatConversations = [{ id: 'default', title: 'New chat' }]; activeConversationId = 'default'"
-                  >
-                    <i data-lucide="plus" class="w-4 h-4 text-[#0078D4]"></i>
-                    New chat
-                  </button>
-                  <div class="flex-1 overflow-y-auto px-2 pb-4">
-                    <template x-for="conv in chatConversations" :key="conv.id">
+                    <!-- Left sidebar: conversations -->
+                    <aside
+                      class="w-[260px] flex-shrink-0 flex flex-col bg-white border-r border-gray-200"
+                    >
                       <button
                         type="button"
-                        class="w-full text-left px-4 py-2.5 rounded-lg text-[13px] text-gray-700 hover:bg-gray-100 transition-colors mb-0.5 truncate"
-                        :class="activeConversationId === conv.id ? 'bg-gray-100 font-medium' : ''"
-                        @click="activeConversationId = conv.id; if (conv.messages) chatMessages = [...conv.messages]; else chatMessages = []"
+                        class="m-3 flex items-center gap-3 px-4 py-3 rounded-xl text-[14px] font-medium text-gray-800 hover:bg-gray-100 transition-colors border border-gray-200"
+                        @click="chatMessages = []; chatConversations = [{ id: 'default', title: 'New chat' }]; activeConversationId = 'default'"
                       >
-                        <i data-lucide="message-circle" class="w-3.5 h-3.5 inline-block mr-2 text-gray-500 align-middle"></i>
-                        <span x-text="conv.title"></span>
+                        <i
+                          data-lucide="plus"
+                          class="w-4 h-4 text-[#0078D4]"
+                        ></i>
+                        New chat
                       </button>
-                    </template>
-                  </div>
-                  <div class="p-3 border-t border-gray-100">
-                    <span class="text-[11px] text-gray-400" x-text="window._aiUiChatBridge?.getPluginName?.() || 'Plugin'"></span>
-                    <span class="text-[11px] text-green-600 ml-1" x-text="'●'"></span>
-                  </div>
-                </aside>
-
-                <!-- Main chat area -->
-                <main class="flex-1 flex flex-col min-w-0 bg-[#fafafa]">
-                  <!-- Messages area -->
-                  <div
-                    class="flex-1 overflow-y-auto p-6"
-                    style="scrollbar-width: thin; scrollbar-color: #d1d5db transparent;"
-                  >
-                    <template x-if="chatMessages.length === 0">
-                      <div class="h-full flex flex-col items-center justify-center max-w-2xl mx-auto text-center">
-                        <div class="w-16 h-16 rounded-2xl bg-[#0078D4]/10 flex items-center justify-center mb-6">
-                          <i data-lucide="sparkles" class="w-8 h-8 text-[#0078D4]"></i>
-                        </div>
-                        <h2 class="text-2xl font-semibold text-gray-800 mb-2">How can I help you today?</h2>
-                        <p class="text-[14px] text-gray-500 mb-8">Ask me anything. I'm ready to assist.</p>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full">
-                          <template x-for="(prompt, i) in suggestedPrompts" :key="i">
-                            <button
-                              class="px-5 py-3.5 rounded-2xl text-left text-[13px] font-medium text-gray-700 bg-white border border-gray-200 hover:border-[#0078D4]/40 hover:bg-[#0078D4]/5 transition-all shadow-sm"
-                              x-text="prompt"
-                              @click="sendChat(prompt)"
-                            ></button>
-                          </template>
-                        </div>
+                      <div class="flex-1 overflow-y-auto px-2 pb-4">
+                        <template
+                          x-for="conv in chatConversations"
+                          :key="conv.id"
+                        >
+                          <button
+                            type="button"
+                            class="w-full text-left px-4 py-2.5 rounded-lg text-[13px] text-gray-700 hover:bg-gray-100 transition-colors mb-0.5 truncate"
+                            :class="activeConversationId === conv.id ? 'bg-gray-100 font-medium' : ''"
+                            @click="activeConversationId = conv.id; if (conv.messages) chatMessages = [...conv.messages]; else chatMessages = []"
+                          >
+                            <i
+                              data-lucide="message-circle"
+                              class="w-3.5 h-3.5 inline-block mr-2 text-gray-500 align-middle"
+                            ></i>
+                            <span x-text="conv.title"></span>
+                          </button>
+                        </template>
                       </div>
-                    </template>
+                      <div class="p-3 border-t border-gray-100">
+                        <span
+                          class="text-[11px] text-gray-400"
+                          x-text="window._aiUiChatBridge?.getPluginName?.() || 'Plugin'"
+                        ></span>
+                        <span
+                          class="text-[11px] text-green-600 ml-1"
+                          x-text="'●'"
+                        ></span>
+                      </div>
+                    </aside>
 
-                    <template x-if="chatMessages.length > 0">
-                      <div class="space-y-6 max-w-3xl mx-auto">
-                        <template x-for="(msg, idx) in chatMessages" :key="idx">
+                    <!-- Main chat area -->
+                    <main class="flex-1 flex flex-col min-w-0 bg-[#fafafa]">
+                      <!-- Messages area -->
+                      <div
+                        class="flex-1 overflow-y-auto p-6"
+                        style="
+                          scrollbar-width: thin;
+                          scrollbar-color: #d1d5db transparent;
+                        "
+                      >
+                        <template x-if="chatMessages.length === 0">
                           <div
-                            class="flex"
-                            :class="msg.role === 'user' ? 'justify-end' : 'justify-start'"
+                            class="h-full flex flex-col items-center justify-center max-w-2xl mx-auto text-center"
                           >
                             <div
-                              class="max-w-[85%] rounded-2xl px-4 py-3 text-[14px] leading-relaxed"
-                              :class="msg.role === 'user'
-                                ? 'bg-[#0078D4] text-white'
-                                : 'bg-white text-gray-800 border border-gray-200 shadow-sm'"
+                              class="w-16 h-16 rounded-2xl bg-[#0078D4]/10 flex items-center justify-center mb-6"
                             >
-                              <p x-text="msg.content" class="whitespace-pre-wrap"></p>
+                              <i
+                                data-lucide="sparkles"
+                                class="w-8 h-8 text-[#0078D4]"
+                              ></i>
+                            </div>
+                            <h2
+                              class="text-2xl font-semibold text-gray-800 mb-2"
+                            >
+                              How can I help you today?
+                            </h2>
+                            <p class="text-[14px] text-gray-500 mb-8">
+                              Ask me anything. I'm ready to assist.
+                            </p>
+                            <div
+                              class="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full"
+                            >
+                              <template
+                                x-for="(prompt, i) in suggestedPrompts"
+                                :key="i"
+                              >
+                                <button
+                                  class="px-5 py-3.5 rounded-2xl text-left text-[13px] font-medium text-gray-700 bg-white border border-gray-200 hover:border-[#0078D4]/40 hover:bg-[#0078D4]/5 transition-all shadow-sm"
+                                  x-text="prompt"
+                                  @click="sendChat(prompt)"
+                                ></button>
+                              </template>
                             </div>
                           </div>
                         </template>
-                        <template x-if="chatLoading">
-                          <div class="flex justify-start">
-                            <div class="max-w-[85%] rounded-2xl px-4 py-3 bg-white border border-gray-200 shadow-sm">
-                              <div class="flex gap-1">
-                                <span class="w-2 h-2 rounded-full bg-gray-400 animate-bounce" style="animation-delay: 0ms"></span>
-                                <span class="w-2 h-2 rounded-full bg-gray-400 animate-bounce" style="animation-delay: 150ms"></span>
-                                <span class="w-2 h-2 rounded-full bg-gray-400 animate-bounce" style="animation-delay: 300ms"></span>
+
+                        <template x-if="chatMessages.length > 0">
+                          <div class="space-y-6 max-w-3xl mx-auto">
+                            <template
+                              x-for="(msg, idx) in chatMessages"
+                              :key="idx"
+                            >
+                              <div
+                                class="flex"
+                                :class="msg.role === 'user' ? 'justify-end' : 'justify-start'"
+                              >
+                                <div
+                                  class="max-w-[85%] rounded-2xl px-4 py-3 text-[14px] leading-relaxed"
+                                  :class="msg.role === 'user'
+                                ? 'bg-[#0078D4] text-white'
+                                : 'bg-white text-gray-800 border border-gray-200 shadow-sm'"
+                                >
+                                  <p
+                                    x-text="msg.content"
+                                    class="whitespace-pre-wrap"
+                                  ></p>
+                                </div>
                               </div>
-                            </div>
+                            </template>
+                            <template x-if="chatLoading">
+                              <div class="flex justify-start">
+                                <div
+                                  class="max-w-[85%] rounded-2xl px-4 py-3 bg-white border border-gray-200 shadow-sm"
+                                >
+                                  <div class="flex gap-1">
+                                    <span
+                                      class="w-2 h-2 rounded-full bg-gray-400 animate-bounce"
+                                      style="animation-delay: 0ms"
+                                    ></span>
+                                    <span
+                                      class="w-2 h-2 rounded-full bg-gray-400 animate-bounce"
+                                      style="animation-delay: 150ms"
+                                    ></span>
+                                    <span
+                                      class="w-2 h-2 rounded-full bg-gray-400 animate-bounce"
+                                      style="animation-delay: 300ms"
+                                    ></span>
+                                  </div>
+                                </div>
+                              </div>
+                            </template>
                           </div>
                         </template>
                       </div>
-                    </template>
-                  </div>
 
-                  <!-- Input bar (Copilot-style) -->
-                  <div class="p-4 bg-white border-t border-gray-200">
-                    <div
-                      class="max-w-3xl mx-auto flex items-end gap-3 p-3 rounded-2xl bg-white border-2 border-gray-200 hover:border-[#0078D4]/40 focus-within:border-[#0078D4] transition-colors shadow-sm"
-                    >
-                      <textarea
-                        x-model="chatInput"
-                        placeholder="Ask me anything..."
-                        rows="1"
-                        class="flex-1 min-h-[44px] max-h-32 py-2.5 px-3 resize-none text-[14px] text-gray-800 placeholder-gray-400 bg-transparent border-none outline-none"
-                        :disabled="chatLoading"
-                        @keydown.enter="if (!$event.shiftKey) { $event.preventDefault(); if (chatInput.trim() && !chatLoading) { sendChat(); } }"
-                      ></textarea>
-                      <button
-                        class="flex-shrink-0 w-10 h-10 rounded-xl bg-[#0078D4] text-white flex items-center justify-center hover:bg-[#106ebe] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        :disabled="!chatInput.trim() || chatLoading"
-                        @click="sendChat()"
-                      >
-                        <i data-lucide="send" class="w-4 h-4"></i>
-                      </button>
-                    </div>
-                    <p class="text-[11px] text-gray-400 text-center mt-2">
-                      AI can make mistakes. Consider checking important information.
-                    </p>
+                      <!-- Input bar (Copilot-style) -->
+                      <div class="p-4 bg-white border-t border-gray-200">
+                        <div
+                          class="max-w-3xl mx-auto flex items-end gap-3 p-3 rounded-2xl bg-white border-2 border-gray-200 hover:border-[#0078D4]/40 focus-within:border-[#0078D4] transition-colors shadow-sm"
+                        >
+                          <textarea
+                            x-model="chatInput"
+                            placeholder="Ask me anything..."
+                            rows="1"
+                            class="flex-1 min-h-[44px] max-h-32 py-2.5 px-3 resize-none text-[14px] text-gray-800 placeholder-gray-400 bg-transparent border-none outline-none"
+                            :disabled="chatLoading"
+                            @keydown.enter="if (!$event.shiftKey) { $event.preventDefault(); if (chatInput.trim() && !chatLoading) { sendChat(); } }"
+                          ></textarea>
+                          <button
+                            class="flex-shrink-0 w-10 h-10 rounded-xl bg-[#0078D4] text-white flex items-center justify-center hover:bg-[#106ebe] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            :disabled="!chatInput.trim() || chatLoading"
+                            @click="sendChat()"
+                          >
+                            <i data-lucide="send" class="w-4 h-4"></i>
+                          </button>
+                        </div>
+                        <p class="text-[11px] text-gray-400 text-center mt-2">
+                          AI can make mistakes. Consider checking important
+                          information.
+                        </p>
+                      </div>
+                    </main>
                   </div>
-                </main>
-              </div>
                 </template>
 
                 <!-- Iframe embed (web_view: iframe) — plugin's own UI -->
@@ -1080,7 +1141,9 @@
           <div
             class="flex-1 min-h-0 bg-white rounded-2xl overflow-hidden shadow-2xl relative border border-white/5 animate-fade-in"
           >
-            <template x-if="aiUI.selectedPlugin.status === 'running' && aiUI.selectedPlugin.port">
+            <template
+              x-if="aiUI.selectedPlugin.status === 'running' && aiUI.selectedPlugin.port"
+            >
               <div class="w-full h-full flex flex-col">
                 <div
                   class="h-10 bg-black/5 border-b border-black/10 flex items-center justify-between px-4 flex-shrink-0"
@@ -1090,7 +1153,10 @@
                   >
                     <i data-lucide="book-open" class="w-4 h-4"></i>
                     <span x-text="aiUI.selectedPlugin.name + ' API'"></span>
-                    <span class="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-md font-bold">LIVE</span>
+                    <span
+                      class="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-md font-bold"
+                      >LIVE</span
+                    >
                   </div>
                   <a
                     :href="'http://localhost:' + aiUI.selectedPlugin.port + '/docs'"
@@ -1109,7 +1175,9 @@
                 ></iframe>
               </div>
             </template>
-            <template x-if="aiUI.selectedPlugin.status !== 'running' || !aiUI.selectedPlugin.port">
+            <template
+              x-if="aiUI.selectedPlugin.status !== 'running' || !aiUI.selectedPlugin.port"
+            >
               <div class="w-full h-full flex flex-col">
                 <div
                   class="h-10 bg-black/5 border-b border-black/10 flex items-center justify-between px-4 flex-shrink-0"
@@ -1119,7 +1187,10 @@
                   >
                     <i data-lucide="book-open" class="w-4 h-4"></i>
                     <span x-text="aiUI.selectedPlugin.name + ' API'"></span>
-                    <span class="text-[10px] bg-gray-200 text-gray-500 px-1.5 py-0.5 rounded-md font-bold">OFFLINE</span>
+                    <span
+                      class="text-[10px] bg-gray-200 text-gray-500 px-1.5 py-0.5 rounded-md font-bold"
+                      >OFFLINE</span
+                    >
                   </div>
                   <a
                     :href="'/api/ai-ui/plugins/' + aiUI.selectedPlugin.id + '/docs'"
@@ -1358,14 +1429,22 @@
           x-transition:enter-end="opacity-100 scale-100"
         >
           <!-- Modal header -->
-          <div class="flex items-center justify-between px-6 py-4 border-b border-white/10">
+          <div
+            class="flex items-center justify-between px-6 py-4 border-b border-white/10"
+          >
             <div class="flex items-center gap-3">
-              <div class="w-10 h-10 rounded-xl bg-accent/20 flex items-center justify-center">
+              <div
+                class="w-10 h-10 rounded-xl bg-accent/20 flex items-center justify-center"
+              >
                 <i data-lucide="settings" class="w-5 h-5 text-accent"></i>
               </div>
               <div>
-                <h3 class="text-lg font-bold text-white">AI Fast API Configuration</h3>
-                <p class="text-[12px] text-white/50">Provider, model, and runtime options</p>
+                <h3 class="text-lg font-bold text-white">
+                  AI Fast API Configuration
+                </h3>
+                <p class="text-[12px] text-white/50">
+                  Provider, model, and runtime options
+                </p>
               </div>
             </div>
             <button
@@ -1379,7 +1458,10 @@
           <!-- Modal body - AI Fast API config fields -->
           <div class="px-6 py-5 space-y-4 max-h-[60vh] overflow-y-auto">
             <div>
-              <label class="block text-[12px] font-semibold text-white/70 mb-1.5">LLM Backend</label>
+              <label
+                class="block text-[12px] font-semibold text-white/70 mb-1.5"
+                >LLM Backend</label
+              >
               <select
                 x-model="aiUI.pluginConfigDraft.LLM_BACKEND"
                 class="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-[14px] focus:border-accent focus:outline-none"
@@ -1389,7 +1471,10 @@
               </select>
             </div>
             <div>
-              <label class="block text-[12px] font-semibold text-white/70 mb-1.5">G4F Provider</label>
+              <label
+                class="block text-[12px] font-semibold text-white/70 mb-1.5"
+                >G4F Provider</label
+              >
               <div class="flex gap-2">
                 <template x-if="aiUI.configProviders.length > 0">
                   <select
@@ -1420,10 +1505,18 @@
                   <i data-lucide="copy" class="w-4 h-4"></i>
                 </button>
               </div>
-              <p x-show="aiUI.configProviders.length === 0" class="text-[11px] text-white/40 mt-1">Start the plugin to load options from API</p>
+              <p
+                x-show="aiUI.configProviders.length === 0"
+                class="text-[11px] text-white/40 mt-1"
+              >
+                Start the plugin to load options from API
+              </p>
             </div>
             <div>
-              <label class="block text-[12px] font-semibold text-white/70 mb-1.5">G4F Model</label>
+              <label
+                class="block text-[12px] font-semibold text-white/70 mb-1.5"
+                >G4F Model</label
+              >
               <div class="flex gap-2">
                 <template x-if="aiUI.configModels.length > 0">
                   <select
@@ -1453,10 +1546,18 @@
                   <i data-lucide="copy" class="w-4 h-4"></i>
                 </button>
               </div>
-              <p x-show="aiUI.configModels.length === 0" class="text-[11px] text-white/40 mt-1">Start the plugin to load options from API</p>
+              <p
+                x-show="aiUI.configModels.length === 0"
+                class="text-[11px] text-white/40 mt-1"
+              >
+                Start the plugin to load options from API
+              </p>
             </div>
             <div>
-              <label class="block text-[12px] font-semibold text-white/70 mb-1.5">Debug</label>
+              <label
+                class="block text-[12px] font-semibold text-white/70 mb-1.5"
+                >Debug</label
+              >
               <select
                 x-model="aiUI.pluginConfigDraft.DEBUG"
                 class="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-[14px] focus:border-accent focus:outline-none"
@@ -1466,7 +1567,10 @@
               </select>
             </div>
             <div>
-              <label class="block text-[12px] font-semibold text-white/70 mb-1.5">Host</label>
+              <label
+                class="block text-[12px] font-semibold text-white/70 mb-1.5"
+                >Host</label
+              >
               <input
                 type="text"
                 x-model="aiUI.pluginConfigDraft.HOST"
@@ -1475,7 +1579,10 @@
               />
             </div>
             <div>
-              <label class="block text-[12px] font-semibold text-white/70 mb-1.5">Port</label>
+              <label
+                class="block text-[12px] font-semibold text-white/70 mb-1.5"
+                >Port</label
+              >
               <input
                 type="text"
                 x-model="aiUI.pluginConfigDraft.PORT"
@@ -1498,7 +1605,9 @@
                 </template>
                 <template x-if="aiUI.testingConnection">
                   <span class="flex items-center gap-2">
-                    <div class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    <div
+                      class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"
+                    ></div>
                     Pinging...
                   </span>
                 </template>
@@ -1508,21 +1617,31 @@
                   class="text-[12px] flex items-center gap-1.5"
                   :class="aiUI.connectionTestResult.ok ? 'text-green-400' : 'text-red-400'"
                 >
-                  <i :data-lucide="aiUI.connectionTestResult.ok ? 'check-circle' : 'x-circle'" class="w-4 h-4"></i>
+                  <i
+                    :data-lucide="aiUI.connectionTestResult.ok ? 'check-circle' : 'x-circle'"
+                    class="w-4 h-4"
+                  ></i>
                   <span x-text="aiUI.connectionTestResult.message"></span>
                 </span>
               </template>
             </div>
-            <div class="rounded-lg bg-amber-500/10 border border-amber-500/20 px-4 py-3">
+            <div
+              class="rounded-lg bg-amber-500/10 border border-amber-500/20 px-4 py-3"
+            >
               <p class="text-[12px] text-amber-200/90">
-                <i data-lucide="info" class="w-4 h-4 inline-block mr-1.5 align-middle"></i>
+                <i
+                  data-lucide="info"
+                  class="w-4 h-4 inline-block mr-1.5 align-middle"
+                ></i>
                 Config changes take effect after restarting the plugin.
               </p>
             </div>
           </div>
 
           <!-- Modal footer -->
-          <div class="flex justify-end gap-2 px-6 py-4 border-t border-white/10 bg-black/20">
+          <div
+            class="flex justify-end gap-2 px-6 py-4 border-t border-white/10 bg-black/20"
+          >
             <button
               class="px-4 py-2.5 rounded-xl text-white/70 hover:text-white hover:bg-white/5 text-[13px] font-medium transition-colors"
               @click="closePluginConfigModal()"
