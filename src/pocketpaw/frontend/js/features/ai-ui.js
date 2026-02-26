@@ -60,6 +60,7 @@ window.PocketPaw.AiUI = {
         // Discover / gallery
         gallery: [],
         galleryLoading: false,
+        installingGalleryApp: null,
 
         // Plugin detail tab (persisted in URL: overview | web | api)
         pluginDetailTab: "web",
@@ -256,6 +257,9 @@ window.PocketPaw.AiUI = {
             );
             this.aiUI.installForm.url = "";
             await this.fetchPlugins();
+            if (data.plugin_id) {
+              await this.openAiUIPlugin(data.plugin_id);
+            }
           } else {
             const err = await res.json();
             this.showToast(err.detail || "Installation failed", "error");
@@ -265,6 +269,95 @@ window.PocketPaw.AiUI = {
           this.showToast("Installation failed", "error");
         } finally {
           this.aiUI.installForm.installing = false;
+        }
+      },
+
+      getAiUIPluginById(pluginId) {
+        return this.aiUI.plugins.find((p) => p.id === pluginId) || null;
+      },
+
+      async openAiUIPlugin(pluginId) {
+        if (!pluginId) return;
+
+        let plugin = this.getAiUIPluginById(pluginId);
+        if (!plugin) {
+          await this.fetchPlugins();
+          plugin = this.getAiUIPluginById(pluginId);
+        }
+        if (!plugin) {
+          this.showToast("Plugin not found", "error");
+          return;
+        }
+
+        if (plugin.status !== "running") {
+          await this.launchAiUIPlugin(pluginId);
+          await this.fetchPlugins();
+          plugin = this.getAiUIPluginById(pluginId) || plugin;
+        }
+
+        await this.selectAiUIPlugin(plugin);
+        this.setPluginDetailTab("web");
+      },
+
+      isGalleryAppInstalled(app) {
+        return !!this.getAiUIPluginById(app?.id);
+      },
+
+      galleryInstallLabel(app) {
+        if (this.aiUI.installingGalleryApp === app?.id) return "Installing...";
+        const plugin = this.getAiUIPluginById(app?.id);
+        if (plugin) return plugin.status === "running" ? "Open" : "Start & Open";
+        return "Install";
+      },
+
+      galleryActionIcon(app) {
+        if (this.aiUI.installingGalleryApp === app?.id) return "loader-2";
+        const plugin = this.getAiUIPluginById(app?.id);
+        if (!plugin) return "download";
+        return plugin.status === "running" ? "external-link" : "play";
+      },
+
+      async installAiUIGalleryApp(app) {
+        const source = (app?.source || "").trim();
+        if (!source) {
+          this.showToast("This app has no install source", "error");
+          return;
+        }
+
+        const installed = this.getAiUIPluginById(app.id);
+        if (installed) {
+          await this.openAiUIPlugin(app.id);
+          return;
+        }
+
+        this.aiUI.installingGalleryApp = app.id;
+        try {
+          const res = await fetch("/api/ai-ui/plugins/install", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ source }),
+          });
+          if (res.ok) {
+            const data = await res.json();
+            this.showToast(
+              data.message || "Plugin installed successfully!",
+              "success",
+            );
+            await this.fetchPlugins();
+            await this.fetchGallery();
+            await this.openAiUIPlugin(data.plugin_id || app.id);
+          } else {
+            const err = await res.json();
+            this.showToast(err.detail || "Installation failed", "error");
+          }
+        } catch (e) {
+          console.error("Gallery install error:", e);
+          this.showToast("Installation failed", "error");
+        } finally {
+          this.aiUI.installingGalleryApp = null;
+          this.$nextTick(() => {
+            if (window.refreshIcons) window.refreshIcons();
+          });
         }
       },
 
@@ -291,8 +384,10 @@ window.PocketPaw.AiUI = {
               "success",
             );
             await this.fetchPlugins();
-            if (this.aiUI.selectedPlugin?.id === data.plugin_id) {
-              const plugin = this.aiUI.plugins.find((p) => p.id === data.plugin_id);
+            if (data.plugin_id) {
+              await this.openAiUIPlugin(data.plugin_id);
+            } else if (this.aiUI.selectedPlugin?.id) {
+              const plugin = this.aiUI.plugins.find((p) => p.id === this.aiUI.selectedPlugin.id);
               if (plugin) this.aiUI.selectedPlugin = plugin;
             }
             this.$nextTick(() => {

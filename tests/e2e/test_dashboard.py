@@ -7,6 +7,9 @@
 # Run with: pytest tests/e2e/ -v --headed (to see browser)
 # Run headless: pytest tests/e2e/ -v
 
+import json
+import re
+
 from playwright.sync_api import Page, expect
 
 
@@ -238,6 +241,71 @@ class TestSidebarNavigation:
         # Check for Settings or other sidebar elements
         sidebar = page.locator("aside, nav").first
         expect(sidebar).to_be_visible()
+
+
+class TestAiUIDiscoveryInstall:
+    """E2E tests for AI UI Discover install flow."""
+
+    def test_discover_install_is_one_click_without_plugins_redirect(
+        self, page: Page, dashboard_url: str
+    ):
+        """Install from Discover directly and keep the user in Discover view."""
+        state = {"install_calls": 0}
+
+        def handle_requirements(route):
+            route.fulfill(
+                status=200,
+                content_type="application/json",
+                body='{"requirements":[]}',
+            )
+
+        def handle_gallery(route):
+            route.fulfill(
+                status=200,
+                content_type="application/json",
+                body=(
+                    '{"apps":[{"id":"g4f-chat-template","name":"Gf4 Chat (Template)",'
+                    '"description":"Template","icon":"message-circle","source":'
+                    '"builtin:g4f-chat-template","stars":"GUI Chat","category":"Template"}]}'
+                ),
+            )
+
+        def handle_plugins(route):
+            route.fulfill(
+                status=200,
+                content_type="application/json",
+                body=json.dumps({"plugins": []}),
+            )
+
+        def handle_install(route):
+            if route.request.method == "POST":
+                state["install_calls"] += 1
+                route.fulfill(
+                    status=200,
+                    content_type="application/json",
+                    body='{"status":"ok","message":"Installed","plugin_id":"g4f-chat-template"}',
+                )
+                return
+            route.continue_()
+
+        page.route("**/api/ai-ui/requirements*", handle_requirements)
+        page.route("**/api/ai-ui/gallery*", handle_gallery)
+        page.route(re.compile(r".*/api/ai-ui/plugins/install(?:\?.*)?$"), handle_install)
+        page.route(re.compile(r".*/api/ai-ui/plugins(?:\?.*)?$"), handle_plugins)
+
+        page.goto(dashboard_url)
+        page.locator("button:has-text('AI UI Local Cloud')").click()
+        page.locator("button:has-text('Discover'):visible").first.click()
+
+        expect(page.get_by_text("Discover AI Apps")).to_be_visible()
+        g4f_card = page.locator("div:has-text('builtin:g4f-chat-template')").first
+        g4f_card.locator("button:has-text('Install')").click()
+
+        expect(page.get_by_text("Discover AI Apps")).to_be_visible()
+        expect(g4f_card.locator("button:has-text('Install')")).to_be_visible(timeout=10000)
+        assert state["install_calls"] == 1
+        assert "#/ai-ui/plugin/" not in page.url
+        assert "#/ai-ui/plugins" not in page.url
 
     def test_settings_opens(self, page: Page, dashboard_url: str):
         """Test that settings modal can be opened."""

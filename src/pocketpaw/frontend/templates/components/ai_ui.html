@@ -1286,11 +1286,16 @@
                     x-text="app.source"
                   ></code>
                   <button
-                    class="px-3 py-1.5 bg-accent/10 text-accent hover:bg-accent/20 rounded-lg text-[11px] font-medium transition-all border border-accent/20 hover:scale-105 flex items-center gap-1.5"
-                    @click="aiUI.installForm.url = app.source; setAiUIView('plugins')"
+                    class="px-3 py-1.5 bg-accent/10 text-accent hover:bg-accent/20 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-[11px] font-medium transition-all border border-accent/20 hover:scale-105 disabled:hover:scale-100 flex items-center gap-1.5"
+                    :disabled="aiUI.installingGalleryApp === app.id"
+                    @click.stop="installAiUIGalleryApp(app)"
                   >
-                    <i data-lucide="download" class="w-3 h-3"></i>
-                    Install
+                    <i
+                      :data-lucide="galleryActionIcon(app)"
+                      :class="aiUI.installingGalleryApp === app.id ? 'animate-spin' : ''"
+                      class="w-3 h-3"
+                    ></i>
+                    <span x-text="galleryInstallLabel(app)"></span>
                   </button>
                 </div>
               </div>
