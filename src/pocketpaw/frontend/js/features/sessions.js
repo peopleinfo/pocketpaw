@@ -16,6 +16,7 @@ window.PocketPaw.Sessions = {
       sessions: [],
       currentSessionId: null,
       sessionsLoading: false,
+      sessionsClearing: false,
       sessionsTotal: 0,
       sessionSearch: "",
       sessionsCollapsed: false,
@@ -121,6 +122,45 @@ window.PocketPaw.Sessions = {
           }
         } catch (e) {
           console.error("[Sessions] Delete failed:", e);
+        }
+      },
+
+      /**
+       * Delete all sessions from sidebar.
+       */
+      async clearAllSessions() {
+        if (this.sessionsClearing || this.sessionsTotal === 0) return;
+        if (!confirm("Clear all sessions? This cannot be undone.")) return;
+
+        this.sessionsClearing = true;
+        try {
+          const res = await fetch("/api/sessions", { method: "DELETE" });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+          const data = await res.json();
+          for (const session of this.sessions) {
+            StateManager.invalidateSession(session.id);
+          }
+
+          this.sessions = [];
+          this.sessionsTotal = 0;
+          this.sessionSearch = "";
+
+          this.currentSessionId = null;
+          this.messages = [];
+          this.isStreaming = false;
+          this.isThinking = false;
+          this.streamingContent = "";
+          StateManager.remove("lastSession");
+
+          // Start a fresh backend session key for subsequent messages.
+          socket.send("new_session");
+          this.showToast(`Cleared ${data.deleted ?? 0} sessions`, "success");
+        } catch (e) {
+          console.error("[Sessions] Clear all failed:", e);
+          this.showToast("Failed to clear sessions", "error");
+        } finally {
+          this.sessionsClearing = false;
         }
       },
 

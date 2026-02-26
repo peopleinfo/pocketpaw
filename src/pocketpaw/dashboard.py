@@ -1169,6 +1169,36 @@ async def list_sessions(limit: int = 20):
     return result.get("sessions", [])
 
 
+@app.delete("/api/sessions")
+async def delete_all_sessions():
+    """Delete all session files tracked in the session index."""
+    manager = get_memory_manager()
+    store = manager._store
+
+    if not hasattr(store, "_load_session_index") or not hasattr(store, "delete_session"):
+        raise HTTPException(status_code=501, detail="Store does not support bulk session deletion")
+
+    index = store._load_session_index()
+    session_ids = list(index.keys())
+
+    deleted = 0
+    for session_id in session_ids:
+        try:
+            if await store.delete_session(session_id):
+                deleted += 1
+        except Exception:
+            continue
+
+    # Reset alias table so stale source->target mappings don't reference deleted sessions.
+    if hasattr(store, "_save_aliases"):
+        try:
+            store._save_aliases({})
+        except Exception:
+            pass
+
+    return {"status": "ok", "deleted": deleted, "total": len(session_ids)}
+
+
 @app.delete("/api/sessions/{session_id}")
 async def delete_session(session_id: str):
     """Delete a session by ID."""

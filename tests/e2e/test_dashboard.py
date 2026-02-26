@@ -242,6 +242,47 @@ class TestSidebarNavigation:
         sidebar = page.locator("aside, nav").first
         expect(sidebar).to_be_visible()
 
+    def test_clear_all_sessions_from_sidebar(self, page: Page, dashboard_url: str):
+        """Clear all sessions from the left sidebar Chats menu."""
+        state = {"delete_all_calls": 0}
+
+        def handle_sessions(route):
+            if route.request.method == "GET":
+                route.fulfill(
+                    status=200,
+                    content_type="application/json",
+                    body=(
+                        '{"sessions":[{"id":"websocket_test_clear","title":"Session To Clear",'
+                        '"channel":"websocket","created":"2026-02-26T10:00:00",'
+                        '"last_activity":"2026-02-26T10:00:00","message_count":1,'
+                        '"preview":"hello"}],"total":1}'
+                    ),
+                )
+                return
+
+            if route.request.method == "DELETE":
+                state["delete_all_calls"] += 1
+                route.fulfill(
+                    status=200,
+                    content_type="application/json",
+                    body='{"status":"ok","deleted":1,"total":1}',
+                )
+                return
+
+            route.continue_()
+
+        page.route(re.compile(r".*/api/sessions(?:\?.*)?$"), handle_sessions)
+
+        page.goto(dashboard_url)
+        expect(page.get_by_text("Session To Clear").first).to_be_visible()
+
+        page.on("dialog", lambda dialog: dialog.accept())
+        page.locator("button:has-text('Clear All')").click()
+
+        page.wait_for_timeout(700)
+        assert state["delete_all_calls"] == 1
+        expect(page.get_by_text("No conversations yet")).to_be_visible()
+
 
 class TestAiUIDiscoveryInstall:
     """E2E tests for AI UI Discover install flow."""

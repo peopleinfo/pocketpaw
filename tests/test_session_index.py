@@ -331,6 +331,39 @@ class TestSessionsRESTEndpoints:
         resp = client.delete("/api/sessions/nonexistent_session_12345", headers=_auth_headers())
         assert resp.status_code == 404
 
+    def test_delete_all_sessions(self, client, tmp_path):
+        store = FileMemoryStore(base_path=tmp_path / "memory")
+
+        session_ids = ["websocket_bulk_a", "websocket_bulk_b"]
+        payload = [
+            {
+                "id": "1",
+                "role": "user",
+                "content": "hello",
+                "timestamp": "2026-02-26T10:00:00",
+                "metadata": {},
+            }
+        ]
+        for session_id in session_ids:
+            (store.sessions_path / f"{session_id}.json").write_text(json.dumps(payload))
+
+        store.rebuild_session_index()
+        store._save_aliases({"websocket:source": "websocket_bulk_a"})
+
+        fake_manager = MagicMock()
+        fake_manager._store = store
+
+        with patch("pocketpaw.dashboard.get_memory_manager", return_value=fake_manager):
+            resp = client.delete("/api/sessions", headers=_auth_headers())
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["status"] == "ok"
+        assert data["deleted"] == 2
+        assert data["total"] == 2
+        assert store._load_session_index() == {}
+        assert store._load_aliases() == {}
+
     def test_update_title_no_body(self, client):
         resp = client.post(
             "/api/sessions/nonexistent/title",
