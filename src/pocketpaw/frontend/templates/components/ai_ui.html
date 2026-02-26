@@ -663,7 +663,7 @@
                 <button
                   type="button"
                   class="px-2 py-0.5 bg-white/5 text-white hover:bg-white/10 rounded text-[11px] font-medium transition-all border border-white/10 flex items-center gap-1 disabled:opacity-50"
-                  :title="'Test LLM (' + (aiUI.selectedPlugin?.env?.LLM_BACKEND || 'g4f') + ' - ' + (aiUI.selectedPlugin?.env?.G4F_MODEL || 'gpt-4o-mini') + ')'"
+                  :title="'Test LLM (' + (aiUI.selectedPlugin?.env?.G4F_MODEL || 'gpt-4o-mini') + ')'"
                   :disabled="aiUI.testingDetailConnection"
                   @click="testPluginConnectionFromDetail()"
                 >
@@ -683,9 +683,9 @@
                   </template>
                 </button>
                 <span
-                  class="text-[10px] text-white/40 font-mono truncate max-w-[150px]"
-                  :title="(aiUI.selectedPlugin?.env?.LLM_BACKEND || 'g4f') + ' - ' + (aiUI.selectedPlugin?.env?.G4F_MODEL || 'gpt-4o-mini')"
-                  x-text="(aiUI.selectedPlugin?.env?.LLM_BACKEND || 'g4f') + ' - ' + (aiUI.selectedPlugin?.env?.G4F_MODEL || 'gpt-4o-mini')"
+                  class="text-[10px] text-white/40 font-mono truncate max-w-[120px]"
+                  :title="aiUI.selectedPlugin?.env?.G4F_MODEL || 'gpt-4o-mini'"
+                  x-text="aiUI.selectedPlugin?.env?.G4F_MODEL || 'gpt-4o-mini'"
                 ></span>
               </div>
             </template>
