@@ -534,9 +534,17 @@ async def websocket_handler(
 
             # Handle get_settings - return current settings to frontend
             elif action == "get_settings":
+                from pocketpaw.agents.registry import get_backend_class, get_backend_info
+
+                selected_backend = settings.agent_backend
+                backend_available = get_backend_class(selected_backend) is not None
+                backend_info = get_backend_info(selected_backend)
                 agent_status = {
                     "status": "running" if agent_loop._running else "stopped",
                     "backend": "AgentLoop",
+                    "available": backend_available,
+                    "selectedBackend": selected_backend,
+                    "features": backend_info.builtin_tools if backend_info else [],
                 }
 
                 await websocket.send_json(

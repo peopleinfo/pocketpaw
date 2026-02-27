@@ -94,6 +94,38 @@ class TestDashboardLoads:
         assert result["external_target"] == "_blank"
 
 
+class TestChatShortcuts:
+    """Tests for the chat composer shortcuts/help menu."""
+
+    def test_shortcuts_menu_fills_help_command(self, page: Page, dashboard_url: str):
+        """Clicking /help in shortcuts menu should insert it into chat input."""
+        page.goto(dashboard_url)
+
+        toggle = page.get_by_label("Toggle quick shortcuts")
+        expect(toggle).to_be_visible()
+        toggle.click()
+
+        expect(page.get_by_text("Quick Shortcuts")).to_be_visible()
+        page.locator("button:has-text('/help')").first.click()
+
+        chat_input = page.get_by_label("Chat message input")
+        expect(chat_input).to_have_value("/help ")
+
+    def test_shortcuts_menu_closes_on_outside_click(self, page: Page, dashboard_url: str):
+        """Quick shortcuts should close when user clicks outside composer."""
+        page.goto(dashboard_url)
+
+        toggle = page.get_by_label("Toggle quick shortcuts")
+        expect(toggle).to_be_visible()
+        toggle.click()
+
+        shortcuts_header = page.get_by_text("Quick Shortcuts")
+        expect(shortcuts_header).to_be_visible()
+
+        page.mouse.click(20, 20)
+        expect(shortcuts_header).to_be_hidden()
+
+
 class TestCrewView:
     """Tests for the Crew (Control Room) view."""
 

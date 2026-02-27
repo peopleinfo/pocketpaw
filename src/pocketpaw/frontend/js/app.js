@@ -506,7 +506,8 @@ function app() {
 
             // Log agent status if available
             if (s.agentStatus) {
-                this.log(`Agent: ${s.agentStatus.backend} (available: ${s.agentStatus.available})`, 'info');
+                const isAvailable = s.agentStatus.available ?? false;
+                this.log(`Agent: ${s.agentStatus.backend} (available: ${isAvailable})`, 'info');
                 if (s.agentStatus.features?.length > 0) {
                     this.log(`Features: ${s.agentStatus.features.join(', ')}`, 'info');
                 }

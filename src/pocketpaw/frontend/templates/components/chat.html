@@ -94,7 +94,34 @@
   <!-- Input Area — flex child, gradient fade, safe-area inset -->
   <div class="shrink-0 relative z-20">
     <div class="absolute inset-x-0 -top-8 h-8 bg-gradient-to-t from-black to-transparent pointer-events-none"></div>
-    <div class="bg-black px-3 md:px-8 pb-2 md:pb-4 pt-1" style="padding-bottom: max(0.5rem, env(safe-area-inset-bottom))">
+    <div class="bg-black px-3 md:px-8 pb-2 md:pb-4 pt-1" style="padding-bottom: max(0.5rem, env(safe-area-inset-bottom))" @click.outside="showComposerHelp = false">
+      <div
+        class="mb-2 rounded-2xl border border-[var(--glass-border)] bg-[#1f1f21]/95 px-3 py-2 md:px-4 md:py-3"
+        x-show="showComposerHelp || inputText.trim().startsWith('/')"
+        x-transition.opacity.duration.150ms
+      >
+        <div class="flex items-center justify-between gap-2">
+          <p class="text-[11px] md:text-xs font-semibold uppercase tracking-wide text-white/65">Quick Shortcuts</p>
+          <p class="text-[10px] md:text-[11px] text-white/45">Ctrl/Cmd + /</p>
+        </div>
+        <div class="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2">
+          <template x-for="item in getVisibleQuickCommands()" :key="item.command">
+            <button
+              type="button"
+              @click="insertQuickCommand(item.command)"
+              class="text-left rounded-xl border border-white/10 bg-white/5 px-3 py-2 hover:bg-white/10 transition-colors"
+            >
+              <p class="text-[12px] md:text-[13px] font-mono text-[var(--accent-color)]" x-text="item.command"></p>
+              <p class="text-[11px] md:text-xs text-white/60 mt-0.5" x-text="item.description"></p>
+            </button>
+          </template>
+        </div>
+        <div class="mt-2 flex flex-wrap gap-1.5 text-[10px] md:text-[11px] text-white/45">
+          <span class="rounded-md bg-white/5 px-2 py-1">Ctrl/Cmd+N New Chat</span>
+          <span class="rounded-md bg-white/5 px-2 py-1">Ctrl/Cmd+K Search</span>
+          <span class="rounded-md bg-white/5 px-2 py-1">Ctrl/Cmd+, Settings</span>
+        </div>
+      </div>
       <form
         class="relative flex items-center bg-[#2c2c2e]/90 backdrop-blur-xl border border-[var(--glass-border)] rounded-[24px] shadow-2xl transition-all focus-within:ring-1 focus-within:ring-white/20 focus-within:bg-[#323234]"
         @submit.prevent="sendMessage()"
@@ -115,12 +142,23 @@
           ></span>
         </label>
         <div class="w-px h-5 bg-white/10 mx-2 shrink-0"></div>
+        <button
+          type="button"
+          @click="toggleComposerHelp()"
+          class="shrink-0 w-7 h-7 rounded-full bg-white/5 hover:bg-white/12 text-white/70 hover:text-white transition-colors flex items-center justify-center"
+          aria-label="Toggle quick shortcuts"
+          title="Shortcuts (Ctrl/Cmd+/)"
+        >
+          <i data-lucide="help-circle" class="w-4 h-4"></i>
+        </button>
 
         <input
           type="text"
           class="flex-1 bg-transparent border-none text-[15px] text-white placeholder-white/30 py-4 pr-14 focus:outline-none focus:ring-0"
           placeholder="Type a message..."
           x-model="inputText"
+          x-ref="chatInput"
+          @keydown="handleComposerKeydown($event)"
           :disabled="isStreaming"
           aria-label="Chat message input"
         />

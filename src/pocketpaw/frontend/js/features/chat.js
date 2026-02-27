@@ -26,6 +26,17 @@ window.PocketPaw.Chat = {
             streamingContent: '',
             streamingMessageId: null,
             hasShownWelcome: false,
+            showComposerHelp: false,
+            quickCommands: [
+                { command: '/help', description: 'Show all chat commands and usage tips.' },
+                { command: '/tools', description: 'List the tools currently enabled.' },
+                { command: '/backends', description: 'Show available agent backends.' },
+                { command: '/status', description: 'Check current system status.' },
+                {
+                    command: 'What can you do in this project?',
+                    description: 'Ask the agent for concrete capabilities here.'
+                }
+            ],
 
             // Messages
             messages: [],
@@ -191,6 +202,7 @@ window.PocketPaw.Chat = {
                 // Add user message
                 this.addMessage('user', text);
                 this.inputText = '';
+                this.showComposerHelp = false;
 
                 // Start streaming indicator
                 this.startStreaming();
@@ -216,6 +228,59 @@ window.PocketPaw.Chat = {
             toggleAgent() {
                 socket.toggleAgent(this.agentActive);
                 this.log(`Switched Agent Mode: ${this.agentActive ? 'ON' : 'OFF'}`, 'info');
+            },
+
+            /**
+             * Toggle quick command/help panel above chat composer.
+             */
+            toggleComposerHelp() {
+                this.showComposerHelp = !this.showComposerHelp;
+                if (this.showComposerHelp) {
+                    this.$nextTick(() => {
+                        if (this.$refs.chatInput) this.$refs.chatInput.focus();
+                    });
+                }
+            },
+
+            /**
+             * Keyboard support for chat composer helpers.
+             */
+            handleComposerKeydown(event) {
+                const slashShortcut = (event.metaKey || event.ctrlKey) && event.key === '/';
+                if (slashShortcut) {
+                    event.preventDefault();
+                    this.toggleComposerHelp();
+                    return;
+                }
+
+                if (event.key === 'Escape' && this.showComposerHelp) {
+                    event.preventDefault();
+                    this.showComposerHelp = false;
+                }
+            },
+
+            /**
+             * Filter quick commands when user starts typing "/" commands.
+             */
+            getVisibleQuickCommands() {
+                const query = (this.inputText || '').trim().toLowerCase();
+                if (!query.startsWith('/')) return this.quickCommands;
+                return this.quickCommands.filter((item) =>
+                    item.command.toLowerCase().includes(query)
+                    || item.description.toLowerCase().includes(query)
+                );
+            },
+
+            /**
+             * Put a quick command/prompt into the chat input.
+             */
+            insertQuickCommand(command) {
+                const needsSpace = command.startsWith('/');
+                this.inputText = needsSpace ? `${command} ` : command;
+                this.showComposerHelp = false;
+                this.$nextTick(() => {
+                    if (this.$refs.chatInput) this.$refs.chatInput.focus();
+                });
             }
         };
     }
