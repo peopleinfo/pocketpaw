@@ -13,6 +13,8 @@ from pocketpaw.config import get_config_dir, get_settings
 
 logger = logging.getLogger(__name__)
 
+_DISK_WARN_MB = 2048
+
 
 def _get_reports_dir() -> Path:
     """Get/create the audit reports directory."""
@@ -69,8 +71,8 @@ def _check_disk_usage() -> tuple[bool, str]:
         total = sum(f.stat().st_size for f in config_dir.rglob("*") if f.is_file())
         total_mb = total / (1024 * 1024)
 
-        if total_mb > 500:
-            return False, f"Data directory is {total_mb:.0f} MB (>500 MB)"
+        if total_mb > _DISK_WARN_MB:
+            return False, f"Data directory is {total_mb:.0f} MB (>{_DISK_WARN_MB:,} MB)"
         return True, f"Data directory size: {total_mb:.1f} MB"
     except Exception as e:
         return False, f"Could not check disk usage: {e}"

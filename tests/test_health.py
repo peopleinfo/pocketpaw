@@ -381,6 +381,7 @@ class TestCheckApiKeyPrimary:
 class TestCheckApiKeyFormat:
     def test_valid_anthropic_key(self):
         settings = MagicMock()
+        settings.agent_backend = "claude_agent_sdk"
         settings.anthropic_api_key = "sk-ant-valid123"
         settings.openai_api_key = ""
         with patch(_P_SETTINGS, return_value=settings):
@@ -389,6 +390,7 @@ class TestCheckApiKeyFormat:
 
     def test_invalid_anthropic_key_format(self):
         settings = MagicMock()
+        settings.agent_backend = "claude_agent_sdk"
         settings.anthropic_api_key = "bad-key-format"
         settings.openai_api_key = ""
         with patch(_P_SETTINGS, return_value=settings):
@@ -398,11 +400,31 @@ class TestCheckApiKeyFormat:
 
     def test_no_keys_is_ok(self):
         settings = MagicMock()
+        settings.agent_backend = "claude_agent_sdk"
         settings.anthropic_api_key = ""
         settings.openai_api_key = ""
         with patch(_P_SETTINGS, return_value=settings):
             r = check_api_key_format()
             assert r.status == "ok"
+
+    def test_openai_key_format_skipped_for_subprocess_backends(self):
+        settings = MagicMock()
+        settings.agent_backend = "codex_cli"
+        settings.anthropic_api_key = ""
+        settings.openai_api_key = "non-sk-token"
+        with patch(_P_SETTINGS, return_value=settings):
+            r = check_api_key_format()
+            assert r.status == "ok"
+
+    def test_openai_key_format_checked_for_openai_agents_backend(self):
+        settings = MagicMock()
+        settings.agent_backend = "openai_agents"
+        settings.anthropic_api_key = ""
+        settings.openai_api_key = "non-sk-token"
+        with patch(_P_SETTINGS, return_value=settings):
+            r = check_api_key_format()
+            assert r.status == "warning"
+            assert "openai_api_key" in r.message
 
 
 class TestCheckBackendDeps:
@@ -493,6 +515,16 @@ class TestCheckDiskSpace:
             r = check_disk_space()
             assert r.status == "ok"
             assert r.check_id == "disk_space"
+
+    def test_warn_threshold_is_not_500mb_anymore(self, tmp_path):
+        blob = tmp_path / "blob.bin"
+        with blob.open("wb") as handle:
+            handle.seek((600 * 1024 * 1024) - 1)
+            handle.write(b"\0")
+
+        with patch(_P_CONFIG_DIR, return_value=tmp_path):
+            r = check_disk_space()
+            assert r.status == "ok"
 
 
 class TestCheckAuditLogWritable:

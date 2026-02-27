@@ -57,12 +57,25 @@ python -m build
 
 ## Verification Workflow (Required)
 
-Follow [`docs/workflow.md`](docs/workflow.md) for all coding tasks.
+Follow [`workflow.md`](workflow.md) for all coding tasks.
 
 - Do not mark tasks done without verification evidence.
 - Coding tasks must include at least one relevant E2E test run.
 - Prefer headless E2E; if headed is needed, run one target at a time and keep single-tab behavior.
 - Final update must list executed commands with pass/fail and exit code.
+
+## Token-Saving Workflow (Permanent)
+
+Use this workflow by default to reduce unnecessary token/tool usage:
+
+- Scope first: inspect only files and modules directly related to the task.
+- Edit once, then verify once: avoid repeated exploratory reruns unless a check fails.
+- Run focused checks only:
+  - Lint/type check only touched targets when possible.
+  - Run at least one relevant E2E test for coding tasks (per required workflow).
+- Avoid duplicate broad scans (`rg`, `sed`, `pytest`, `mypy`, `ruff`) after context is already clear.
+- Avoid extra live UI checks/screenshots unless explicitly requested or needed to resolve ambiguity.
+- Keep progress/final messages concise and evidence-focused.
 
 ## Architecture
 

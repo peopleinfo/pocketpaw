@@ -308,15 +308,26 @@ _KEY_PATTERNS = {
     "openai_api_key": re.compile(r"^sk-"),
 }
 
+# Backends that do not require API key format validation here because
+# credentials are handled by external CLIs or provider-specific flows.
+_SKIP_OPENAI_FORMAT_BACKENDS = {"codex_cli", "opencode", "copilot_sdk"}
+
+# Data directory thresholds (MiB) for health warnings.
+_DISK_WARN_MB = 2048
+_DISK_CRITICAL_MB = 5120
+
 
 def check_api_key_format() -> HealthCheckResult:
     """Validate that configured API keys match expected prefix patterns."""
     from pocketpaw.config import get_settings
 
     settings = get_settings()
+    backend = str(getattr(settings, "agent_backend", "") or "")
     warnings = []
 
     for field_name, pattern in _KEY_PATTERNS.items():
+        if field_name == "openai_api_key" and backend in _SKIP_OPENAI_FORMAT_BACKENDS:
+            continue
         value = getattr(settings, field_name, None)
         if value and not pattern.match(value):
             warnings.append(f"{field_name} doesn't match expected format ({pattern.pattern})")
@@ -471,13 +482,22 @@ def check_disk_space() -> HealthCheckResult:
     try:
         total = sum(f.stat().st_size for f in config_dir.rglob("*") if f.is_file())
         total_mb = total / (1024 * 1024)
-        if total_mb > 500:
+        if total_mb > _DISK_CRITICAL_MB:
+            return HealthCheckResult(
+                check_id="disk_space",
+                name="Disk Space",
+                category="storage",
+                status="critical",
+                message=f"Data directory is {total_mb:.0f} MB (>{_DISK_CRITICAL_MB:,} MB)",
+                fix_hint="Clear old sessions or audit logs in ~/.pocketpaw/",
+            )
+        if total_mb > _DISK_WARN_MB:
             return HealthCheckResult(
                 check_id="disk_space",
                 name="Disk Space",
                 category="storage",
                 status="warning",
-                message=f"Data directory is {total_mb:.0f} MB (>500 MB)",
+                message=f"Data directory is {total_mb:.0f} MB (>{_DISK_WARN_MB:,} MB)",
                 fix_hint="Clear old sessions or audit logs in ~/.pocketpaw/",
             )
         return HealthCheckResult(
