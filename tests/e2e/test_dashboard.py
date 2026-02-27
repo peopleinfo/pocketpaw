@@ -364,6 +364,84 @@ class TestSidebarNavigation:
         assert state["delete_all_calls"] == 1
         expect(page.get_by_text("No conversations yet")).to_be_visible()
 
+    def test_delete_single_session_via_context_menu(self, page: Page, dashboard_url: str):
+        """Session context menu should delete only the selected chat."""
+        state = {"delete_calls": 0}
+
+        def handle_sessions(route):
+            if route.request.method == "GET":
+                route.fulfill(
+                    status=200,
+                    content_type="application/json",
+                    body=(
+                        '{"sessions":[{"id":"websocket_ctx_delete","title":"Ctx Delete Session",'
+                        '"channel":"websocket","created":"2026-02-26T10:00:00",'
+                        '"last_activity":"2026-02-26T10:00:00","message_count":1,'
+                        '"preview":"delete me"}],"total":1}'
+                    ),
+                )
+                return
+
+            if route.request.method == "DELETE":
+                state["delete_calls"] += 1
+                route.fulfill(status=200, content_type="application/json", body='{"status":"ok"}')
+                return
+
+            route.continue_()
+
+        page.route(re.compile(r".*/api/sessions(?:/[^/?]+)?(?:\?.*)?$"), handle_sessions)
+
+        page.goto(dashboard_url)
+        target = page.locator("button:has-text('Ctx Delete Session')").first
+        expect(target).to_be_visible()
+
+        target.click(button="right")
+        expect(page.locator("button:has-text('Delete chat')").first).to_be_visible()
+        page.locator("button:has-text('Delete chat')").first.click()
+
+        page.wait_for_timeout(700)
+        assert state["delete_calls"] == 1
+        expect(page.get_by_text("No conversations yet")).to_be_visible()
+
+    def test_session_click_from_terminal_navigates_to_chat_route(
+        self, page: Page, dashboard_url: str
+    ):
+        """Clicking a sidebar session from Terminal should switch to #/chat/<session-id>."""
+        session_id = "websocket_route_test"
+
+        def handle_sessions(route):
+            if route.request.method == "GET":
+                route.fulfill(
+                    status=200,
+                    content_type="application/json",
+                    body=(
+                        '{"sessions":[{"id":"websocket_route_test","title":"Route Test Session",'
+                        '"channel":"websocket","created":"2026-02-26T10:00:00",'
+                        '"last_activity":"2026-02-26T10:00:00","message_count":1,'
+                        '"preview":"route test"}],"total":1}'
+                    ),
+                )
+                return
+            route.continue_()
+
+        page.route(re.compile(r".*/api/sessions(?:\?.*)?$"), handle_sessions)
+
+        page.goto(dashboard_url)
+        expect(page.get_by_text("Route Test Session").first).to_be_visible()
+
+        page.get_by_role("button", name="Terminal", exact=True).click()
+        expect(page).to_have_url(re.compile(r".*#/terminal$"))
+
+        page.locator("button:has-text('Route Test Session')").first.click()
+        expect(page).to_have_url(re.compile(rf".*#/chat/{session_id}$"))
+
+        chat_input = page.get_by_label("Chat message input")
+        expect(chat_input).to_be_visible()
+
+        page.reload()
+        expect(page).to_have_url(re.compile(rf".*#/chat/{session_id}$"))
+        expect(chat_input).to_be_visible()
+
 
 class TestAiUIDiscoveryInstall:
     """E2E tests for AI UI Discover install flow."""

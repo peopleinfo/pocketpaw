@@ -291,7 +291,13 @@ function app() {
             this.setupSocketHandlers();
 
             // Connect WebSocket (singleton - will only connect once)
-            const lastSession = StateManager.load('lastSession');
+            // Hash route session (e.g. #/chat/<id>) overrides local cache on refresh.
+            const initialRoute = this._parseHash ? this._parseHash() : null;
+            const routeSessionId = initialRoute?.sessionId || null;
+            if (routeSessionId) {
+                StateManager.save('lastSession', routeSessionId);
+            }
+            const lastSession = routeSessionId || StateManager.load('lastSession');
             socket.connect(lastSession);
 
             // Load sessions for sidebar

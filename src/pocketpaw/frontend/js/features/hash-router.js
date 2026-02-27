@@ -7,6 +7,7 @@
  *
  * Route table:
  *   #/chat           → view = 'chat'
+ *   #/chat/{id}      → view = 'chat', selectSession(id)
  *   #/activity       → view = 'activity'
  *   #/terminal       → view = 'terminal'
  *   #/crew           → view = 'missions', crewTab = 'tasks'
@@ -96,6 +97,18 @@ window.PocketPaw.HashRouter = {
       },
 
       /**
+       * Navigate to chat with an optional session id route.
+       */
+      navigateToChatSession(sessionId = null) {
+        this.view = "chat";
+        if (sessionId) {
+          this.updateHash(`#/chat/${encodeURIComponent(sessionId)}`);
+          return;
+        }
+        this.updateHash("#/chat");
+      },
+
+      /**
        * Update the URL hash without triggering the hashchange handler.
        */
       updateHash(hash) {
@@ -116,10 +129,17 @@ window.PocketPaw.HashRouter = {
         const parts = clean.split("/");
 
         // Default route
-        const route = { view: "chat", crewTab: null, projectId: null };
+        const route = { view: "chat", crewTab: null, projectId: null, sessionId: null };
 
         if (parts[0] === "chat") {
           route.view = "chat";
+          if (parts[1]) {
+            try {
+              route.sessionId = decodeURIComponent(parts[1]);
+            } catch (_) {
+              route.sessionId = parts[1];
+            }
+          }
         } else if (parts[0] === "activity") {
           route.view = "activity";
         } else if (parts[0] === "terminal") {
@@ -158,7 +178,11 @@ window.PocketPaw.HashRouter = {
       _applyRoute(route) {
         this.view = route.view;
 
-        if (route.view === "missions") {
+        if (route.view === "chat") {
+          if (route.sessionId && this.selectSession) {
+            this.selectSession(route.sessionId, { syncHash: false });
+          }
+        } else if (route.view === "missions") {
           this.loadMCData();
 
           if (route.crewTab) {

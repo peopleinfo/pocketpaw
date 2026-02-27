@@ -22,6 +22,7 @@ window.PocketPaw.Sessions = {
       sessionsCollapsed: false,
       editingSessionId: null,
       editingSessionTitle: "",
+      sessionMenuOpenId: null,
     };
   },
 
@@ -49,8 +50,26 @@ window.PocketPaw.Sessions = {
       /**
        * Select and switch to a session
        */
-      selectSession(id) {
-        if (this.currentSessionId === id) return;
+      selectSession(id, options = {}) {
+        if (!id) return;
+        this.sessionMenuOpenId = null;
+
+        const syncHash = options.syncHash !== false;
+        const moveToChat = () => {
+          if (this.navigateToChatSession) this.navigateToChatSession(id);
+          else if (this.navigateToView) this.navigateToView("chat");
+          else this.view = "chat";
+        };
+
+        // If user clicks the already-active session from another view, still jump to chat.
+        if (this.currentSessionId === id) {
+          if (this.view !== "chat") {
+            if (syncHash) moveToChat();
+            else this.view = "chat";
+          }
+          this.sidebarOpen = false;
+          return;
+        }
 
         // Cache current messages before switching
         if (this.currentSessionId && this.messages.length > 0) {
@@ -76,6 +95,10 @@ window.PocketPaw.Sessions = {
         // Always fetch from server to get latest
         socket.send("switch_session", { session_id: id });
 
+        // Selecting a session should always switch to chat view.
+        if (syncHash) moveToChat();
+        else this.view = "chat";
+
         // Close mobile sidebar
         this.sidebarOpen = false;
       },
@@ -84,6 +107,7 @@ window.PocketPaw.Sessions = {
        * Create a new chat session
        */
       createNewChat() {
+        this.sessionMenuOpenId = null;
         // Cache current messages
         if (this.currentSessionId && this.messages.length > 0) {
           StateManager.cacheSession(this.currentSessionId, this.messages);
@@ -107,6 +131,7 @@ window.PocketPaw.Sessions = {
        */
       async deleteSession(id, event) {
         if (event) event.stopPropagation();
+        this.sessionMenuOpenId = null;
 
         try {
           const res = await fetch(`/api/sessions/${id}`, { method: "DELETE" });
@@ -123,6 +148,43 @@ window.PocketPaw.Sessions = {
         } catch (e) {
           console.error("[Sessions] Delete failed:", e);
         }
+      },
+
+      /**
+       * Open per-session context menu (right-click or menu button).
+       */
+      openSessionMenu(id, event) {
+        if (event) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+        this.sessionMenuOpenId = id;
+      },
+
+      /**
+       * Toggle per-session context menu.
+       */
+      toggleSessionMenu(id, event) {
+        if (event) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+        this.sessionMenuOpenId = this.sessionMenuOpenId === id ? null : id;
+      },
+
+      /**
+       * Close context menu.
+       */
+      closeSessionMenu() {
+        this.sessionMenuOpenId = null;
+      },
+
+      /**
+       * Delete a session via the per-session context menu.
+       */
+      deleteSessionFromMenu(id, event) {
+        this.closeSessionMenu();
+        this.deleteSession(id, event);
       },
 
       /**
