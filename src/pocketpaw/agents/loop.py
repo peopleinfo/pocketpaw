@@ -8,6 +8,7 @@ and streams AgentEvent responses back to channels.
 import asyncio
 import logging
 import re
+from typing import Any
 
 from pocketpaw.agents.router import AgentRouter
 from pocketpaw.bootstrap import AgentContextBuilder
@@ -44,6 +45,12 @@ _AI_UI_PLUGIN_LIST_INTENT_RE = re.compile(
 )
 _AI_UI_PLUGIN_STOP_INTENT_RE = re.compile(
     r"^\s*stop(?:\s+plugin)?\s+([a-z0-9][a-z0-9_-]*)\s*$",
+    re.IGNORECASE,
+)
+_AI_UI_PLUGIN_START_INTENT_RE = re.compile(
+    r"^\s*(?:please\s+)?(?:let'?s\s+)?(?:start|launch|run|open)"
+    r"(?:\s+(?:ai[\s-]?ui\s+)?(?:plugin|app))?\s+"
+    r"([a-z0-9][a-z0-9_\-\s]*)\s*[.!?]?\s*$",
     re.IGNORECASE,
 )
 
@@ -187,6 +194,69 @@ class AgentLoop:
             return None
         return m.group(1).strip().lower() or None
 
+    @staticmethod
+    def _extract_ai_ui_plugin_start_target(text: str) -> str | None:
+        """Extract plugin id/name from a plain-language start request, if present."""
+        if not text:
+            return None
+        m = _AI_UI_PLUGIN_START_INTENT_RE.match(text)
+        if not m:
+            return None
+        return m.group(1).strip() or None
+
+    @staticmethod
+    def _normalize_ai_ui_plugin_key(text: str) -> str:
+        """Normalize plugin ids/names to a comparable slug-like key."""
+        return re.sub(r"[^a-z0-9]+", "-", (text or "").strip().lower()).strip("-")
+
+    @classmethod
+    def _lookup_ai_ui_plugin_id(
+        cls, target: str, plugins: list[dict[str, Any]]
+    ) -> str | None:
+        """Resolve a free-form target to an installed plugin id."""
+        target_keys = {
+            target.strip().lower(),
+            cls._normalize_ai_ui_plugin_key(target),
+        }
+        for item in plugins:
+            plugin_id = str(item.get("id", "")).strip()
+            if not plugin_id:
+                continue
+            plugin_keys = {
+                plugin_id.lower(),
+                cls._normalize_ai_ui_plugin_key(plugin_id),
+            }
+            plugin_name = str(item.get("name", "")).strip()
+            if plugin_name:
+                plugin_keys.add(cls._normalize_ai_ui_plugin_key(plugin_name))
+            if target_keys & plugin_keys:
+                return plugin_id
+        return None
+
+    @classmethod
+    def _lookup_ai_ui_gallery_entry(
+        cls, target: str, gallery: list[dict[str, Any]]
+    ) -> dict[str, Any] | None:
+        """Resolve a free-form target to a discoverable gallery entry."""
+        target_keys = {
+            target.strip().lower(),
+            cls._normalize_ai_ui_plugin_key(target),
+        }
+        for item in gallery:
+            plugin_id = str(item.get("id", "")).strip()
+            if not plugin_id:
+                continue
+            item_keys = {
+                plugin_id.lower(),
+                cls._normalize_ai_ui_plugin_key(plugin_id),
+            }
+            item_name = str(item.get("name", "")).strip()
+            if item_name:
+                item_keys.add(cls._normalize_ai_ui_plugin_key(item_name))
+            if target_keys & item_keys:
+                return item
+        return None
+
     async def _process_message_inner(self, message: InboundMessage, session_key: str) -> None:
         """Inner message processing (called under concurrency guards)."""
         # Keep context_builder in sync if memory manager was hot-reloaded
@@ -270,6 +340,105 @@ class AgentLoop:
                     return
             except Exception:
                 logger.exception("Failed to stop AI UI plugin via local intent")
+
+        # Lightweight local intent: start/launch an AI UI plugin and return open routes.
+        # Supports requests like "start counter-template" in dashboard chat.
+        start_target = self._extract_ai_ui_plugin_start_target(message.content)
+        if start_target:
+            has_ai_ui_context = bool(
+                _AI_UI_MARKER_RE.search(message.content) or _PLUGIN_WORD_RE.search(message.content)
+            )
+            looks_like_plugin_id = "-" in start_target or "_" in start_target
+            try:
+                from pocketpaw.ai_ui.builtins import get_gallery
+                from pocketpaw.ai_ui.plugins import (
+                    get_plugin,
+                    install_plugin,
+                    launch_plugin,
+                    list_plugins,
+                )
+
+                installed = list_plugins()
+                plugin_id = self._lookup_ai_ui_plugin_id(start_target, installed)
+                install_message = ""
+
+                if plugin_id is None:
+                    gallery_entry = self._lookup_ai_ui_gallery_entry(start_target, get_gallery())
+                    if gallery_entry is not None:
+                        source = str(gallery_entry.get("source", "")).strip()
+                        if not source:
+                            source = f"builtin:{gallery_entry.get('id', '').strip()}"
+                        install_result = await install_plugin(source)
+                        plugin_id = str(
+                            install_result.get("plugin_id") or gallery_entry.get("id", "")
+                        ).strip()
+                        install_message = str(install_result.get("message", "")).strip()
+                    elif not has_ai_ui_context and not looks_like_plugin_id:
+                        # Avoid hijacking generic commands like "open browser".
+                        plugin_id = None
+                    else:
+                        content = (
+                            f"Could not find AI UI plugin '{start_target}'. "
+                            "Use `/plugins` or open `#/ai-ui/discover`."
+                        )
+                        await self.bus.publish_outbound(
+                            OutboundMessage(
+                                channel=message.channel,
+                                chat_id=message.chat_id,
+                                content=content,
+                            )
+                        )
+                        await self.bus.publish_outbound(
+                            OutboundMessage(
+                                channel=message.channel,
+                                chat_id=message.chat_id,
+                                content="",
+                                is_stream_end=True,
+                            )
+                        )
+                        return
+
+                if plugin_id:
+                    launch_result = await launch_plugin(plugin_id)
+                    plugin = get_plugin(plugin_id) or {}
+                    lines: list[str] = []
+                    if install_message:
+                        lines.append(install_message)
+                    lines.append(
+                        str(
+                            launch_result.get("message")
+                            or f"Plugin '{plugin_id}' launch requested."
+                        )
+                    )
+                    dashboard_route = f"#/ai-ui/plugin/{plugin_id}/web"
+                    lines.append(f"Open in dashboard: [{dashboard_route}]({dashboard_route})")
+
+                    port = plugin.get("port")
+                    if port:
+                        web_path = str(plugin.get("web_view_path") or "/")
+                        if not web_path.startswith("/"):
+                            web_path = "/" + web_path
+                        app_url = f"http://localhost:{port}{web_path}"
+                        lines.append(f"Open app: [{app_url}]({app_url})")
+
+                    await self.bus.publish_outbound(
+                        OutboundMessage(
+                            channel=message.channel,
+                            chat_id=message.chat_id,
+                            content="\n".join(lines),
+                        )
+                    )
+                    await self.bus.publish_outbound(
+                        OutboundMessage(
+                            channel=message.channel,
+                            chat_id=message.chat_id,
+                            content="",
+                            is_stream_end=True,
+                        )
+                    )
+                    return
+            except Exception:
+                logger.exception("Failed to start AI UI plugin via local intent")
 
         # Welcome hint — one-time message on first interaction in a channel
         if self.settings.welcome_hint_enabled and message.channel not in self._WELCOME_EXCLUDED:
@@ -464,7 +633,9 @@ class AgentLoop:
                 cancelled = True
                 logger.info("Stream cancelled for session %s", session_key)
             finally:
-                await run_iter.aclose()
+                aclose = getattr(run_iter, "aclose", None)
+                if callable(aclose):
+                    await aclose()
 
             # 4. Send stream end marker (with any media files detected)
             # Fallback: if no media tags found in tool_result chunks,
@@ -476,7 +647,13 @@ class AgentLoop:
 
             # Deduplicate while preserving order
             seen: set[str] = set()
-            media_paths = [p for p in media_paths if not (p in seen or seen.add(p))]
+            deduped_media_paths: list[str] = []
+            for path in media_paths:
+                if path in seen:
+                    continue
+                seen.add(path)
+                deduped_media_paths.append(path)
+            media_paths = deduped_media_paths
             await self.bus.publish_outbound(
                 OutboundMessage(
                     channel=message.channel,

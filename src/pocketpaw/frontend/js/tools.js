@@ -5,6 +5,28 @@
 
 const Tools = {
     /**
+     * Decide whether a link should open in the same tab.
+     * Local app routes/URLs stay in-app; external URLs open in new tab.
+     */
+    shouldUseSameTabLink(href) {
+        if (!href) return true;
+        const raw = String(href).trim();
+        if (!raw) return true;
+        if (raw.startsWith('#') || raw.startsWith('/')) return true;
+
+        try {
+            const parsed = new URL(raw, window.location.origin);
+            const host = parsed.hostname.toLowerCase();
+            if (host === 'localhost' || host === '127.0.0.1' || host === '0.0.0.0') {
+                return true;
+            }
+        } catch (_) {
+            // Keep default external behavior when URL parsing fails.
+        }
+        return false;
+    },
+
+    /**
      * Format message content (markdown-like)
      */
     formatMessage(content) {
@@ -14,9 +36,12 @@ const Tools = {
         if (typeof marked !== 'undefined' && typeof DOMPurify !== 'undefined') {
             try {
                 const renderer = new marked.Renderer();
-                // Open links in new tab
+                // Open local app links in the same tab; external links in a new tab.
                 renderer.link = function ({ href, title, text }) {
                     const titleAttr = title ? ` title="${title}"` : '';
+                    if (Tools.shouldUseSameTabLink(href)) {
+                        return `<a href="${href}"${titleAttr}>${text}</a>`;
+                    }
                     return `<a href="${href}"${titleAttr} target="_blank" rel="noopener noreferrer">${text}</a>`;
                 };
                 const html = marked.parse(content, {

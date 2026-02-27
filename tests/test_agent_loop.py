@@ -328,6 +328,148 @@ async def test_agent_loop_ai_ui_stop_local_intent(
 @patch("pocketpaw.agents.loop.get_message_bus")
 @patch("pocketpaw.agents.loop.get_memory_manager")
 @patch("pocketpaw.agents.loop.AgentContextBuilder")
+@patch("pocketpaw.agents.loop.get_command_handler")
+@patch("pocketpaw.agents.loop.get_settings")
+@pytest.mark.asyncio
+async def test_agent_loop_ai_ui_start_local_intent(
+    mock_get_settings,
+    mock_get_cmd_handler,
+    mock_builder_cls,
+    mock_get_memory,
+    mock_get_bus,
+    mock_bus,
+    mock_memory,
+):
+    """Plain-language start requests should launch an installed AI UI plugin."""
+    settings = MagicMock()
+    settings.agent_backend = "claude_agent_sdk"
+    settings.max_concurrent_conversations = 5
+    settings.injection_scan_enabled = False
+    settings.welcome_hint_enabled = False
+    mock_get_settings.return_value = settings
+
+    cmd_handler = MagicMock()
+    cmd_handler._on_settings_changed = None
+    cmd_handler.is_command.return_value = False
+    mock_get_cmd_handler.return_value = cmd_handler
+
+    mock_get_bus.return_value = mock_bus
+    mock_get_memory.return_value = mock_memory
+    mock_builder_cls.return_value.build_system_prompt = AsyncMock(return_value="System Prompt")
+
+    loop = AgentLoop()
+
+    with patch("pocketpaw.ai_ui.plugins.list_plugins") as mock_list, patch(
+        "pocketpaw.ai_ui.plugins.launch_plugin"
+    ) as mock_launch, patch("pocketpaw.ai_ui.plugins.get_plugin") as mock_get_plugin:
+        mock_list.return_value = [{"id": "counter-template", "name": "Counter Template"}]
+        mock_launch.return_value = {
+            "status": "ok",
+            "message": "Plugin 'counter-template' launched on port 7860",
+        }
+        mock_get_plugin.return_value = {
+            "id": "counter-template",
+            "port": 7860,
+            "web_view_path": "/",
+        }
+        msg = InboundMessage(
+            channel=Channel.WEBSOCKET,
+            sender_id="user1",
+            chat_id="chat1",
+            content="start counter-template",
+        )
+        await loop._process_message(msg)
+
+    first = mock_bus.publish_outbound.call_args_list[0][0][0]
+    second = mock_bus.publish_outbound.call_args_list[1][0][0]
+    assert "counter-template" in first.content
+    assert "#/ai-ui/plugin/counter-template/web" in first.content
+    assert "http://localhost:7860/" in first.content
+    assert second.is_stream_end is True
+    mock_launch.assert_awaited_once_with("counter-template")
+
+
+@patch("pocketpaw.agents.loop.get_message_bus")
+@patch("pocketpaw.agents.loop.get_memory_manager")
+@patch("pocketpaw.agents.loop.AgentContextBuilder")
+@patch("pocketpaw.agents.loop.get_command_handler")
+@patch("pocketpaw.agents.loop.get_settings")
+@pytest.mark.asyncio
+async def test_agent_loop_ai_ui_start_local_intent_installs_from_gallery(
+    mock_get_settings,
+    mock_get_cmd_handler,
+    mock_builder_cls,
+    mock_get_memory,
+    mock_get_bus,
+    mock_bus,
+    mock_memory,
+):
+    """If missing, start intent should install from gallery and then launch."""
+    settings = MagicMock()
+    settings.agent_backend = "claude_agent_sdk"
+    settings.max_concurrent_conversations = 5
+    settings.injection_scan_enabled = False
+    settings.welcome_hint_enabled = False
+    mock_get_settings.return_value = settings
+
+    cmd_handler = MagicMock()
+    cmd_handler._on_settings_changed = None
+    cmd_handler.is_command.return_value = False
+    mock_get_cmd_handler.return_value = cmd_handler
+
+    mock_get_bus.return_value = mock_bus
+    mock_get_memory.return_value = mock_memory
+    mock_builder_cls.return_value.build_system_prompt = AsyncMock(return_value="System Prompt")
+
+    loop = AgentLoop()
+
+    with patch("pocketpaw.ai_ui.plugins.list_plugins") as mock_list, patch(
+        "pocketpaw.ai_ui.builtins.get_gallery"
+    ) as mock_gallery, patch("pocketpaw.ai_ui.plugins.install_plugin") as mock_install, patch(
+        "pocketpaw.ai_ui.plugins.launch_plugin"
+    ) as mock_launch, patch("pocketpaw.ai_ui.plugins.get_plugin") as mock_get_plugin:
+        mock_list.return_value = []
+        mock_gallery.return_value = [
+            {
+                "id": "counter-template",
+                "name": "Counter Template",
+                "source": "builtin:counter-template",
+            }
+        ]
+        mock_install.return_value = {
+            "status": "ok",
+            "message": "Counter Template has been added!",
+            "plugin_id": "counter-template",
+        }
+        mock_launch.return_value = {
+            "status": "ok",
+            "message": "Plugin 'counter-template' launched on port 7860",
+        }
+        mock_get_plugin.return_value = {
+            "id": "counter-template",
+            "port": 7860,
+            "web_view_path": "/",
+        }
+        msg = InboundMessage(
+            channel=Channel.WEBSOCKET,
+            sender_id="user1",
+            chat_id="chat1",
+            content="launch plugin counter-template",
+        )
+        await loop._process_message(msg)
+
+    first = mock_bus.publish_outbound.call_args_list[0][0][0]
+    second = mock_bus.publish_outbound.call_args_list[1][0][0]
+    assert "Counter Template has been added!" in first.content
+    assert "#/ai-ui/plugin/counter-template/web" in first.content
+    assert second.is_stream_end is True
+    mock_install.assert_awaited_once_with("builtin:counter-template")
+    mock_launch.assert_awaited_once_with("counter-template")
+
+
+@patch("pocketpaw.agents.loop.get_message_bus")
+@patch("pocketpaw.agents.loop.get_memory_manager")
+@patch("pocketpaw.agents.loop.AgentContextBuilder")
 @patch("pocketpaw.agents.loop.AgentRouter")
 @pytest.mark.asyncio
 async def test_agent_loop_builds_context_and_passes_to_router(

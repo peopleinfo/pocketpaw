@@ -55,6 +55,15 @@ uv run mypy .
 python -m build
 ```
 
+## Verification Workflow (Required)
+
+Follow [`docs/workflow.md`](docs/workflow.md) for all coding tasks.
+
+- Do not mark tasks done without verification evidence.
+- Coding tasks must include at least one relevant E2E test run.
+- Prefer headless E2E; if headed is needed, run one target at a time and keep single-tab behavior.
+- Final update must list executed commands with pass/fail and exit code.
+
 ## Architecture
 
 ### Message Bus Pattern

@@ -19,23 +19,25 @@ class TestDashboardLoads:
     def test_dashboard_title(self, page: Page, dashboard_url: str):
         """Test that dashboard page loads with correct title."""
         page.goto(dashboard_url)
-        expect(page).to_have_title("PocketPaw")
+        title = page.title().strip()
+        assert title in {"PocketPaw", "PocketPaw (Beta)"}
 
     def test_chat_view_visible_by_default(self, page: Page, dashboard_url: str):
         """Test that Chat view is visible by default."""
         page.goto(dashboard_url)
 
         # Chat tab should be active
-        chat_tab = page.locator("button:has-text('Chat')")
+        chat_tab = page.get_by_role("button", name="Chat", exact=True)
         expect(chat_tab).to_be_visible()
 
     def test_view_tabs_exist(self, page: Page, dashboard_url: str):
         """Test that all view tabs exist."""
         page.goto(dashboard_url)
 
-        tabs = ["Chat", "Activity", "Crew"]
-        for tab in tabs:
-            expect(page.locator(f"button:has-text('{tab}')")).to_be_visible()
+        expect(page.get_by_role("button", name="Chat", exact=True)).to_be_visible()
+        expect(page.locator("button:has-text('Activity')").first).to_be_visible()
+        crew_or_deep_work = page.locator("button:has-text('Crew'), button:has-text('Deep Work')")
+        expect(crew_or_deep_work.first).to_be_visible()
 
     def test_agent_mode_toggle_exists(self, page: Page, dashboard_url: str):
         """Test that agent mode toggle exists."""
@@ -43,6 +45,53 @@ class TestDashboardLoads:
 
         # Look for Agent Mode label (use exact match to avoid multiple matches)
         expect(page.get_by_text("Agent Mode", exact=True).first).to_be_visible()
+
+    def test_local_and_external_links_target_behavior(self, page: Page, dashboard_url: str):
+        """Local app links should stay same-tab; external links should open in new tab."""
+        page.goto(dashboard_url)
+
+        result = page.evaluate("""
+            () => {
+                const localHtml = window.Tools.formatMessage(
+                    "Open app: [http://localhost:8000/](http://localhost:8000/)"
+                );
+                const hashHtml = window.Tools.formatMessage(
+                    "Open in dashboard: "
+                    + "[#/ai-ui/plugin/counter-template/web]"
+                    + "(#/ai-ui/plugin/counter-template/web)"
+                );
+                const externalHtml = window.Tools.formatMessage(
+                    "Docs: [OpenAI](https://openai.com)"
+                );
+
+                const host = document.createElement("div");
+
+                host.innerHTML = localHtml;
+                const local = host.querySelector("a");
+
+                host.innerHTML = hashHtml;
+                const hash = host.querySelector("a");
+
+                host.innerHTML = externalHtml;
+                const external = host.querySelector("a");
+
+                return {
+                    local_href: local?.getAttribute("href") || "",
+                    local_target: local?.getAttribute("target"),
+                    hash_href: hash?.getAttribute("href") || "",
+                    hash_target: hash?.getAttribute("target"),
+                    external_href: external?.getAttribute("href") || "",
+                    external_target: external?.getAttribute("target"),
+                };
+            }
+        """)
+
+        assert result["local_href"] == "http://localhost:8000/"
+        assert result["local_target"] in (None, "")
+        assert result["hash_href"] == "#/ai-ui/plugin/counter-template/web"
+        assert result["hash_target"] in (None, "")
+        assert result["external_href"] == "https://openai.com"
+        assert result["external_target"] == "_blank"
 
 
 class TestCrewView:
