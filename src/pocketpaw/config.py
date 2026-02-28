@@ -584,9 +584,6 @@ class Settings(BaseSettings):
         """
         from pocketpaw.credentials import SECRET_FIELDS, get_credential_store
 
-        for msg in validate_api_keys(self):
-            logger.warning("Settings validation: %s", msg)
-
         config_path = get_config_path()
 
         # Load existing config to preserve secret values if current is empty
