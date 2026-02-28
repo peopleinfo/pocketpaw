@@ -476,7 +476,11 @@ function app() {
             // Data-driven settings sync: map server keys to local settings
             const SETTINGS_MAP = [
                 'agentBackend', 'claudeSdkProvider', 'claudeSdkModel', 'claudeSdkMaxTurns',
-                'openaiAgentsProvider',
+                'openaiAgentsProvider', 'openaiAgentsModel', 'openaiAgentsMaxTurns',
+                'googleAdkModel', 'googleAdkMaxTurns',
+                'codexCliModel', 'codexCliMaxTurns',
+                'copilotSdkProvider', 'copilotSdkModel', 'copilotSdkMaxTurns',
+                'opencodeBaseUrl', 'opencodeModel', 'opencodeMaxTurns',
                 'llmProvider', 'ollamaHost', 'ollamaModel', 'anthropicModel',
                 'openaiCompatibleBaseUrl', 'openaiCompatibleModel', 'openaiCompatibleMaxTokens',
                 'geminiModel',
@@ -715,6 +719,65 @@ function app() {
                 'opencode': 'OpenCode AI coding agent. Requires server at configured URL.'
             };
             return descriptions[backend] || '';
+        },
+
+        /**
+         * Return the active model label for the current backend/provider.
+         */
+        getCurrentModelBadge() {
+            const backend = this.settings.agentBackend;
+            if (backend === 'claude_agent_sdk') {
+                const provider = this.settings.claudeSdkProvider || 'anthropic';
+                if (provider === 'ollama') return this.settings.ollamaModel || 'llama3.2';
+                if (provider === 'openai_compatible') {
+                    return this.settings.openaiCompatibleModel || 'openai-compatible (unset)';
+                }
+                return this.settings.claudeSdkModel || 'auto';
+            }
+            if (backend === 'openai_agents') {
+                const provider = this.settings.openaiAgentsProvider || 'openai';
+                if (provider === 'ollama') return this.settings.ollamaModel || 'llama3.2';
+                if (provider === 'openai_compatible') {
+                    return this.settings.openaiCompatibleModel || 'openai-compatible (unset)';
+                }
+                return this.settings.openaiAgentsModel || 'gpt-5.2';
+            }
+            if (backend === 'google_adk') return this.settings.googleAdkModel || 'gemini-3-pro-preview';
+            if (backend === 'codex_cli') return this.settings.codexCliModel || 'gpt-5.3-codex';
+            if (backend === 'copilot_sdk') return this.settings.copilotSdkModel || 'gpt-5.2';
+            if (backend === 'opencode') return this.settings.opencodeModel || 'server default';
+            return 'unknown';
+        },
+
+        /**
+         * Tooltip for the sidebar model badge.
+         */
+        getCurrentModelTitle() {
+            return `Active model (${this.settings.agentBackend}): ${this.getCurrentModelBadge()}`;
+        },
+
+        /**
+         * Return human-readable backend label for sidebar badge.
+         */
+        getCurrentBackendBadge() {
+            const fromApi = this._backendsData.find(x => x.name === this.settings.agentBackend);
+            if (fromApi?.displayName) return fromApi.displayName;
+            const labels = {
+                'claude_agent_sdk': 'Claude Agent SDK',
+                'openai_agents': 'OpenAI Agents',
+                'google_adk': 'Google ADK',
+                'codex_cli': 'Codex CLI',
+                'copilot_sdk': 'Copilot SDK',
+                'opencode': 'OpenCode',
+            };
+            return labels[this.settings.agentBackend] || this.settings.agentBackend;
+        },
+
+        /**
+         * Tooltip for the sidebar backend badge.
+         */
+        getCurrentBackendTitle() {
+            return `Active backend: ${this.getCurrentBackendBadge()}`;
         },
 
         /**

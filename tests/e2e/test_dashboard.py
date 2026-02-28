@@ -731,6 +731,69 @@ class TestAiUIDiscoveryInstall:
             # Settings modal should appear
             page.wait_for_timeout(500)
 
+    def test_codex_model_persists_after_reload(self, page: Page, dashboard_url: str):
+        """Codex CLI model should persist after reload."""
+        page.goto(dashboard_url)
+        page.evaluate(
+            """
+            () => {
+                localStorage.setItem('pocketpaw_setup_dismissed', '1');
+                const root = document.querySelector('body');
+                const data = root?._x_dataStack?.[0];
+                if (data) data.showWelcome = false;
+            }
+            """
+        )
+
+        settings_btn = page.locator(
+            "button:has(i[data-lucide='settings']), button:has-text('Settings')"
+        ).first
+        expect(settings_btn).to_be_visible()
+        settings_btn.click()
+
+        backend_select = page.locator("select[x-model='settings.agentBackend']").first
+        expect(backend_select).to_be_visible()
+        codex_option = page.locator(
+            "select[x-model='settings.agentBackend'] option[value='codex_cli']"
+        )
+        expect(codex_option).to_have_count(1)
+
+        backend_select.select_option("codex_cli")
+
+        codex_model_input = page.locator("input[x-model='settings.codexCliModel']").first
+        expect(codex_model_input).to_be_visible()
+        codex_model_input.fill("gpt-5.2")
+        codex_model_input.press("Tab")
+        page.wait_for_timeout(800)
+        backend_badge = page.locator("aside span[x-text='getCurrentBackendBadge()']").first
+        expect(backend_badge).to_be_visible()
+        expect(backend_badge).to_have_text(re.compile(r"Codex", re.I))
+        model_badge = page.locator("aside span[x-text='getCurrentModelBadge()']").first
+        expect(model_badge).to_be_visible()
+        expect(model_badge).to_have_text("gpt-5.2")
+
+        page.reload()
+        backend_badge = page.locator("aside span[x-text='getCurrentBackendBadge()']").first
+        expect(backend_badge).to_be_visible()
+        expect(backend_badge).to_have_text(re.compile(r"Codex", re.I))
+        model_badge = page.locator("aside span[x-text='getCurrentModelBadge()']").first
+        expect(model_badge).to_be_visible()
+        expect(model_badge).to_have_text("gpt-5.2")
+
+        settings_btn = page.locator(
+            "button:has(i[data-lucide='settings']), button:has-text('Settings')"
+        ).first
+        expect(settings_btn).to_be_visible()
+        settings_btn.click()
+
+        backend_select = page.locator("select[x-model='settings.agentBackend']").first
+        expect(backend_select).to_be_visible()
+        backend_select.select_option("codex_cli")
+
+        codex_model_input = page.locator("input[x-model='settings.codexCliModel']").first
+        expect(codex_model_input).to_be_visible()
+        expect(codex_model_input).to_have_value("gpt-5.2")
+
     def test_discover_install_disabled_for_unsupported_app(
         self, page: Page, dashboard_url: str
     ):

@@ -50,6 +50,27 @@
     </button>
   </div>
 
+  <div class="px-2 mb-3 shrink-0">
+    <div class="rounded-lg bg-white/5 border border-white/10 px-2.5 py-1.5">
+      <div class="flex items-center gap-2">
+        <span class="text-[10px] uppercase tracking-wide text-white/40">Backend</span>
+        <span
+          class="flex-1 min-w-0 text-[11px] font-medium text-white/80 truncate"
+          x-text="getCurrentBackendBadge()"
+          :title="getCurrentBackendTitle()"
+        ></span>
+      </div>
+      <div class="mt-1 flex items-center gap-2">
+        <span class="text-[10px] uppercase tracking-wide text-white/40">Model</span>
+        <span
+          class="flex-1 min-w-0 text-[11px] font-medium text-white/80 truncate"
+          x-text="getCurrentModelBadge()"
+          :title="getCurrentModelTitle()"
+        ></span>
+      </div>
+    </div>
+  </div>
+
   <!-- Tab Switcher: Chats / Projects -->
   <div class="flex bg-white/5 rounded-lg p-0.5 mb-3 shrink-0 mx-1">
     <button
