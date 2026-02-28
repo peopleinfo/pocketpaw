@@ -102,8 +102,14 @@ def _sandbox_env(plugin_dir: Path, manifest: dict) -> dict[str, str]:
     _SHARED_UV_CACHE.mkdir(parents=True, exist_ok=True)
 
     venv_dir = plugin_dir / ".venv"
-    venv_bin = venv_dir / "bin"
-    local_bin = plugin_dir / "bin"
+    if platform.system() == "Windows":
+        venv_bin = venv_dir / "Scripts"
+        local_bin = plugin_dir / "Scripts"
+        shell_value = os.environ.get("COMSPEC", r"C:\Windows\System32\cmd.exe")
+    else:
+        venv_bin = venv_dir / "bin"
+        local_bin = plugin_dir / "bin"
+        shell_value = "/bin/bash"
     path_parts = []
     if venv_bin.is_dir():
         path_parts.append(str(venv_bin))
@@ -115,7 +121,7 @@ def _sandbox_env(plugin_dir: Path, manifest: dict) -> dict[str, str]:
         # Identity — everything lives in the plugin folder
         "HOME": plugin_str,
         "USER": "pocketpaw",
-        "SHELL": "/bin/bash",
+        "SHELL": shell_value,
         # Temp / cache — stays in plugin folder
         "TMPDIR": str(tmp_dir),
         "TEMP": str(tmp_dir),

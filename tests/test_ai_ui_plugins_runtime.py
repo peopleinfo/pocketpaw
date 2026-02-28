@@ -1,4 +1,5 @@
 import json
+import os
 from unittest.mock import patch
 
 import pytest
@@ -57,3 +58,16 @@ async def test_stop_plugin_shared_port_returns_ambiguous(tmp_path):
     assert "shares port 8000" in result["message"]
     mock_pid_on_port.assert_not_called()
     mock_kill.assert_not_called()
+
+
+def test_sandbox_env_windows_prefers_scripts_dir(tmp_path):
+    plugin_dir = tmp_path / "demo"
+    (plugin_dir / ".venv" / "Scripts").mkdir(parents=True)
+    (plugin_dir / "Scripts").mkdir(parents=True)
+
+    with patch("platform.system", return_value="Windows"):
+        env = plugins._sandbox_env(plugin_dir, {})
+
+    path_parts = env["PATH"].split(os.pathsep)
+    assert str(plugin_dir / ".venv" / "Scripts") in path_parts
+    assert str(plugin_dir / "Scripts") in path_parts

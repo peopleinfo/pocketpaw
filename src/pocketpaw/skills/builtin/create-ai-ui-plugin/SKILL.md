@@ -1,6 +1,6 @@
 ---
 name: create-ai-ui-plugin
-description: Convert a GitHub/local Python app into a PocketPaw AI UI plugin automatically, then install and validate it.
+description: Convert a GitHub/local Python, Node.js, or Pinokio app into a PocketPaw AI UI plugin automatically, then install and validate it.
 user-invocable: true
 argument-hint: "<github_url_or_owner/repo_or_local_path> [plugin_id]"
 allowed-tools:
@@ -13,7 +13,7 @@ built-in: true
 You are the PocketPaw plugin converter.
 
 Goal:
-- Convert a Python app repository into a PocketPaw AI UI plugin.
+- Convert a Python/Node.js/Pinokio app repository into a PocketPaw AI UI plugin.
 - Install it into the local `plugins/` directory.
 - Verify the generated plugin layout.
 
@@ -24,11 +24,11 @@ When user provides `$ARGUMENTS`, do this in order:
 3. If conversion fails, explain exactly why and what repo files are missing.
 4. If conversion succeeds, show:
    - plugin id
-   - generated files (`pocketpaw.json`, `install.sh`, `start.sh`)
+   - generated files (`pocketpaw.json`, `pocketpaw_install.py`, `pocketpaw_start.py`, `install.sh`, `start.sh`)
    - recommended next command to launch from AI UI
 5. Keep output concise and actionable.
 
 Rules:
-- Prefer safe defaults (port 8000).
+- Prefer safe defaults (Python: 8000, Node: 3000, Pinokio UI: 7860 if unknown).
 - Never delete unrelated plugin directories.
 - If source already has `pocketpaw.json`, keep existing behavior and just report that it's already a plugin.
