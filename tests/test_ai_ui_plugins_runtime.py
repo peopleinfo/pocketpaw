@@ -1,5 +1,7 @@
+import asyncio
 import json
 import os
+import subprocess
 from unittest.mock import patch
 
 import pytest
@@ -19,6 +21,19 @@ def _write_manifest(path, port: int) -> None:
         ),
         encoding="utf-8",
     )
+
+
+async def _wait_for_log_contains(log_path, needle: str, timeout: float = 3.0) -> str:
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + timeout
+    last = ""
+    while loop.time() < deadline:
+        if log_path.exists():
+            last = log_path.read_text(encoding="utf-8", errors="replace")
+            if needle in last:
+                return last
+        await asyncio.sleep(0.05)
+    return last
 
 
 @pytest.fixture(autouse=True)
@@ -71,3 +86,216 @@ def test_sandbox_env_windows_prefers_scripts_dir(tmp_path):
     path_parts = env["PATH"].split(os.pathsep)
     assert str(plugin_dir / ".venv" / "Scripts") in path_parts
     assert str(plugin_dir / "Scripts") in path_parts
+
+
+def test_sandbox_env_posix_creates_python_shims(tmp_path):
+    plugin_dir = tmp_path / "demo"
+    plugin_dir.mkdir(parents=True)
+
+    with patch("platform.system", return_value="Darwin"):
+        env = plugins._sandbox_env(plugin_dir, {})
+
+    shim_python = plugin_dir / "bin" / "python"
+    shim_python3 = plugin_dir / "bin" / "python3"
+    assert shim_python.exists()
+    assert shim_python3.exists()
+    assert str(plugin_dir / "bin") in env["PATH"].split(os.pathsep)
+
+
+def test_posix_python3_shim_does_not_self_recurse(tmp_path):
+    plugin_dir = tmp_path / "demo"
+    plugin_dir.mkdir(parents=True)
+
+    with patch("platform.system", return_value="Darwin"):
+        plugins._sandbox_env(plugin_dir, {})
+
+    shim_python3 = plugin_dir / "bin" / "python3"
+    env = {
+        "PATH": str(plugin_dir / "bin"),
+    }
+    proc = subprocess.run(
+        [str(shim_python3), "-c", "import sys; print(sys.version_info[0])"],
+        capture_output=True,
+        text=True,
+        timeout=5,
+        env=env,
+        check=False,
+    )
+    assert proc.returncode == 0
+    assert (proc.stdout or "").strip() == "3"
+
+
+def test_resolve_phase_command_windows_extracts_exec_from_start_sh(tmp_path):
+    plugin_dir = tmp_path / "legacy"
+    plugin_dir.mkdir(parents=True)
+    (plugin_dir / "start.sh").write_text(
+        "#!/bin/bash\n"
+        "set -euo pipefail\n"
+        "if [ -d .venv ]; then\n"
+        "  source .venv/bin/activate\n"
+        "fi\n"
+        "exec python app.py --port 8000\n",
+        encoding="utf-8",
+    )
+    manifest = {"start": "bash start.sh"}
+
+    with patch("platform.system", return_value="Windows"), patch(
+        "shutil.which", return_value=None
+    ):
+        cmd = plugins._resolve_phase_command(plugin_dir, manifest, "start")
+
+    assert cmd == "python app.py --port 8000"
+
+
+@pytest.mark.asyncio
+async def test_launch_plugin_raises_when_process_exits_immediately(tmp_path):
+    plugin_id = "fast-exit"
+    plugin_dir = tmp_path / plugin_id
+    plugin_dir.mkdir(parents=True)
+    (plugin_dir / "pocketpaw.json").write_text(
+        json.dumps(
+            {
+                "name": "Fast Exit",
+                "start": "echo boom && exit 1",
+                "port": 9001,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with patch("pocketpaw.ai_ui.plugins.get_plugins_dir", return_value=tmp_path):
+        with pytest.raises(RuntimeError, match="failed to start"):
+            await plugins.launch_plugin(plugin_id)
+
+
+@pytest.mark.asyncio
+async def test_launch_plugin_python_shim_fallback_without_system_python(tmp_path):
+    plugin_id = "shim-launch"
+    plugin_dir = tmp_path / plugin_id
+    plugin_dir.mkdir(parents=True)
+    (plugin_dir / "pocketpaw.json").write_text(
+        json.dumps(
+            {
+                "name": "Shim Launch",
+                "start": 'python -c "import time; time.sleep(2)"',
+                "port": 9002,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with patch("pocketpaw.ai_ui.plugins.get_plugins_dir", return_value=tmp_path), patch(
+        "pocketpaw.ai_ui.plugins._SYSTEM_PATHS", ""
+    ):
+        result = await plugins.launch_plugin(plugin_id)
+        assert result["status"] == "ok"
+        stop_result = await plugins.stop_plugin(plugin_id)
+        assert stop_result["status"] in {"ok", "stopped", "already_stopped"}
+
+
+@pytest.mark.asyncio
+async def test_launch_plugin_prefers_python_wrapper_over_shell_manifest(tmp_path):
+    plugin_id = "wrapper-first"
+    plugin_dir = tmp_path / plugin_id
+    plugin_dir.mkdir(parents=True)
+    (plugin_dir / "pocketpaw.json").write_text(
+        json.dumps(
+            {
+                "name": "Wrapper First",
+                "start": "bash start.sh",
+                "port": 9003,
+            }
+        ),
+        encoding="utf-8",
+    )
+    (plugin_dir / "start.sh").write_text("echo should-not-run && exit 1\n", encoding="utf-8")
+    (plugin_dir / "pocketpaw_start.py").write_text(
+        "import time\n"
+        "time.sleep(2)\n",
+        encoding="utf-8",
+    )
+
+    with patch("pocketpaw.ai_ui.plugins.get_plugins_dir", return_value=tmp_path):
+        result = await plugins.launch_plugin(plugin_id)
+        assert result["status"] == "ok"
+        stop_result = await plugins.stop_plugin(plugin_id)
+        assert stop_result["status"] in {"ok", "stopped", "already_stopped"}
+
+
+@pytest.mark.asyncio
+async def test_launch_wan2gp_on_macos_injects_allow_mac_env(tmp_path):
+    plugin_id = "wan2gp"
+    plugin_dir = tmp_path / plugin_id
+    plugin_dir.mkdir(parents=True)
+    start_cmd = (
+        "python -c "
+        "\"import os,time; print('ALLOW_MAC=' + os.getenv('WAN2GP_ALLOW_MAC', '')); time.sleep(2)\""
+    )
+    (plugin_dir / "pocketpaw.json").write_text(
+        json.dumps(
+            {
+                "name": "Wan2GP",
+                "start": start_cmd,
+                "port": 9004,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with patch("pocketpaw.ai_ui.plugins.get_plugins_dir", return_value=tmp_path), patch(
+        "platform.system", return_value="Darwin"
+    ), patch(
+        "pocketpaw.ai_ui.builtins.get_registry",
+        return_value={},
+    ):
+        result = await plugins.launch_plugin(plugin_id)
+        assert result["status"] == "ok"
+        logs = await _wait_for_log_contains(plugin_dir / ".pocketpaw.log", "ALLOW_MAC=1")
+        assert "ALLOW_MAC=1" in logs
+        stop_result = await plugins.stop_plugin(plugin_id)
+        assert stop_result["status"] in {"ok", "stopped", "already_stopped"}
+
+
+@pytest.mark.asyncio
+async def test_launch_wan2gp_refreshes_builtin_overlay_files(tmp_path):
+    plugin_id = "wan2gp"
+    plugin_dir = tmp_path / plugin_id
+    plugin_dir.mkdir(parents=True)
+    (plugin_dir / "pocketpaw.json").write_text(
+        json.dumps(
+            {
+                "name": "Wan2GP",
+                "start": "python pocketpaw_start.py",
+                "port": 9005,
+            }
+        ),
+        encoding="utf-8",
+    )
+    (plugin_dir / "pocketpaw_start.py").write_text(
+        "raise SystemExit('stale-script-should-not-run')\n",
+        encoding="utf-8",
+    )
+
+    fresh_script = "import time\nprint('fresh-script-ran')\ntime.sleep(2)\n"
+
+    with patch("pocketpaw.ai_ui.plugins.get_plugins_dir", return_value=tmp_path), patch(
+        "platform.system", return_value="Darwin"
+    ), patch(
+        "pocketpaw.ai_ui.builtins.get_registry",
+        return_value={plugin_id: {"files": {"pocketpaw_start.py": fresh_script}}},
+    ):
+        result = await plugins.launch_plugin(plugin_id)
+        assert result["status"] == "ok"
+        logs = await _wait_for_log_contains(plugin_dir / ".pocketpaw.log", "fresh-script-ran")
+        assert "fresh-script-ran" in logs
+        stop_result = await plugins.stop_plugin(plugin_id)
+        assert stop_result["status"] in {"ok", "stopped", "already_stopped"}
+
+
+@pytest.mark.asyncio
+async def test_install_plugin_blocks_unsupported_builtin(tmp_path):
+    with patch("pocketpaw.ai_ui.plugins.get_plugins_dir", return_value=tmp_path), patch(
+        "pocketpaw.ai_ui.builtins.platform.system", return_value="Darwin"
+    ), patch("pocketpaw.ai_ui.builtins.platform.machine", return_value="arm64"):
+        with pytest.raises(ValueError, match="unavailable on macOS arm64"):
+            await plugins.install_plugin("builtin:wan2gp")

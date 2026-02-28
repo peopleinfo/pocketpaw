@@ -731,6 +731,66 @@ class TestAiUIDiscoveryInstall:
             # Settings modal should appear
             page.wait_for_timeout(500)
 
+    def test_discover_install_disabled_for_unsupported_app(
+        self, page: Page, dashboard_url: str
+    ):
+        """Unsupported gallery app should render disabled Install action."""
+        state = {"install_calls": 0}
+
+        def handle_requirements(route):
+            route.fulfill(
+                status=200,
+                content_type="application/json",
+                body='{"requirements":[]}',
+            )
+
+        def handle_gallery(route):
+            route.fulfill(
+                status=200,
+                content_type="application/json",
+                body=(
+                    '{"apps":[{"id":"wan2gp","name":"Wan2GP","description":"Template","icon":"film","source":'
+                    '"builtin:wan2gp","stars":"Windows-first","category":"Curated / Built-in",'
+                    '"install_disabled":true,'
+                    '"install_disabled_reason":"Wan2GP is unavailable on macOS arm64. '
+                    'Use Windows/Linux with NVIDIA GPU."}]}'
+                ),
+            )
+
+        def handle_plugins(route):
+            route.fulfill(
+                status=200,
+                content_type="application/json",
+                body=json.dumps({"plugins": []}),
+            )
+
+        def handle_install(route):
+            if route.request.method == "POST":
+                state["install_calls"] += 1
+                route.fulfill(
+                    status=200,
+                    content_type="application/json",
+                    body='{"status":"ok","message":"Installed","plugin_id":"wan2gp"}',
+                )
+                return
+            route.continue_()
+
+        page.route("**/api/ai-ui/requirements*", handle_requirements)
+        page.route("**/api/ai-ui/gallery*", handle_gallery)
+        page.route(re.compile(r".*/api/ai-ui/plugins/install(?:\?.*)?$"), handle_install)
+        page.route(re.compile(r".*/api/ai-ui/plugins(?:\?.*)?$"), handle_plugins)
+
+        page.goto(dashboard_url)
+        page.locator("button:has-text('AI UI Local Cloud')").click()
+        page.locator("button:has-text('Discover'):visible").first.click()
+
+        wan_card = page.locator("div.group:has(code:text-is('builtin:wan2gp'))").first
+        button = wan_card.get_by_role("button", name="Unsupported")
+        expect(button).to_be_disabled()
+        expect(button).to_have_text(re.compile(r"Unsupported"))
+        expect(wan_card.get_by_text("unavailable on macOS arm64")).to_be_visible()
+        assert state["install_calls"] == 0
+
 
 class TestRemoteAccessModal:
     """Tests for the Remote Access modal."""

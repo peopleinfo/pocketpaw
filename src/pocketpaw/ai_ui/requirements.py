@@ -132,8 +132,8 @@ def _friendly_version(req_id: str, raw: str) -> str:
 
 async def _download_bytes(url: str) -> bytes:
     """Download a URL and return raw bytes."""
-    import urllib.request
     import ssl
+    import urllib.request
 
     logger.info("Downloading %s", url)
 
@@ -205,6 +205,31 @@ async def _download_and_extract_binary(
 
 # ─── Self-contained Installers ───────────────────────────────────────────
 
+
+async def _run_exec(*cmd: str, timeout: int = 120) -> tuple[int, str, str]:
+    """Run a subprocess and return (returncode, stdout_text, stderr_text)."""
+    proc = await asyncio.create_subprocess_exec(
+        *cmd,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
+    rc = proc.returncode
+    if rc is None:
+        rc = 1
+    return rc, stdout.decode(errors="replace"), stderr.decode(errors="replace")
+
+
+def _error_tail(stdout: str, stderr: str, *, lines: int = 6) -> str:
+    """Return a concise tail of stderr/stdout for user-facing errors."""
+    raw = (stderr or stdout or "").strip()
+    if not raw:
+        return ""
+    chunks = [line.strip() for line in raw.splitlines() if line.strip()]
+    if not chunks:
+        return ""
+    return "\n".join(chunks[-lines:])
+
 def _caddy_url() -> str:
     """Build the Caddy download URL for this platform."""
     os_key = _get_os()
@@ -242,21 +267,60 @@ async def _install_caddy() -> str:
 
 async def _install_ffmpeg() -> str:
     """Install FFmpeg via static_ffmpeg Python package."""
-    proc = await asyncio.create_subprocess_exec(
-        sys.executable, "-m", "pip", "install", "static-ffmpeg",
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-    )
-    stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=120)
-    if proc.returncode != 0:
-        raise RuntimeError("Could not download FFmpeg. Please check your internet connection.")
+    uv = _find_binary("uv")
+    if uv:
+        rc, out, err = await _run_exec(
+            uv,
+            "pip",
+            "install",
+            "--python",
+            sys.executable,
+            "static-ffmpeg",
+            timeout=180,
+        )
+    else:
+        rc, out, err = await _run_exec(
+            sys.executable,
+            "-m",
+            "pip",
+            "install",
+            "static-ffmpeg",
+            timeout=180,
+        )
+        # Some uv-managed Python envs don't ship pip by default.
+        if rc != 0 and "No module named pip" in err:
+            ensure_rc, ensure_out, ensure_err = await _run_exec(
+                sys.executable,
+                "-m",
+                "ensurepip",
+                "--upgrade",
+                timeout=180,
+            )
+            if ensure_rc != 0:
+                detail = _error_tail(ensure_out, ensure_err) or "ensurepip failed"
+                raise RuntimeError(f"Could not bootstrap pip for FFmpeg install. {detail}")
+            rc, out, err = await _run_exec(
+                sys.executable,
+                "-m",
+                "pip",
+                "install",
+                "static-ffmpeg",
+                timeout=180,
+            )
+
+    if rc != 0:
+        detail = _error_tail(out, err) or "pip install static-ffmpeg failed"
+        raise RuntimeError(f"Could not install static-ffmpeg. {detail}")
 
     # Trigger download of binaries
-    import importlib
-    if "static_ffmpeg" in sys.modules:
-        importlib.reload(sys.modules["static_ffmpeg"])
-    import static_ffmpeg
-    ffmpeg_path, _ = static_ffmpeg.run.get_or_fetch_platform_executables_else_raise()
+    try:
+        import importlib
+
+        static_ffmpeg = importlib.import_module("static_ffmpeg")
+        ffmpeg_path, _ = static_ffmpeg.run.get_or_fetch_platform_executables_else_raise()
+    except Exception as exc:
+        raise RuntimeError(f"static-ffmpeg installed but failed to fetch binaries: {exc}") from exc
+
     logger.info("Installed ffmpeg via static-ffmpeg -> %s", ffmpeg_path)
     return ffmpeg_path
 
@@ -297,7 +361,11 @@ async def _install_git() -> str:
     if os_key == "macos":
         cmd = "xcode-select --install"
     elif os_key == "linux":
-        cmd = "conda install -y git 2>/dev/null || apt install -y git 2>/dev/null || echo 'Please install git manually'"
+        cmd = (
+            "conda install -y git 2>/dev/null || "
+            "apt install -y git 2>/dev/null || "
+            "echo 'Please install git manually'"
+        )
     else:
         cmd = "winget install Git.Git --accept-source-agreements --accept-package-agreements"
 
@@ -392,7 +460,9 @@ REQUIREMENTS = [
 def _check_static_ffmpeg() -> tuple[bool, str | None, str | None]:
     """Check if ffmpeg is available via the static_ffmpeg Python package."""
     try:
-        import static_ffmpeg
+        import importlib
+
+        static_ffmpeg = importlib.import_module("static_ffmpeg")
         ffmpeg_path, _ = static_ffmpeg.run.get_or_fetch_platform_executables_else_raise()
         return True, "Bundled", ffmpeg_path
     except Exception:
@@ -475,9 +545,14 @@ async def install_requirement(req_id: str) -> dict:
     logger.info("Installing requirement '%s' (self-contained)", req_id)
 
     try:
-        path = await installer()
+        await installer()
     except Exception as exc:
         logger.exception("Install failed for %s", req_id)
+        detail = str(exc).strip()
+        if detail:
+            raise RuntimeError(
+                f"Something went wrong installing {req['name']}: {detail}"
+            ) from exc
         raise RuntimeError(
             f"Something went wrong installing {req['name']}. "
             f"Please check your internet connection and try again."

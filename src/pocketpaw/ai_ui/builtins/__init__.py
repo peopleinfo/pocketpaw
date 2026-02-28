@@ -10,6 +10,7 @@ import importlib
 import json
 import logging
 import pkgutil
+import platform
 import shutil
 from pathlib import Path
 from typing import Any
@@ -48,6 +49,22 @@ def get_gallery() -> list[dict[str, Any]]:
     """Return gallery entries for all registered builtins."""
     _discover()
     return [defn["gallery"] for defn in _REGISTRY.values() if "gallery" in defn]
+
+
+def get_install_block_reason(app_id: str) -> str | None:
+    """Return install block reason for current host, or None when installable."""
+    system = platform.system().lower()
+    machine = platform.machine().lower()
+
+    if app_id == "wan2gp" and system == "darwin":
+        if machine in {"arm64", "aarch64"}:
+            return (
+                "Wan2GP is unavailable on macOS arm64. "
+                "Use Windows/Linux with NVIDIA GPU."
+            )
+        return "Wan2GP is unavailable on macOS in one-click mode."
+
+    return None
 
 
 # ─── Install logic ───────────────────────────────────────────────────────

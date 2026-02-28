@@ -243,6 +243,7 @@ window.PocketPaw.AiUI = {
         }
 
         this.aiUI.installForm.installing = true;
+        this.log?.(`[AI UI] Install requested: ${url}`, "info");
         try {
           const res = await fetch("/api/ai-ui/plugins/install", {
             method: "POST",
@@ -255,6 +256,10 @@ window.PocketPaw.AiUI = {
               data.message || "Plugin installed successfully!",
               "success",
             );
+            this.log?.(
+              `[AI UI] Install success: ${data.plugin_id || "unknown"} - ${data.message || "Plugin installed successfully"}`,
+              "success",
+            );
             this.aiUI.installForm.url = "";
             await this.fetchPlugins();
             if (data.plugin_id) {
@@ -263,10 +268,15 @@ window.PocketPaw.AiUI = {
           } else {
             const err = await res.json();
             this.showToast(err.detail || "Installation failed", "error");
+            this.log?.(
+              `[AI UI] Install failed: ${url} - ${err.detail || "Installation failed"}`,
+              "error",
+            );
           }
         } catch (e) {
           console.error("Plugin install error:", e);
           this.showToast("Installation failed", "error");
+          this.log?.(`[AI UI] Install error: ${url} - ${e.message || e}`, "error");
         } finally {
           this.aiUI.installForm.installing = false;
         }
@@ -303,8 +313,20 @@ window.PocketPaw.AiUI = {
         return !!this.getAiUIPluginById(app?.id);
       },
 
+      isGalleryInstallDisabled(app) {
+        const plugin = this.getAiUIPluginById(app?.id);
+        if (plugin) return false;
+        return !!app?.install_disabled;
+      },
+
+      galleryInstallDisabledReason(app) {
+        if (!this.isGalleryInstallDisabled(app)) return "";
+        return app?.install_disabled_reason || "This app is not supported on your OS.";
+      },
+
       galleryInstallLabel(app) {
         if (this.aiUI.installingGalleryApp === app?.id) return "Installing...";
+        if (this.isGalleryInstallDisabled(app)) return "Unsupported";
         const plugin = this.getAiUIPluginById(app?.id);
         if (plugin) return plugin.status === "running" ? "Open" : "Start & Open";
         return "Install";
@@ -312,12 +334,20 @@ window.PocketPaw.AiUI = {
 
       galleryActionIcon(app) {
         if (this.aiUI.installingGalleryApp === app?.id) return "loader-2";
+        if (this.isGalleryInstallDisabled(app)) return "ban";
         const plugin = this.getAiUIPluginById(app?.id);
         if (!plugin) return "download";
         return plugin.status === "running" ? "external-link" : "play";
       },
 
       async installAiUIGalleryApp(app) {
+        if (this.isGalleryInstallDisabled(app)) {
+          const reason = this.galleryInstallDisabledReason(app);
+          this.showToast(reason, "error");
+          this.log?.(`[AI UI] Gallery install blocked: ${app?.id} - ${reason}`, "warning");
+          return;
+        }
+
         const source = (app?.source || "").trim();
         if (!source) {
           this.showToast("This app has no install source", "error");
@@ -331,6 +361,7 @@ window.PocketPaw.AiUI = {
         }
 
         this.aiUI.installingGalleryApp = app.id;
+        this.log?.(`[AI UI] Gallery install requested: ${app.id}`, "info");
         try {
           const res = await fetch("/api/ai-ui/plugins/install", {
             method: "POST",
@@ -343,16 +374,25 @@ window.PocketPaw.AiUI = {
               data.message || "Plugin installed successfully!",
               "success",
             );
+            this.log?.(
+              `[AI UI] Gallery install success: ${data.plugin_id || app.id} - ${data.message || "Plugin installed successfully"}`,
+              "success",
+            );
             await this.fetchPlugins();
             await this.fetchGallery();
             await this.openAiUIPlugin(data.plugin_id || app.id);
           } else {
             const err = await res.json();
             this.showToast(err.detail || "Installation failed", "error");
+            this.log?.(
+              `[AI UI] Gallery install failed: ${app.id} - ${err.detail || "Installation failed"}`,
+              "error",
+            );
           }
         } catch (e) {
           console.error("Gallery install error:", e);
           this.showToast("Installation failed", "error");
+          this.log?.(`[AI UI] Gallery install error: ${app.id} - ${e.message || e}`, "error");
         } finally {
           this.aiUI.installingGalleryApp = null;
           this.$nextTick(() => {
@@ -370,6 +410,7 @@ window.PocketPaw.AiUI = {
         }
 
         this.aiUI.installForm.installing = true;
+        this.log?.(`[AI UI] Zip install requested: ${file.name}`, "info");
         try {
           const formData = new FormData();
           formData.append("file", file);
@@ -381,6 +422,10 @@ window.PocketPaw.AiUI = {
             const data = await res.json();
             this.showToast(
               data.message || "Plugin installed successfully!",
+              "success",
+            );
+            this.log?.(
+              `[AI UI] Zip install success: ${data.plugin_id || file.name} - ${data.message || "Plugin installed successfully"}`,
               "success",
             );
             await this.fetchPlugins();
@@ -396,10 +441,15 @@ window.PocketPaw.AiUI = {
           } else {
             const err = await res.json();
             this.showToast(err.detail || "Installation failed", "error");
+            this.log?.(
+              `[AI UI] Zip install failed: ${file.name} - ${err.detail || "Installation failed"}`,
+              "error",
+            );
           }
         } catch (e) {
           console.error("Plugin install from zip error:", e);
           this.showToast("Installation failed", "error");
+          this.log?.(`[AI UI] Zip install error: ${file.name} - ${e.message || e}`, "error");
         } finally {
           this.aiUI.installForm.installing = false;
           event.target.value = "";
@@ -408,6 +458,7 @@ window.PocketPaw.AiUI = {
 
       async launchAiUIPlugin(pluginId) {
         this.aiUI.launchingPlugin = pluginId;
+        this.log?.(`[AI UI] Launch requested: ${pluginId}`, "info");
         try {
           const res = await fetch(`/api/ai-ui/plugins/${pluginId}/launch`, {
             method: "POST",
@@ -415,7 +466,16 @@ window.PocketPaw.AiUI = {
           if (res.ok) {
             const data = await res.json();
             this.showToast(data.message || "App launched!", "success");
+            this.log?.(
+              `[AI UI] Launch success: ${pluginId} - ${data.message || "App launched"}`,
+              "success",
+            );
             await this.fetchPlugins();
+            await this.fetchAiUIPluginLogs(pluginId);
+            const lines = this.aiUI.logs?.[pluginId] || [];
+            if (lines.length > 0) {
+              this.log?.(`[AI UI:${pluginId}] ${lines[lines.length - 1]}`, "info");
+            }
             // Update selected plugin if viewing detail
             if (this.aiUI.selectedPlugin?.id === pluginId) {
               const plugin = this.aiUI.plugins.find((p) => p.id === pluginId);
@@ -424,22 +484,34 @@ window.PocketPaw.AiUI = {
           } else {
             const err = await res.json();
             this.showToast(err.detail || "Launch failed", "error");
+            this.log?.(
+              `[AI UI] Launch failed: ${pluginId} - ${err.detail || "Launch failed"}`,
+              "error",
+            );
+            await this.fetchAiUIPluginLogs(pluginId);
+            const lines = this.aiUI.logs?.[pluginId] || [];
+            if (lines.length > 0) {
+              this.log?.(`[AI UI:${pluginId}] ${lines[lines.length - 1]}`, "error");
+            }
           }
         } catch (e) {
           console.error("Launch error:", e);
           this.showToast("Launch failed", "error");
+          this.log?.(`[AI UI] Launch error: ${pluginId} - ${e.message || e}`, "error");
         } finally {
           this.aiUI.launchingPlugin = null;
         }
       },
 
       async stopAiUIPlugin(pluginId) {
+        this.log?.(`[AI UI] Stop requested: ${pluginId}`, "info");
         try {
           const res = await fetch(`/api/ai-ui/plugins/${pluginId}/stop`, {
             method: "POST",
           });
           if (res.ok) {
             this.showToast("App stopped", "info");
+            this.log?.(`[AI UI] Stop success: ${pluginId}`, "info");
             await this.fetchPlugins();
             if (this.aiUI.selectedPlugin?.id === pluginId) {
               const plugin = this.aiUI.plugins.find((p) => p.id === pluginId);
@@ -448,19 +520,26 @@ window.PocketPaw.AiUI = {
           } else {
             const err = await res.json();
             this.showToast(err.detail || "Failed to stop app", "error");
+            this.log?.(
+              `[AI UI] Stop failed: ${pluginId} - ${err.detail || "Failed to stop app"}`,
+              "error",
+            );
           }
         } catch (e) {
           this.showToast("Failed to stop app", "error");
+          this.log?.(`[AI UI] Stop error: ${pluginId} - ${e.message || e}`, "error");
         }
       },
 
       async removeAiUIPlugin(pluginId) {
+        this.log?.(`[AI UI] Remove requested: ${pluginId}`, "warning");
         try {
           const res = await fetch(`/api/ai-ui/plugins/${pluginId}`, {
             method: "DELETE",
           });
           if (res.ok) {
             this.showToast("Plugin removed", "info");
+            this.log?.(`[AI UI] Remove success: ${pluginId}`, "warning");
             this.aiUI.plugins = this.aiUI.plugins.filter(
               (p) => p.id !== pluginId,
             );
@@ -474,9 +553,14 @@ window.PocketPaw.AiUI = {
           } else {
             const err = await res.json();
             this.showToast(err.detail || "Failed to remove plugin", "error");
+            this.log?.(
+              `[AI UI] Remove failed: ${pluginId} - ${err.detail || "Failed to remove plugin"}`,
+              "error",
+            );
           }
         } catch (e) {
           this.showToast("Failed to remove plugin", "error");
+          this.log?.(`[AI UI] Remove error: ${pluginId} - ${e.message || e}`, "error");
         }
       },
 

@@ -64,7 +64,24 @@ def _run(cmd: list[str]) -> None:
     subprocess.run(cmd, cwd=str(ROOT), check=True)
 
 
+def _has_uv() -> bool:
+    try:
+        proc = subprocess.run(
+            ["uv", "--version"],
+            cwd=str(ROOT),
+            check=False,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        return proc.returncode == 0
+    except Exception:
+        return False
+
+
 def _pip(py: Path, *args: str) -> None:
+    if args and args[0] == "install" and _has_uv():
+        _run(["uv", "pip", "install", "--python", str(py), *args[1:]])
+        return
     _run([str(py), "-m", "pip", *args])
 
 
@@ -154,8 +171,8 @@ def main() -> int:
     print(f"Platform: {system}")
 
     if system == "darwin":
-        print("macOS is optional for this built-in. Skipping dependency install by default.")
-        print("If you want to try anyway, launch once with: WAN2GP_ALLOW_MAC=1")
+        print("Detected macOS. Skipping heavy install during add.")
+        print("Wan2GP start will auto-enable optional macOS mode.")
         return 0
 
     if not _has_nvidia_gpu() and os.getenv("WAN2GP_ALLOW_NO_NVIDIA", "0") != "1":
@@ -225,7 +242,24 @@ def _run(cmd: list[str]) -> None:
     subprocess.run(cmd, cwd=str(ROOT), check=True)
 
 
+def _has_uv() -> bool:
+    try:
+        proc = subprocess.run(
+            ["uv", "--version"],
+            cwd=str(ROOT),
+            check=False,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        return proc.returncode == 0
+    except Exception:
+        return False
+
+
 def _pip(py: Path, *args: str) -> None:
+    if args and args[0] == "install" and _has_uv():
+        _run(["uv", "pip", "install", "--python", str(py), *args[1:]])
+        return
     _run([str(py), "-m", "pip", *args])
 
 
@@ -256,6 +290,57 @@ def _deps_ready(py: Path) -> bool:
         stderr=subprocess.DEVNULL,
     )
     return check.returncode == 0
+
+
+def _macos_requirements_file() -> Path:
+    source = ROOT / "requirements.txt"
+    target = ROOT / "requirements.macos.txt"
+    if not source.exists():
+        return source
+
+    lines = source.read_text(encoding="utf-8").splitlines()
+    filtered: list[str] = []
+    has_onnxruntime_cpu = False
+
+    for raw in lines:
+        line = raw.strip()
+        lower = line.lower()
+
+        if line.startswith("--extra-index-url"):
+            # CUDA nightly index is not useful on macOS and can slow resolution.
+            continue
+        if lower.startswith("onnxruntime-gpu"):
+            continue
+        if lower.startswith("rembg[gpu]"):
+            filtered.append("rembg==2.0.65")
+            continue
+        if lower.startswith("nvidia-ml-py"):
+            continue
+        if lower.startswith("onnxruntime==") or lower.startswith("onnxruntime>="):
+            has_onnxruntime_cpu = True
+        filtered.append(raw)
+
+    if not has_onnxruntime_cpu:
+        filtered.append("onnxruntime>=1.18.0")
+
+    target.write_text("\\n".join(filtered).rstrip() + "\\n", encoding="utf-8")
+    return target
+
+
+def _macos_preflight(py: Path) -> tuple[bool, str]:
+    major, minor = _python_mm(py)
+    machine = platform.machine().lower()
+    if machine in {"arm64", "aarch64"}:
+        return (
+            False,
+            "decord does not provide macOS arm64 wheels required by Wan2GP.",
+        )
+    if (major, minor) > (3, 8):
+        return (
+            False,
+            "decord macOS wheels are only published up to Python 3.8 (x86_64).",
+        )
+    return True, ""
 
 
 def _install_pinokio_torch_stack(py: Path) -> None:
@@ -313,17 +398,30 @@ def _bootstrap_deps(py: Path) -> None:
     _pip(py, "install", "--upgrade", "pip")
     if os.getenv("WAN2GP_SKIP_PINOKIO_TORCH", "0") != "1":
         _install_pinokio_torch_stack(py)
-    _pip(py, "install", "-r", "requirements.txt")
+    req_file = ROOT / "requirements.txt"
+    if platform.system().lower() == "darwin":
+        req_file = _macos_requirements_file()
+        print(f"Using macOS compatibility requirements: {req_file.name}")
+    _pip(py, "install", "-r", str(req_file.name))
 
 
 def main() -> int:
     system = platform.system().lower()
-    if system == "darwin" and os.getenv("WAN2GP_ALLOW_MAC", "0") != "1":
-        print("Wan2GP built-in is Windows-first; macOS support is optional.")
-        print("To try on macOS, set WAN2GP_ALLOW_MAC=1 and start again.")
-        return 1
+    if system == "darwin" and os.getenv("WAN2GP_ALLOW_MAC") is None:
+        os.environ["WAN2GP_ALLOW_MAC"] = "1"
+        print("Detected macOS; enabling optional WAN2GP_ALLOW_MAC=1 automatically.")
+        print("Wan2GP is Windows-first, so macOS is best-effort support.")
 
     py = _ensure_venv()
+    if system == "darwin":
+        ok, reason = _macos_preflight(py)
+        if not ok:
+            print("Wan2GP macOS preflight failed.")
+            print(reason)
+            print("Recommended: run Wan2GP on Windows/Linux with NVIDIA GPU.")
+            print("Advanced: Intel macOS + Python 3.8 + manual decord build/setup.")
+            return 1
+
     _bootstrap_deps(py)
 
     port = os.getenv("PORT") or os.getenv("SERVER_PORT") or "7860"

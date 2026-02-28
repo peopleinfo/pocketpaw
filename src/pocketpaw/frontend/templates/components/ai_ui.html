@@ -533,10 +533,10 @@
                       class="font-semibold text-[14px] text-white/90 truncate"
                       x-text="plugin.name"
                     ></div>
-                    <div
-                      class="text-[11px] text-white/40"
-                      x-text="'v' + plugin.version"
-                    ></div>
+                    <div class="text-[11px] text-white/40 flex items-center gap-2">
+                      <span x-text="'v' + plugin.version"></span>
+                      <span class="font-mono text-white/30" x-text="'id:' + plugin.id"></span>
+                    </div>
                   </div>
                 </div>
 
@@ -619,10 +619,16 @@
                 class="text-[13px] font-bold text-white tracking-tight leading-tight"
                 x-text="aiUI.selectedPlugin.name"
               ></h1>
-              <span
-                class="text-[10px] text-white/40"
-                x-text="aiUI.selectedPlugin.status === 'running' ? '● Running' : '○ Stopped'"
-              ></span>
+              <div class="flex items-center gap-2">
+                <span
+                  class="text-[10px] text-white/40"
+                  x-text="aiUI.selectedPlugin.status === 'running' ? '● Running' : '○ Stopped'"
+                ></span>
+                <span
+                  class="text-[10px] text-white/30 font-mono"
+                  x-text="'id:' + aiUI.selectedPlugin.id"
+                ></span>
+              </div>
             </div>
           </div>
           <div class="h-4 w-px bg-white/10 shrink-0"></div>
@@ -1280,6 +1286,9 @@
                   class="text-[12px] text-white/40 leading-relaxed mb-4"
                   x-text="app.description"
                 ></p>
+                <template x-if="isGalleryInstallDisabled(app)">
+                  <div class="mb-3 text-[11px] text-amber-300/90" x-text="galleryInstallDisabledReason(app)"></div>
+                </template>
                 <div class="flex items-center justify-between">
                   <code
                     class="text-[11px] font-mono text-white/30"
@@ -1287,7 +1296,8 @@
                   ></code>
                   <button
                     class="px-3 py-1.5 bg-accent/10 text-accent hover:bg-accent/20 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-[11px] font-medium transition-all border border-accent/20 hover:scale-105 disabled:hover:scale-100 flex items-center gap-1.5"
-                    :disabled="aiUI.installingGalleryApp === app.id"
+                    :disabled="aiUI.installingGalleryApp === app.id || isGalleryInstallDisabled(app)"
+                    :title="isGalleryInstallDisabled(app) ? galleryInstallDisabledReason(app) : ''"
                     @click.stop="installAiUIGalleryApp(app)"
                   >
                     <i

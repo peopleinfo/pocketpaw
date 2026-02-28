@@ -135,3 +135,39 @@ module.exports = {
     )
     stderr = (proc.stderr or "").strip()
     assert "NameError" not in stderr
+
+
+def test_scaffold_in_place_plugin_path_does_not_delete_source(tmp_path: Path):
+    project_root = tmp_path / "workspace"
+    plugin_dir = project_root / "plugins" / "plugin"
+    plugin_dir.mkdir(parents=True)
+    (plugin_dir / "app.py").write_text("print('ok')\n")
+
+    result = scaffold_plugin(
+        str(plugin_dir),
+        project_root=project_root,
+        plugin_id="plugin",
+        install=True,
+    )
+
+    assert result.plugin_dir == plugin_dir
+    assert (plugin_dir / "app.py").exists()
+    assert (plugin_dir / "pocketpaw.json").exists()
+    assert (plugin_dir / "pocketpaw_install.py").exists()
+
+
+def test_scaffold_treats_plugins_dir_as_project_root_parent(tmp_path: Path):
+    source = tmp_path / "repo"
+    source.mkdir()
+    (source / "app.py").write_text("print('ok')\n")
+
+    project_root = tmp_path / "workspace"
+    plugins_dir = project_root / "plugins"
+    plugins_dir.mkdir(parents=True)
+
+    result = scaffold_plugin(str(source), project_root=plugins_dir, install=True)
+
+    expected = project_root / "plugins" / result.plugin_id
+    assert result.plugin_dir == expected
+    assert expected.exists()
+    assert (expected / "pocketpaw.json").exists()

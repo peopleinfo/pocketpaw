@@ -46,6 +46,7 @@ import shutil
 import signal
 import socket
 import subprocess
+import sys
 import zipfile
 from pathlib import Path
 from typing import Any
@@ -73,6 +74,48 @@ _SYSTEM_PATHS = (
 
 
 # ─── Workspace sandbox ──────────────────────────────────────────────────
+
+
+def _write_executable(path: Path, content: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8")
+    try:
+        path.chmod(0o755)
+    except OSError:
+        logger.debug("Failed to chmod executable: %s", path)
+
+
+def _ensure_python_shims(plugin_dir: Path, venv_dir: Path, local_bin: Path) -> None:
+    """Provide stable `python`/`python3` launch shims for sandboxed scripts."""
+    local_bin.mkdir(parents=True, exist_ok=True)
+    if platform.system() == "Windows":
+        venv_py = venv_dir / "Scripts" / "python.exe"
+        fallback = Path(sys.executable)
+        shim = (
+            "@echo off\n"
+            f'set "_VENV_PY={venv_py}"\n'
+            'if exist "%_VENV_PY%" (\n'
+            '  "%_VENV_PY%" %*\n'
+            "  exit /b %errorlevel%\n"
+            ")\n"
+            f'"{fallback}" %*\n'
+        )
+        _write_executable(local_bin / "python.cmd", shim)
+        _write_executable(local_bin / "python3.cmd", shim)
+        return
+
+    venv_py = venv_dir / "bin" / "python"
+    fallback = Path(sys.executable)
+    shim = (
+        "#!/bin/bash\n"
+        "set -euo pipefail\n"
+        f'if [ -x "{venv_py}" ]; then\n'
+        f'  exec "{venv_py}" "$@"\n'
+        "fi\n"
+        f'exec "{fallback}" "$@"\n'
+    )
+    _write_executable(local_bin / "python", shim)
+    _write_executable(local_bin / "python3", shim)
 
 
 def _sandbox_env(plugin_dir: Path, manifest: dict) -> dict[str, str]:
@@ -110,11 +153,13 @@ def _sandbox_env(plugin_dir: Path, manifest: dict) -> dict[str, str]:
         venv_bin = venv_dir / "bin"
         local_bin = plugin_dir / "bin"
         shell_value = "/bin/bash"
+
+    _ensure_python_shims(plugin_dir, venv_dir, local_bin)
+
     path_parts = []
     if venv_bin.is_dir():
         path_parts.append(str(venv_bin))
-    if local_bin.is_dir():
-        path_parts.append(str(local_bin))
+    path_parts.append(str(local_bin))
     path_parts.append(_SYSTEM_PATHS)
 
     env: dict[str, str] = {
@@ -232,6 +277,39 @@ def _get_effective_manifest(plugin_id: str, manifest: dict) -> dict:
     return manifest
 
 
+def _refresh_builtin_overlay_files(plugin_id: str, plugin_dir: Path) -> None:
+    """Refresh overlay files for installed built-ins without requiring reinstall."""
+    try:
+        from pocketpaw.ai_ui.builtins import get_registry
+
+        builtin_def = get_registry().get(plugin_id)
+        if not builtin_def:
+            return
+
+        files = builtin_def.get("files") or {}
+        for filename, content in files.items():
+            if not isinstance(filename, str) or not isinstance(content, str):
+                continue
+            path = plugin_dir / filename
+            try:
+                if path.exists() and path.read_text(encoding="utf-8") == content:
+                    continue
+            except OSError:
+                logger.debug("Unable to read existing built-in overlay '%s'", path, exc_info=True)
+            try:
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(content, encoding="utf-8")
+            except OSError:
+                logger.warning(
+                    "Failed to refresh built-in overlay file '%s' for plugin '%s'",
+                    filename,
+                    plugin_id,
+                    exc_info=True,
+                )
+    except Exception:
+        logger.debug("Failed to refresh built-in overlay files for '%s'", plugin_id, exc_info=True)
+
+
 # ─── PID persistence ────────────────────────────────────────────────────
 
 
@@ -247,6 +325,88 @@ def _read_pid(plugin_dir: Path) -> int | None:
         return int(pid_path.read_text(encoding="utf-8").strip())
     except (ValueError, OSError):
         return None
+
+
+def _tail_file(path: Path, lines: int = 20) -> str:
+    """Return the last N lines from a text file, or empty string."""
+    if not path.exists():
+        return ""
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return ""
+    chunk = text.strip().splitlines()[-lines:]
+    return "\n".join(chunk).strip()
+
+
+def _is_shell_command(cmd: str) -> bool:
+    tokens = [t.lower() for t in cmd.strip().split() if t.strip()]
+    if not tokens:
+        return False
+    if tokens[0] in {"bash", "sh"}:
+        return True
+    return any(token.endswith(".sh") for token in tokens)
+
+
+def _extract_exec_command(script_path: Path) -> str | None:
+    """Extract a trailing `exec ...` command from a shell script, if present."""
+    try:
+        lines = script_path.read_text(encoding="utf-8", errors="ignore").splitlines()
+    except OSError:
+        return None
+
+    for raw in reversed(lines):
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("exec "):
+            cmd = line[5:].strip()
+            return cmd or None
+    return None
+
+
+def _resolve_phase_command(plugin_dir: Path, manifest: dict | None, phase: str) -> str:
+    """Resolve install/start/stop command with cross-platform fallbacks.
+
+    Priority:
+    1) `pocketpaw_<phase>.py` wrapper (universal)
+    2) manifest command
+    3) `<phase>.sh` script
+    """
+    wrapper = plugin_dir / f"pocketpaw_{phase}.py"
+    if wrapper.exists():
+        return f"python {wrapper.name}"
+
+    cmd = str((manifest or {}).get(phase) or "").strip()
+    if cmd:
+        # On Windows, allow shell scripts when Git Bash exists.
+        if platform.system() == "Windows" and _is_shell_command(cmd):
+            bash = shutil.which("bash")
+            if bash:
+                script = plugin_dir / f"{phase}.sh"
+                if script.exists():
+                    return f'"{bash}" {script.name}'
+            script = plugin_dir / f"{phase}.sh"
+            if script.exists():
+                extracted = _extract_exec_command(script)
+                if extracted:
+                    return extracted
+            return ""
+        return cmd
+
+    script = plugin_dir / f"{phase}.sh"
+    if script.exists():
+        if platform.system() == "Windows":
+            bash = shutil.which("bash")
+            if bash:
+                return f'"{bash}" {script.name}'
+            extracted = _extract_exec_command(script)
+            if extracted:
+                return extracted
+            return ""
+        return f"bash {script.name}"
+
+    return ""
 
 
 def _clear_pid(plugin_dir: Path) -> None:
@@ -694,7 +854,11 @@ async def install_plugin(source: str) -> dict:
     # Built-in curated plugins
     if source.startswith("builtin:"):
         app_id = source.split(":", 1)[1]
-        from pocketpaw.ai_ui.builtins import install_builtin
+        from pocketpaw.ai_ui.builtins import get_install_block_reason, install_builtin
+
+        reason = get_install_block_reason(app_id)
+        if reason:
+            raise ValueError(reason)
 
         return await install_builtin(app_id, plugins_dir)
 
@@ -773,21 +937,10 @@ async def install_plugin(source: str) -> dict:
             shutil.rmtree(git_dir)
 
     # Run install in sandboxed env (with network access for deps)
-    install_script = dest / "install.sh"
-    install_cmd = manifest.get("install")
+    install_cmd = _resolve_phase_command(dest, manifest, "install")
     sandbox_env = _sandbox_install_env(dest, manifest)
 
-    if install_script.exists():
-        logger.info("Running install script for '%s'", plugin_id)
-        proc = await asyncio.create_subprocess_shell(
-            "bash install.sh",
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-            cwd=str(dest),
-            env=sandbox_env,
-        )
-        await asyncio.wait_for(proc.communicate(), timeout=300)
-    elif install_cmd:
+    if install_cmd:
         logger.info("Running install command for '%s': %s", plugin_id, install_cmd)
         proc = await asyncio.create_subprocess_shell(
             install_cmd,
@@ -862,24 +1015,11 @@ async def install_plugin_from_zip(zip_bytes: bytes) -> dict:
         # Copy done while temp dir still exists
 
     # Run install in sandboxed env
-    install_script = dest / "install.sh"
-    install_cmd = manifest.get("install")
+    install_cmd = _resolve_phase_command(dest, manifest, "install")
     sandbox_env = _sandbox_install_env(dest, manifest)
 
-    if install_script.exists():
-        logger.info("Running install script for '%s'", plugin_id)
-        proc = await asyncio.create_subprocess_shell(
-            "bash install.sh",
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-            cwd=str(dest),
-            env=sandbox_env,
-        )
-        await asyncio.wait_for(proc.communicate(), timeout=300)
-    elif install_cmd:
-        logger.info(
-            "Running install command for '%s': %s", plugin_id, install_cmd
-        )
+    if install_cmd:
+        logger.info("Running install command for '%s': %s", plugin_id, install_cmd)
         proc = await asyncio.create_subprocess_shell(
             install_cmd,
             stdout=asyncio.subprocess.PIPE,
@@ -913,11 +1053,15 @@ async def launch_plugin(plugin_id: str) -> dict:
     if manifest is None:
         raise ValueError(f"Plugin '{plugin_id}' not found or missing manifest")
 
-    start_cmd = manifest.get("start")
+    _refresh_builtin_overlay_files(plugin_id, plugin_dir)
+
+    start_cmd = _resolve_phase_command(plugin_dir, manifest, "start")
     if not start_cmd:
         raise ValueError(f"Plugin '{plugin_id}' has no start command")
 
     env = _sandbox_env(plugin_dir, manifest)
+    if plugin_id == "wan2gp" and platform.system() == "Darwin":
+        env["WAN2GP_ALLOW_MAC"] = "1"
 
     logger.info(
         "Launching plugin '%s': %s (sandboxed in %s)",
@@ -929,19 +1073,36 @@ async def launch_plugin(plugin_id: str) -> dict:
     log_path = plugin_dir / _LOG_FILENAME
     log_file = log_path.open("w", encoding="utf-8")
 
-    proc = await asyncio.create_subprocess_shell(
-        start_cmd,
-        stdout=log_file,
-        stderr=log_file,
-        cwd=str(plugin_dir),
-        env=env,
-        preexec_fn=os.setsid,
-    )
+    spawn_kwargs: dict[str, Any] = {
+        "stdout": log_file,
+        "stderr": log_file,
+        "cwd": str(plugin_dir),
+        "env": env,
+    }
+    if platform.system() != "Windows":
+        spawn_kwargs["preexec_fn"] = os.setsid
+    proc = await asyncio.create_subprocess_shell(start_cmd, **spawn_kwargs)
 
     log_file.close()
 
     _running_processes[plugin_id] = proc
     _write_pid(plugin_dir, proc.pid)
+
+    # Catch immediate failures (bad command, missing deps, crash on startup)
+    # so UI doesn't report "launched" for a dead process.
+    await asyncio.sleep(0.35)
+    if proc.returncode is not None:
+        _running_processes.pop(plugin_id, None)
+        _clear_pid(plugin_dir)
+        tail = _tail_file(log_path, lines=25)
+        detail = (
+            f"Plugin '{plugin_id}' failed to start (exit code {proc.returncode})."
+            if proc.returncode != 0
+            else f"Plugin '{plugin_id}' exited immediately."
+        )
+        if tail:
+            detail += f"\n\nRecent logs:\n{tail}"
+        raise RuntimeError(detail)
 
     port = manifest.get("port")
     msg = (
@@ -993,7 +1154,7 @@ async def stop_plugin(plugin_id: str) -> dict:
             "message": f"Plugin '{plugin_id}' was not running",
         }
 
-    stop_cmd = manifest.get("stop") if manifest else None
+    stop_cmd = _resolve_phase_command(plugin_dir, manifest, "stop")
 
     if stop_cmd:
         try:

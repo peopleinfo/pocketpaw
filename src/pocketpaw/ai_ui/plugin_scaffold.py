@@ -70,6 +70,18 @@ def _safe_rmtree(path: Path) -> None:
     shutil.rmtree(path, onerror=_onerror)
 
 
+def _normalize_project_root(project_root: Path) -> Path:
+    """Accept either project root or the plugins directory itself.
+
+    Some callers accidentally pass `<root>/plugins` as --project-root, which
+    otherwise creates nested `<root>/plugins/plugins/...` directories.
+    """
+    resolved = project_root.resolve()
+    if resolved.name == "plugins":
+        return resolved.parent
+    return resolved
+
+
 def _copytree_ignore(
     source_root: Path, *, plugin_id: str, ignore_plugins: bool
 ) -> Callable[[str, list[str]], set[str]]:
@@ -411,6 +423,11 @@ def _ensure_venv(app_dir: Path) -> Path:
 
 
 def _pip(py: Path, *args: str) -> None:
+    # Prefer `uv pip install --python ...` when available for faster, more
+    # reliable wheel resolution on heavy CUDA stacks; fall back to pip.
+    if args and args[0] == "install" and _has_cmd("uv"):
+        subprocess.run(["uv", "pip", "install", "--python", str(py), *args[1:]], check=True)
+        return
     subprocess.run([str(py), "-m", "pip", *args], check=True)
 
 
@@ -693,6 +710,8 @@ def scaffold_plugin(
 
     If source already contains `pocketpaw.json`, it is copied as-is.
     """
+    project_root = _normalize_project_root(project_root)
+
     with tempfile.TemporaryDirectory() as tmpdir:
         tmp_root = Path(tmpdir)
         source_dir, copied_from = _resolve_source_to_dir(source, tmp_root)
@@ -705,7 +724,21 @@ def scaffold_plugin(
         if install:
             source_dir_resolved = source_dir.resolve()
             dest_resolved = dest.resolve()
+            source_is_dest = source_dir_resolved == dest_resolved
             dest_is_within_source = dest_resolved.is_relative_to(source_dir_resolved)
+
+            # In-place scaffolding for an already-local plugin path:
+            # avoid deleting/copying the same directory onto itself.
+            if source_is_dest:
+                has_manifest = (dest / "pocketpaw.json").exists()
+                if not has_manifest:
+                    _ensure_scaffold(dest, final_id)
+                return ScaffoldResult(
+                    plugin_id=final_id,
+                    plugin_dir=dest,
+                    already_plugin=has_manifest,
+                    copied_from=copied_from,
+                )
 
             if dest.exists():
                 _safe_rmtree(dest)

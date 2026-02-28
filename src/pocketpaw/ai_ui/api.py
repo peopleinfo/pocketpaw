@@ -9,7 +9,7 @@ Provides REST endpoints for:
 
 import logging
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, UploadFile
 
 logger = logging.getLogger(__name__)
 
@@ -130,7 +130,10 @@ async def save_chat_history_endpoint(plugin_id: str, request: Request):
 
 @router.get("/plugins/{plugin_id}/models")
 async def get_plugin_models_endpoint(plugin_id: str, request: Request):
-    """Fetch /v1/models from a running plugin. Returns { models: [...] }. Empty when plugin not running."""
+    """Fetch /v1/models from a running plugin.
+
+    Returns { models: [...] }. Empty when plugin is not running.
+    """
     from pocketpaw.ai_ui.plugins import fetch_plugin_models as _fetch
 
     host = request.query_params.get("host")
@@ -148,7 +151,10 @@ async def get_plugin_models_endpoint(plugin_id: str, request: Request):
 
 @router.get("/plugins/{plugin_id}/providers")
 async def get_plugin_providers_endpoint(plugin_id: str, request: Request):
-    """Fetch /v1/providers from a running plugin. Returns { providers: [...] }. Empty when plugin not running."""
+    """Fetch /v1/providers from a running plugin.
+
+    Returns { providers: [...] }. Empty when plugin is not running.
+    """
     from pocketpaw.ai_ui.plugins import fetch_plugin_providers as _fetch
 
     host = request.query_params.get("host")
@@ -222,7 +228,7 @@ async def install_plugin_endpoint(request: Request):
     if "multipart/form-data" in content_type:
         form = await request.form()
         file = form.get("file")
-        if not file or file.filename == "":
+        if not isinstance(file, UploadFile) or file.filename == "":
             raise HTTPException(
                 status_code=400, detail="No file provided. Upload a .zip plugin."
             )
@@ -476,6 +482,16 @@ async def shell_endpoint(request: Request):
 @router.get("/gallery")
 async def get_gallery():
     """Get discovery gallery of curated built-in apps."""
-    from pocketpaw.ai_ui.builtins import get_gallery as builtin_gallery
+    from pocketpaw.ai_ui import builtins as ai_ui_builtins
 
-    return {"apps": builtin_gallery()}
+    apps = []
+    for app in ai_ui_builtins.get_gallery():
+        item = dict(app)
+        app_id = str(item.get("id", ""))
+        reason = ai_ui_builtins.get_install_block_reason(app_id) if app_id else None
+        item["install_disabled"] = bool(reason)
+        if reason:
+            item["install_disabled_reason"] = reason
+        apps.append(item)
+
+    return {"apps": apps}
