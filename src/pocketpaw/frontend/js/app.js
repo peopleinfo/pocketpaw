@@ -445,6 +445,11 @@ function app() {
             // Transparency handlers
             socket.on('connection_info', (data) => this.handleConnectionInfo(data));
             socket.on('system_event', (data) => this.handleSystemEvent(data));
+            socket.on('dev_reload', () => {
+                if (window.POCKETPAW_DEV_MODE) {
+                    window.location.reload();
+                }
+            });
 
             // Health
             socket.on('health_update', (data) => this.handleHealthUpdate(data));

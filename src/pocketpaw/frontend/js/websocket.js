@@ -14,6 +14,8 @@ class PocketPawSocket {
         this.maxReconnectAttempts = 5;
         this.isConnecting = false;
         this.isConnected = false;
+        this.devMode = !!window.POCKETPAW_DEV_MODE;
+        this.hadDisconnect = false;
     }
 
     /**
@@ -44,6 +46,11 @@ class PocketPawSocket {
             this.isConnecting = false;
             this.isConnected = true;
             this.reconnectAttempts = 0;
+            if (this.devMode && this.hadDisconnect) {
+                console.log('[WS] Dev reconnect detected — reloading page');
+                window.location.reload();
+                return;
+            }
             // Authenticate via first message (not URL query param)
             if (token) {
                 this.ws.send(JSON.stringify({ action: 'authenticate', token }));
@@ -74,6 +81,7 @@ class PocketPawSocket {
 
             this.isConnecting = false;
             this.isConnected = false;
+            this.hadDisconnect = true;
             this.emit('disconnected');
             this.attemptReconnect();
         };

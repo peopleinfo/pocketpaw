@@ -387,6 +387,10 @@
     <!-- Toast Container -->
     <div class="toast-container" x-ref="toasts"></div>
 
+    <script>
+      window.POCKETPAW_DEV_MODE = {% if dev_mode %}true{% else %}false{% endif %};
+    </script>
+
     <!-- Scripts (cache-busted via ?v= hash) -->
     <script src="/static/js/state.js?v={{ v }}"></script>
     <script src="/static/js/websocket.js?v={{ v }}"></script>

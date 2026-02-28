@@ -26,6 +26,7 @@ import base64
 import io
 import json
 import logging
+import os
 from pathlib import Path
 
 try:
@@ -871,15 +872,28 @@ async def oauth_callback(
 
 
 def _static_version() -> str:
-    """Generate a cache-busting version string from JS file mtimes."""
+    """Generate a cache-busting version string from frontend asset mtimes."""
     import hashlib
 
-    js_dir = FRONTEND_DIR / "js"
-    if not js_dir.exists():
+    roots = [FRONTEND_DIR / "js", FRONTEND_DIR / "css", TEMPLATES_DIR]
+    if not any(root.exists() for root in roots):
         return "0"
+
     mtimes = []
-    for f in sorted(js_dir.rglob("*.js")):
-        mtimes.append(str(int(f.stat().st_mtime)))
+    for root in roots:
+        if not root.exists():
+            continue
+        for f in sorted(root.rglob("*")):
+            if not f.is_file():
+                continue
+            if f.suffix not in {".js", ".css", ".html"}:
+                continue
+            st = f.stat()
+            mtimes.append(f"{f}:{st.st_mtime_ns}:{st.st_size}")
+
+    if not mtimes:
+        return "0"
+
     return hashlib.md5("|".join(mtimes).encode()).hexdigest()[:8]
 
 
@@ -901,9 +915,16 @@ async def index(request: Request):
     """Serve the main dashboard page."""
     from importlib.metadata import version as get_version
 
+    dev_mode = os.getenv("POCKETPAW_DEV_MODE") == "1"
+
     return templates.TemplateResponse(
         "base.html",
-        {"request": request, "v": _static_version(), "app_version": get_version("pocketpaw")},
+        {
+            "request": request,
+            "v": _static_version(),
+            "app_version": get_version("pocketpaw"),
+            "dev_mode": dev_mode,
+        },
     )
 
 
@@ -1895,6 +1916,7 @@ def run_dashboard(
     dev: bool = False,
 ):
     """Run the dashboard server."""
+    os.environ["POCKETPAW_DEV_MODE"] = "1" if dev else "0"
 
     print("\n" + "=" * 50)
     print("🐾 POCKETPAW WEB DASHBOARD")
@@ -1929,7 +1951,7 @@ def run_dashboard(
             port=port,
             reload=True,
             reload_dirs=[src_dir],
-            reload_includes=["*.py", "*.html", "*.js", "*.css"],
+            reload_includes=["*.py"],
             log_level="debug",
         )
     else:

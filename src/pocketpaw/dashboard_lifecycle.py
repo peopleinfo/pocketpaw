@@ -9,6 +9,9 @@ Extracted from dashboard.py — contains:
 
 import asyncio
 import logging
+import os
+from pathlib import Path
+from time import monotonic
 
 import pocketpaw.dashboard_state as _state
 from pocketpaw.bus import get_message_bus
@@ -26,6 +29,7 @@ from pocketpaw.security import get_audit_logger
 from pocketpaw.security.rate_limiter import cleanup_all
 
 logger = logging.getLogger(__name__)
+_dev_reload_task: asyncio.Task | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -114,6 +118,8 @@ async def startup_event(
         Callable for starting a channel adapter. Injected from dashboard.py
         to avoid circular import with dashboard_channels.
     """
+    global _dev_reload_task
+
     # Start Message Bus Integration
     bus = get_message_bus()
     await ws_adapter.start(bus)
@@ -244,14 +250,14 @@ async def startup_event(
                 logger.warning("Health heartbeat error: %s", e)
 
         # Reuse the daemon's APScheduler
-        from datetime import datetime, timedelta, timezone
+        from datetime import UTC, datetime, timedelta
         daemon.trigger_engine.scheduler.add_job(
             _health_heartbeat,
             "interval",
             minutes=5,
             id="health_heartbeat",
             replace_existing=True,
-            next_run_time=datetime.now(timezone.utc) + timedelta(seconds=10),
+            next_run_time=datetime.now(UTC) + timedelta(seconds=10),
         )
         logger.info("Health heartbeat registered (every 5 min)")
     except Exception as e:
@@ -266,6 +272,40 @@ async def startup_event(
                 logger.debug("Rate limiter cleanup: removed %d stale entries", removed)
 
     asyncio.create_task(_rate_limit_cleanup_loop())
+
+    # Dev-only frontend watcher: push reload events to connected clients.
+    if os.getenv("POCKETPAW_DEV_MODE") == "1" and _dev_reload_task is None:
+        frontend_dir = Path(__file__).parent / "frontend"
+        if frontend_dir.exists():
+
+            async def _dev_reload_watch_loop() -> None:
+                try:
+                    from watchfiles import awatch
+                except Exception:
+                    logger.warning("Dev reload watcher unavailable (watchfiles not installed)")
+                    return
+
+                logger.info("Dev reload watcher active: %s", frontend_dir)
+                last_emit = 0.0
+                async for changes in awatch(str(frontend_dir), debounce=200):
+                    changed = False
+                    for _change, changed_path in changes:
+                        suffix = Path(changed_path).suffix.lower()
+                        if suffix in {".html", ".js", ".css"}:
+                            changed = True
+                            break
+                    if not changed:
+                        continue
+                    now = monotonic()
+                    if now - last_emit < 0.5:
+                        continue
+                    last_emit = now
+                    await ws_adapter.broadcast(
+                        {"reason": "frontend_changed"},
+                        msg_type="dev_reload",
+                    )
+
+            _dev_reload_task = asyncio.create_task(_dev_reload_watch_loop())
 
     # Open browser now that the server is actually listening
     if _state._open_browser_url:
@@ -287,6 +327,13 @@ async def shutdown_event(*, _stop_channel_adapter_fn=None):
     _stop_channel_adapter_fn:
         Callable for stopping a channel adapter. Injected from dashboard.py.
     """
+    global _dev_reload_task
+
+    # Stop dev reload watcher
+    if _dev_reload_task is not None:
+        _dev_reload_task.cancel()
+        _dev_reload_task = None
+
     # Stop Agent Loop
     await agent_loop.stop()
     await ws_adapter.stop()
@@ -315,4 +362,3 @@ async def shutdown_event(*, _stop_channel_adapter_fn=None):
         await mcp.stop_all()
     except Exception as e:
         logger.warning("Error stopping MCP servers: %s", e)
-
