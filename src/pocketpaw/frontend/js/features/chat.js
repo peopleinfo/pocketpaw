@@ -23,6 +23,7 @@ window.PocketPaw.Chat = {
             agentActive: true,
             isStreaming: false,
             isThinking: false,
+            isStopRequested: false,
             streamingContent: '',
             streamingMessageId: null,
             hasShownWelcome: false,
@@ -122,6 +123,7 @@ window.PocketPaw.Chat = {
             startStreaming() {
                 this.isStreaming = true;
                 this.isThinking = true;
+                this.isStopRequested = false;
                 this.streamingContent = '';
             },
 
@@ -134,6 +136,7 @@ window.PocketPaw.Chat = {
                 }
                 this.isStreaming = false;
                 this.isThinking = false;
+                this.isStopRequested = false;
                 this.streamingContent = '';
 
                 // Refresh sidebar sessions and auto-title
@@ -182,18 +185,23 @@ window.PocketPaw.Chat = {
                 // otherwise fall through to chat so CommandHandler picks it up
                 // (e.g. /backend, /backends, /model, /tools, /help, etc.)
                 if (text.startsWith('/')) {
-                    const parts = text.slice(1).split(' ');
-                    const skillName = parts[0];
-                    const isSkill = (this.skills || []).some(
-                        s => s.name.toLowerCase() === skillName.toLowerCase()
-                    );
+                    const slash = this.parseSlashCommand(text);
+                    const skill = slash ? this.findSkillByName(slash.command) : null;
 
-                    if (isSkill) {
-                        const args = parts.slice(1).join(' ');
+                    if (skill && slash) {
+                        const args = slash.args.trim();
+                        if (this.skillHasRequiredArgs(skill) && !args) {
+                            const usage = this.getSkillUsageText(skill);
+                            this.showToast(`Usage: ${usage}`, 'error');
+                            this.log(`Skill requires arguments: ${usage}`, 'warning');
+                            return;
+                        }
+
                         this.addMessage('user', text);
                         this.inputText = '';
-                        socket.send('run_skill', { name: skillName, args });
-                        this.log(`Running skill: /${skillName} ${args}`, 'info');
+                        this.startStreaming();
+                        socket.send('run_skill', { name: skill.name, args });
+                        this.log(`Running skill: /${skill.name} ${args}`, 'info');
                         return;
                     }
                     // Not a skill — fall through to send as normal message
@@ -221,6 +229,7 @@ window.PocketPaw.Chat = {
              */
             stopResponse() {
                 if (!this.isStreaming) return;
+                this.isStopRequested = true;
                 socket.stopResponse();
                 this.log('Stop requested', 'info');
             },
@@ -260,6 +269,100 @@ window.PocketPaw.Chat = {
             },
 
             /**
+             * Parse slash command text into command and args.
+             */
+            parseSlashCommand(text) {
+                const raw = (text || '').trimStart();
+                if (!raw.startsWith('/')) return null;
+
+                const commandText = raw.slice(1);
+                if (!commandText) return null;
+
+                const firstSpace = commandText.indexOf(' ');
+                if (firstSpace === -1) {
+                    return { command: commandText, args: '' };
+                }
+
+                return {
+                    command: commandText.slice(0, firstSpace),
+                    args: commandText.slice(firstSpace + 1)
+                };
+            },
+
+            /**
+             * Find a skill by name (case-insensitive).
+             */
+            findSkillByName(name) {
+                if (!name) return null;
+                return (this.skills || []).find(
+                    (s) => s.name.toLowerCase() === name.toLowerCase()
+                ) || null;
+            },
+
+            /**
+             * True when a skill hint declares at least one required arg (`<...>`).
+             */
+            skillHasRequiredArgs(skill) {
+                return Boolean(skill?.argument_hint && /<[^>]+>/.test(skill.argument_hint));
+            },
+
+            /**
+             * Render usage text shown in composer and validation.
+             */
+            getSkillUsageText(skill) {
+                if (!skill) return '';
+                return skill.argument_hint
+                    ? `/${skill.name} ${skill.argument_hint}`
+                    : `/${skill.name}`;
+            },
+
+            /**
+             * Build a lightweight example command from argument-hint placeholders.
+             */
+            getSkillExampleText(skill) {
+                if (!skill || !skill.argument_hint) return '';
+
+                const sampleForToken = (token) => {
+                    const clean = token.replace(/[<>\[\]]/g, '').toLowerCase();
+                    if (clean.includes('url') || clean.includes('repo')) return 'owner/repo';
+                    if (clean.includes('path')) return './my-app';
+                    if (clean.includes('id') || clean.includes('name')) return 'my-plugin';
+                    return clean.replace(/[^a-z0-9_-]+/g, '-') || 'value';
+                };
+
+                const args = skill.argument_hint
+                    .split(/\s+/)
+                    .map((token) => {
+                        if (token.startsWith('<') && token.endsWith('>')) return sampleForToken(token);
+                        if (token.startsWith('[') && token.endsWith(']')) return '';
+                        return '';
+                    })
+                    .filter(Boolean)
+                    .join(' ');
+
+                return args ? `/${skill.name} ${args}` : `/${skill.name}`;
+            },
+
+            /**
+             * Resolve current slash-skill context from the input box.
+             */
+            getActiveSkillContext() {
+                const slash = this.parseSlashCommand(this.inputText);
+                if (!slash) return null;
+                const skill = this.findSkillByName(slash.command);
+                if (!skill) return null;
+
+                return {
+                    skill,
+                    args: slash.args || '',
+                    hasArgs: Boolean((slash.args || '').trim()),
+                    usage: this.getSkillUsageText(skill),
+                    example: this.getSkillExampleText(skill),
+                    requiresArgs: this.skillHasRequiredArgs(skill)
+                };
+            },
+
+            /**
              * Filter quick commands when user starts typing "/" commands.
              */
             getVisibleQuickCommands() {
@@ -281,6 +384,47 @@ window.PocketPaw.Chat = {
                 this.$nextTick(() => {
                     if (this.$refs.chatInput) this.$refs.chatInput.focus();
                 });
+            },
+
+            /**
+             * Helpers for composer hint bindings.
+             */
+            shouldShowSkillHint() {
+                return Boolean(this.getActiveSkillContext());
+            },
+
+            getActiveSkillUsage() {
+                const ctx = this.getActiveSkillContext();
+                return ctx ? ctx.usage : '';
+            },
+
+            getActiveSkillExample() {
+                const ctx = this.getActiveSkillContext();
+                return ctx ? ctx.example : '';
+            },
+
+            activeSkillNeedsArgs() {
+                const ctx = this.getActiveSkillContext();
+                return Boolean(ctx && ctx.requiresArgs);
+            },
+
+            activeSkillHasArgs() {
+                const ctx = this.getActiveSkillContext();
+                return Boolean(ctx && ctx.hasArgs);
+            },
+
+            /**
+             * Determine whether submit should be enabled.
+             */
+            canSubmitInput() {
+                const text = (this.inputText || '').trim();
+                if (!text) return false;
+
+                const ctx = this.getActiveSkillContext();
+                if (!ctx) return true;
+
+                if (!ctx.requiresArgs) return true;
+                return ctx.hasArgs;
             }
         };
     }

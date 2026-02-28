@@ -121,6 +121,27 @@
           <span class="rounded-md bg-white/5 px-2 py-1">Ctrl/Cmd+K Search</span>
           <span class="rounded-md bg-white/5 px-2 py-1">Ctrl/Cmd+, Settings</span>
         </div>
+        <div
+          x-show="shouldShowSkillHint()"
+          x-transition.opacity.duration.120ms
+          class="mt-3 rounded-xl border border-white/10 bg-black/25 px-3 py-2.5"
+        >
+          <p class="text-[10px] md:text-[11px] uppercase tracking-wide text-white/45">Skill Usage</p>
+          <p class="mt-1 text-[12px] md:text-[13px] font-mono text-[var(--accent-color)] break-all" x-text="getActiveSkillUsage()"></p>
+          <p
+            x-show="getActiveSkillExample()"
+            class="mt-1 text-[11px] md:text-xs text-white/55 break-all"
+          >
+            Example:
+            <span class="font-mono text-white/70" x-text="getActiveSkillExample()"></span>
+          </p>
+          <p
+            x-show="activeSkillNeedsArgs() && !activeSkillHasArgs()"
+            class="mt-1 text-[11px] md:text-xs text-amber-300/90"
+          >
+            Required arguments missing.
+          </p>
+        </div>
       </div>
       <form
         class="relative flex items-center bg-[#2c2c2e]/90 backdrop-blur-xl border border-[var(--glass-border)] rounded-[24px] shadow-2xl transition-all focus-within:ring-1 focus-within:ring-white/20 focus-within:bg-[#323234]"
@@ -167,7 +188,7 @@
           x-show="!isStreaming"
           type="submit"
           class="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 md:w-9 md:h-9 bg-[var(--accent-color)] hover:bg-[var(--accent-hover)] text-white rounded-full flex items-center justify-center transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-[0_0_15px_rgba(10,132,255,0.4)] hover:scale-105 active:scale-95"
-          :disabled="!inputText.trim()"
+          :disabled="!canSubmitInput()"
           aria-label="Send message"
         >
           <i data-lucide="arrow-up" class="w-4 h-4 md:w-5 md:h-5"></i>
@@ -177,7 +198,8 @@
           x-show="isStreaming"
           type="button"
           @click="stopResponse()"
-          class="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 md:w-9 md:h-9 bg-red-600 hover:bg-red-500 text-white rounded-full flex items-center justify-center transition-all shadow-lg hover:shadow-[0_0_15px_rgba(239,68,68,0.4)] hover:scale-105 active:scale-95"
+          :disabled="isStopRequested"
+          class="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 md:w-9 md:h-9 bg-red-600 hover:bg-red-500 text-white rounded-full flex items-center justify-center transition-all shadow-lg hover:shadow-[0_0_15px_rgba(239,68,68,0.4)] hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
           aria-label="Stop response"
         >
           <i data-lucide="square" class="w-3.5 h-3.5 md:w-4 md:h-4"></i>

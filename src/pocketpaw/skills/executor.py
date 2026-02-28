@@ -136,7 +136,11 @@ User request: {args if args else "(no additional input)"}
                     chunk["metadata"] = event.metadata
 
                 # Track whether any visible text was produced.
-                if event.type == "message" and isinstance(event.content, str) and event.content.strip():
+                if (
+                    event.type == "message"
+                    and isinstance(event.content, str)
+                    and event.content.strip()
+                ):
                     has_content = True
 
                 yield chunk
@@ -171,6 +175,11 @@ User request: {args if args else "(no additional input)"}
         """Reset the agent router (e.g., after settings change)."""
         self._agent_router = None
         logger.info("Agent router reset")
+
+    async def stop(self) -> None:
+        """Stop the currently active backend stream for this executor."""
+        if self._agent_router is not None:
+            await self._agent_router.stop()
 
     def list_skills(self) -> list[dict]:
         """

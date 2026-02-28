@@ -8,6 +8,7 @@ import asyncio
 import base64
 import logging
 import uuid
+from contextlib import suppress
 from pathlib import Path
 
 from fastapi import WebSocket, WebSocketDisconnect
@@ -199,6 +200,55 @@ async def websocket_handler(
 
     # Legacy state
     agent_active = False
+    active_skill_task: asyncio.Task | None = None
+    active_skill_executor: SkillExecutor | None = None
+
+    async def _cancel_active_skill() -> bool:
+        nonlocal active_skill_task, active_skill_executor
+        if active_skill_task is None or active_skill_task.done():
+            return False
+
+        if active_skill_executor is not None:
+            with suppress(Exception):
+                await active_skill_executor.stop()
+
+        active_skill_task.cancel()
+        return True
+
+    async def _run_skill_stream(skill, skill_args: str) -> None:
+        nonlocal active_skill_task, active_skill_executor
+
+        try:
+            if active_skill_executor is None:
+                return
+
+            async for chunk in active_skill_executor.execute_skill(skill, skill_args):
+                await websocket.send_json(chunk)
+        except asyncio.CancelledError:
+            logger.info("Skill execution cancelled: %s", skill.name)
+            with suppress(Exception):
+                await websocket.send_json(
+                    {
+                        "type": "notification",
+                        "content": f"\u23f9\ufe0f Skill cancelled: {skill.name}",
+                    }
+                )
+            raise
+        except Exception as e:
+            logger.error("Skill execution task error for %s: %s", skill.name, e)
+            with suppress(Exception):
+                await websocket.send_json(
+                    {
+                        "type": "skill_error",
+                        "skill_name": skill.name,
+                        "error": str(e),
+                    }
+                )
+        finally:
+            with suppress(Exception):
+                await websocket.send_json({"type": "stream_end"})
+            active_skill_task = None
+            active_skill_executor = None
 
     try:
         while True:
@@ -220,7 +270,8 @@ async def websocket_handler(
             elif action == "stop":
                 session_key = f"websocket:{chat_id}"
                 cancelled = await agent_loop.cancel_session(session_key)
-                if not cancelled:
+                skill_cancelled = await _cancel_active_skill()
+                if not cancelled and not skill_cancelled:
                     await websocket.send_json({"type": "stream_end"})
 
             # Session switching
@@ -844,6 +895,18 @@ async def websocket_handler(
                     data["content"] = full_text
                     await ws_adapter.handle_message(chat_id, data)
                 else:
+                    if active_skill_task is not None and not active_skill_task.done():
+                        await websocket.send_json(
+                            {
+                                "type": "notification",
+                                "content": (
+                                    "\u23f3 A skill is already running. "
+                                    "Press Stop before starting another."
+                                ),
+                            }
+                        )
+                        continue
+
                     await websocket.send_json(
                         {
                             "type": "notification",
@@ -852,19 +915,23 @@ async def websocket_handler(
                     )
 
                     # Execute skill through agent
-                    executor = SkillExecutor(settings)
+                    active_skill_executor = SkillExecutor(settings)
                     await websocket.send_json({"type": "stream_start"})
-                    try:
-                        async for chunk in executor.execute_skill(skill, skill_args):
-                            await websocket.send_json(chunk)
-                    finally:
-                        await websocket.send_json({"type": "stream_end"})
+                    active_skill_task = asyncio.create_task(_run_skill_stream(skill, skill_args))
 
     except WebSocketDisconnect:
         logger.info("WebSocket client disconnected")
     except Exception as e:
         logger.error(f"WebSocket error: {e}")
     finally:
+        if active_skill_task is not None and not active_skill_task.done():
+            if active_skill_executor is not None:
+                with suppress(Exception):
+                    await active_skill_executor.stop()
+            active_skill_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await active_skill_task
+
         if websocket in active_connections:
             active_connections.remove(websocket)
         await ws_adapter.unregister_connection(chat_id)

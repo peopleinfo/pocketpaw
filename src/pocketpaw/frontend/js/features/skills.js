@@ -265,23 +265,28 @@ window.PocketPaw.Skills = {
       },
 
       /**
-       * Run a skill
+       * Put a skill command in the chat input (does not execute immediately)
        */
       runSkill(name, args = "") {
         this.showSkills = false;
 
-        // Navigate to chat so the response is visible
+        // Navigate to chat so the user can confirm by pressing Send/Enter.
         if (this.navigateToView) this.navigateToView("chat");
 
-        // Show the invocation as a user message so the user knows it ran
-        const cmdText = args ? `/${name} ${args}` : `/${name}`;
-        this.addMessage("user", cmdText);
+        const normalizedArgs = (args || "").trim();
+        this.inputText = normalizedArgs ? `/${name} ${normalizedArgs}` : `/${name} `;
+        this.showComposerHelp = false;
 
-        // Arm streaming so stream_start/stream_end work correctly
-        this.startStreaming();
+        this.$nextTick(() => {
+          if (this.$refs.chatInput) {
+            this.$refs.chatInput.focus();
+            const cursor = this.inputText.length;
+            this.$refs.chatInput.setSelectionRange(cursor, cursor);
+          }
+        });
 
-        socket.send("run_skill", { name, args });
-        this.log(`Running skill: ${name} ${args}`, "info");
+        this.showToast(`Prepared /${name}. Press Send to run.`, "info");
+        this.log(`Prepared skill command: ${this.inputText}`, "info");
       },
 
       /**

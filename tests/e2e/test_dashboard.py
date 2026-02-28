@@ -10,6 +10,7 @@
 import json
 import re
 
+import pytest
 from playwright.sync_api import Page, expect
 
 
@@ -124,6 +125,216 @@ class TestChatShortcuts:
 
         page.mouse.click(20, 20)
         expect(shortcuts_header).to_be_hidden()
+
+    def test_skill_insert_prefills_input_without_auto_run(self, page: Page, dashboard_url: str):
+        """Clicking Insert in Skills should prefill slash command but not execute it."""
+        page.goto(dashboard_url)
+
+        # Track websocket actions after initial page load.
+        page.evaluate("""
+            () => {
+                window.__sentActions = [];
+                const originalSend = window.socket.send.bind(window.socket);
+                window.socket.send = (action, data = {}) => {
+                    window.__sentActions.push(action);
+                    return originalSend(action, data);
+                };
+            }
+        """)
+
+        opened = page.evaluate("""
+            async () => {
+                const root = document.querySelector("body");
+                const data = root?._x_dataStack?.[0];
+                if (!data || typeof data.openSkills !== "function") return false;
+                await data.openSkills();
+                return true;
+            }
+        """)
+        assert opened is True
+        expect(page.get_by_role("heading", name="Skills", exact=True)).to_be_visible()
+
+        insert_button = page.locator("button:has-text('Insert')").first
+        expect(insert_button).to_be_visible(timeout=5000)
+        insert_button.click()
+
+        chat_input = page.get_by_label("Chat message input")
+        expect(chat_input).to_be_focused()
+        expect(chat_input).to_have_value(re.compile(r"^/[a-zA-Z0-9_-]+\s$"))
+
+        page.wait_for_timeout(250)
+        sent_actions = page.evaluate("() => window.__sentActions || []")
+        assert "run_skill" not in sent_actions
+
+    def test_skill_usage_hint_and_required_args_block_send(self, page: Page, dashboard_url: str):
+        """Required-args skill should show usage hint and refuse empty execution."""
+        page.goto(dashboard_url)
+
+        page.evaluate("""
+            () => {
+                window.__sentActions = [];
+                const originalSend = window.socket.send.bind(window.socket);
+                window.socket.send = (action, data = {}) => {
+                    window.__sentActions.push(action);
+                    return originalSend(action, data);
+                };
+            }
+        """)
+
+        opened = page.evaluate("""
+            async () => {
+                const root = document.querySelector("body");
+                const data = root?._x_dataStack?.[0];
+                if (!data || typeof data.openSkills !== "function") return false;
+                await data.openSkills();
+                return true;
+            }
+        """)
+        assert opened is True
+
+        has_converter_skill = page.evaluate("""
+            () => {
+                const root = document.querySelector("body");
+                const data = root?._x_dataStack?.[0];
+                return Boolean((data?.skills || []).some((s) => s.name === "create-ai-ui-plugin"));
+            }
+        """)
+        if not has_converter_skill:
+            pytest.skip("create-ai-ui-plugin is not available in this environment")
+
+        page.evaluate("""
+            () => {
+                const root = document.querySelector("body");
+                const data = root?._x_dataStack?.[0];
+                if (data) data.showSkills = false;
+            }
+        """)
+
+        chat_input = page.get_by_label("Chat message input")
+        chat_input.fill("/create-ai-ui-plugin ")
+
+        usage_text = page.evaluate("""
+            () => {
+                const root = document.querySelector("body");
+                const data = root?._x_dataStack?.[0];
+                return data?.getActiveSkillUsage?.() || "";
+            }
+        """)
+        assert usage_text.startswith("/create-ai-ui-plugin ")
+        usage_hint = page.locator('p[x-text="getActiveSkillUsage()"]')
+        expect(usage_hint).to_be_visible()
+        expect(usage_hint).to_have_text(usage_text)
+        expect(page.get_by_text("Required arguments missing.", exact=True)).to_be_visible()
+
+        send_button = page.get_by_label("Send message")
+        expect(send_button).to_be_disabled()
+
+        sent_actions = page.evaluate("() => window.__sentActions || []")
+        assert "run_skill" not in sent_actions
+        expect(chat_input).to_have_value("/create-ai-ui-plugin ")
+
+    def test_required_skill_args_disable_send_until_filled(self, page: Page, dashboard_url: str):
+        """Send button stays disabled for required-args skills until arguments are present."""
+        page.goto(dashboard_url)
+
+        opened = page.evaluate("""
+            async () => {
+                const root = document.querySelector("body");
+                const data = root?._x_dataStack?.[0];
+                if (!data || typeof data.openSkills !== "function") return false;
+                await data.openSkills();
+                return true;
+            }
+        """)
+        assert opened is True
+
+        has_converter_skill = page.evaluate("""
+            () => {
+                const root = document.querySelector("body");
+                const data = root?._x_dataStack?.[0];
+                return Boolean((data?.skills || []).some((s) => s.name === "create-ai-ui-plugin"));
+            }
+        """)
+        if not has_converter_skill:
+            pytest.skip("create-ai-ui-plugin is not available in this environment")
+
+        page.evaluate("""
+            () => {
+                const root = document.querySelector("body");
+                const data = root?._x_dataStack?.[0];
+                if (data) data.showSkills = false;
+            }
+        """)
+
+        chat_input = page.get_by_label("Chat message input")
+        send_button = page.get_by_label("Send message")
+
+        chat_input.fill("/create-ai-ui-plugin ")
+        expect(send_button).to_be_disabled()
+
+        chat_input.fill("/create-ai-ui-plugin owner/repo")
+        expect(send_button).to_be_enabled()
+
+    def test_skill_submit_shows_loading_and_stop_action(self, page: Page, dashboard_url: str):
+        """Skill submit should enter loading state and Stop should emit stop action."""
+        page.goto(dashboard_url)
+
+        page.evaluate("""
+            () => {
+                window.__sentActions = [];
+                window.__sentPayloads = [];
+                window.socket.send = (action, data = {}) => {
+                    window.__sentActions.push(action);
+                    window.__sentPayloads.push({ action, data });
+                    return true;
+                };
+            }
+        """)
+
+        opened = page.evaluate("""
+            async () => {
+                const root = document.querySelector("body");
+                const data = root?._x_dataStack?.[0];
+                if (!data || typeof data.openSkills !== "function") return false;
+                await data.openSkills();
+                return true;
+            }
+        """)
+        assert opened is True
+
+        has_converter_skill = page.evaluate("""
+            () => {
+                const root = document.querySelector("body");
+                const data = root?._x_dataStack?.[0];
+                return Boolean((data?.skills || []).some((s) => s.name === "create-ai-ui-plugin"));
+            }
+        """)
+        if not has_converter_skill:
+            pytest.skip("create-ai-ui-plugin is not available in this environment")
+
+        page.evaluate("""
+            () => {
+                const root = document.querySelector("body");
+                const data = root?._x_dataStack?.[0];
+                if (data) data.showSkills = false;
+            }
+        """)
+
+        chat_input = page.get_by_label("Chat message input")
+        chat_input.fill("/create-ai-ui-plugin owner/repo")
+        page.get_by_label("Send message").click()
+
+        stop_button = page.get_by_label("Stop response")
+        expect(stop_button).to_be_visible()
+        expect(chat_input).to_be_disabled()
+
+        sent_actions = page.evaluate("() => window.__sentActions || []")
+        assert "run_skill" in sent_actions
+
+        stop_button.click()
+        sent_actions_after_stop = page.evaluate("() => window.__sentActions || []")
+        assert "stop" in sent_actions_after_stop
+        expect(stop_button).to_be_disabled()
 
 
 class TestCrewView:
