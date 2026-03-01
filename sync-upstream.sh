@@ -8,7 +8,7 @@
 set -e
 
 BRANCH="main"
-REMOTE="origin"
+REMOTE="upstream"
 
 echo "🔄 Fetching latest from $REMOTE..."
 git fetch $REMOTE
