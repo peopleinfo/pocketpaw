@@ -2,6 +2,7 @@ import time
 
 import pytest
 
+from pocketpaw.ai_ui.builtins.ai_fast_api.source.app.config import settings
 from pocketpaw.ai_ui.builtins.ai_fast_api.source.app.models import (
     ChatCompletionChoice,
     ChatCompletionRequest,
@@ -20,6 +21,7 @@ class _DummyService:
         self._fail = fail
         self._label = label
         self.chat_calls = 0
+        self.models_seen: list[str] = []
 
     async def initialize(self):
         return None
@@ -31,6 +33,7 @@ class _DummyService:
         self, request: ChatCompletionRequest
     ) -> ChatCompletionResponse:
         self.chat_calls += 1
+        self.models_seen.append(request.model)
         if self._fail:
             raise RuntimeError(f"{self._label} failed")
         return ChatCompletionResponse(
@@ -125,3 +128,78 @@ async def test_auto_rotate_raises_when_no_active_backends():
 
     with pytest.raises(RuntimeError, match="no active backends"):
         await svc.create_chat_completion(request)
+
+
+@pytest.mark.asyncio
+async def test_auto_rotate_uses_backend_default_models(monkeypatch):
+    monkeypatch.setattr(settings, "auto_codex_model", "gpt-5")
+    monkeypatch.setattr(settings, "auto_g4f_model", "gpt-4o-mini")
+
+    svc = AutoRotateService()
+    svc._backend_chain = ["codex", "g4f"]
+    svc._max_rotate_retry = 2
+
+    failing_codex = _DummyService(
+        {"supports_stream": True, "oauth": True, "logged_in": True, "no_auth": False},
+        fail=True,
+        label="codex",
+    )
+    passing_g4f = _DummyService(
+        {"supports_stream": True, "no_auth": True},
+        fail=False,
+        label="g4f",
+    )
+    svc._services = {"codex": failing_codex, "g4f": passing_g4f}
+
+    request = ChatCompletionRequest(
+        model="some-user-model",
+        messages=[ChatMessage(role=MessageRole.USER, content="hello")],
+        stream=False,
+    )
+
+    response = await svc.create_chat_completion(request)
+    assert response.choices[0].message.content == "ok-g4f"
+    assert failing_codex.models_seen == ["gpt-5"]
+    assert passing_g4f.models_seen == ["gpt-4o-mini"]
+
+
+@pytest.mark.asyncio
+async def test_auto_rotate_retries_only_active_backends(monkeypatch):
+    monkeypatch.setattr(settings, "auto_qwen_model", "qwen3-coder-plus")
+    monkeypatch.setattr(settings, "auto_g4f_model", "gpt-4o-mini")
+
+    svc = AutoRotateService()
+    svc._backend_chain = ["codex", "qwen", "g4f"]
+    svc._max_rotate_retry = 3
+
+    inactive_codex = _DummyService(
+        {"supports_stream": True, "oauth": True, "logged_in": False, "no_auth": False},
+        fail=True,
+        label="codex",
+    )
+    failing_qwen = _DummyService(
+        {"supports_stream": True, "oauth": True, "logged_in": True, "no_auth": False},
+        fail=True,
+        label="qwen",
+    )
+    passing_g4f = _DummyService(
+        {"supports_stream": True, "no_auth": True},
+        fail=False,
+        label="g4f",
+    )
+    svc._services = {"codex": inactive_codex, "qwen": failing_qwen, "g4f": passing_g4f}
+
+    request = ChatCompletionRequest(
+        model="ignored-by-auto",
+        messages=[ChatMessage(role=MessageRole.USER, content="hello")],
+        stream=False,
+    )
+
+    response = await svc.create_chat_completion(request)
+
+    assert response.choices[0].message.content == "ok-g4f"
+    assert inactive_codex.chat_calls == 0
+    assert failing_qwen.chat_calls == 1
+    assert passing_g4f.chat_calls == 1
+    assert failing_qwen.models_seen == ["qwen3-coder-plus"]
+    assert passing_g4f.models_seen == ["gpt-4o-mini"]

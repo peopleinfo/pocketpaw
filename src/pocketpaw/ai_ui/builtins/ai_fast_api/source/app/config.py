@@ -40,6 +40,11 @@ class Settings:
         self.auto_rotate_backends: str = os.getenv(
             "AUTO_ROTATE_BACKENDS", "g4f,ollama,codex,qwen,gemini"
         )
+        self.auto_g4f_model: str = os.getenv("AUTO_G4F_MODEL", "gpt-4o-mini")
+        self.auto_ollama_model: str = os.getenv("AUTO_OLLAMA_MODEL", "llama3.1")
+        self.auto_codex_model: str = os.getenv("AUTO_CODEX_MODEL", "gpt-5")
+        self.auto_qwen_model: str = os.getenv("AUTO_QWEN_MODEL", "qwen3-coder-plus")
+        self.auto_gemini_model: str = os.getenv("AUTO_GEMINI_MODEL", "gemini-2.5-flash")
 
         self.rate_limit_requests: int = int(os.getenv("RATE_LIMIT_REQUESTS", "60"))
         self.rate_limit_window: int = int(os.getenv("RATE_LIMIT_WINDOW", "60"))

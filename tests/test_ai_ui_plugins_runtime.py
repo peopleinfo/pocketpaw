@@ -81,15 +81,40 @@ async def test_stop_plugin_shared_port_returns_ambiguous(tmp_path):
         patch("pocketpaw.ai_ui.plugins.get_plugins_dir", return_value=tmp_path),
         patch("pocketpaw.ai_ui.plugins._read_pid", return_value=None),
         patch("pocketpaw.ai_ui.plugins._is_port_listening", return_value=True),
-        patch("pocketpaw.ai_ui.plugins._get_pid_on_port") as mock_pid_on_port,
+        patch("pocketpaw.ai_ui.plugins._get_pid_on_port", return_value=4321) as mock_pid_on_port,
+        patch("pocketpaw.ai_ui.plugins._pid_belongs_to_plugin", return_value=False),
         patch("os.kill") as mock_kill,
     ):
         result = await plugins.stop_plugin("counter-template")
 
     assert result["status"] == "ambiguous"
     assert "shares port 8000" in result["message"]
-    mock_pid_on_port.assert_not_called()
+    mock_pid_on_port.assert_called_once_with(8000)
     mock_kill.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_stop_plugin_shared_port_can_stop_when_pid_belongs_to_plugin(tmp_path):
+    plugin_a = tmp_path / "counter-template"
+    plugin_b = tmp_path / "ai-fast-api"
+    _write_manifest(plugin_a, 8000)
+    _write_manifest(plugin_b, 8000)
+
+    with (
+        patch("pocketpaw.ai_ui.plugins.get_plugins_dir", return_value=tmp_path),
+        patch("pocketpaw.ai_ui.plugins._read_pid", return_value=None),
+        patch("pocketpaw.ai_ui.plugins._is_port_listening", return_value=True),
+        patch("pocketpaw.ai_ui.plugins._get_pid_on_port", return_value=5555),
+        patch("pocketpaw.ai_ui.plugins._pid_belongs_to_plugin", return_value=True),
+        patch("pocketpaw.ai_ui.plugins._is_pid_alive", return_value=False),
+        patch("os.getpgid", return_value=5555),
+        patch("os.killpg") as mock_killpg,
+    ):
+        result = await plugins.stop_plugin("counter-template")
+
+    assert result["status"] == "ok"
+    assert result["message"] == "Plugin 'counter-template' stopped"
+    mock_killpg.assert_called_once()
 
 
 def test_sandbox_env_windows_prefers_scripts_dir(tmp_path):
@@ -352,7 +377,7 @@ def test_resolve_chat_model_from_env_gemini():
 
 
 def test_resolve_chat_model_from_env_auto():
-    env = {"LLM_BACKEND": "auto", "AUTO_MODEL": "gpt-4.1"}
+    env = {"LLM_BACKEND": "auto", "AUTO_G4F_MODEL": "gpt-4.1"}
     assert plugins._resolve_chat_model_from_env(env) == "gpt-4.1"
 
 
@@ -530,7 +555,7 @@ def test_test_plugin_connection_uses_auto_model(tmp_path):
                     "HOST": "0.0.0.0",
                     "PORT": "8000",
                     "LLM_BACKEND": "auto",
-                    "AUTO_MODEL": "gpt-4.1",
+                    "AUTO_G4F_MODEL": "gpt-4.1",
                 },
             }
         ),

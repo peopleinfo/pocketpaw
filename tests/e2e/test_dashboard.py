@@ -1223,6 +1223,11 @@ class TestAiUIDiscoveryInstall:
                                     "LLM_BACKEND": "auto",
                                     "AUTO_MAX_ROTATE_RETRY": "4",
                                     "AUTO_ROTATE_BACKENDS": "g4f,ollama,codex,qwen,gemini",
+                                    "AUTO_G4F_MODEL": "gpt-4o-mini",
+                                    "AUTO_OLLAMA_MODEL": "llama3.1",
+                                    "AUTO_CODEX_MODEL": "gpt-5",
+                                    "AUTO_QWEN_MODEL": "qwen3-coder-plus",
+                                    "AUTO_GEMINI_MODEL": "gemini-2.5-flash",
                                 },
                                 "openapi": "openapi.json",
                                 "web_view": "native",
@@ -1244,6 +1249,11 @@ class TestAiUIDiscoveryInstall:
                                 "LLM_BACKEND": "auto",
                                 "AUTO_MAX_ROTATE_RETRY": "4",
                                 "AUTO_ROTATE_BACKENDS": "g4f,ollama,codex,qwen,gemini",
+                                "AUTO_G4F_MODEL": "gpt-4o-mini",
+                                "AUTO_OLLAMA_MODEL": "llama3.1",
+                                "AUTO_CODEX_MODEL": "gpt-5",
+                                "AUTO_QWEN_MODEL": "qwen3-coder-plus",
+                                "AUTO_GEMINI_MODEL": "gemini-2.5-flash",
                                 "HOST": "0.0.0.0",
                                 "PORT": "8000",
                                 "DEBUG": "true",
@@ -1291,6 +1301,22 @@ class TestAiUIDiscoveryInstall:
         ).first
         expect(rotate_backends_input).to_be_visible()
         expect(rotate_backends_input).to_have_value("g4f,ollama,codex,qwen,gemini")
+
+        expect(
+            page.locator("input[x-model='aiUI.pluginConfigDraft.AUTO_G4F_MODEL']").first
+        ).to_have_value("gpt-4o-mini")
+        expect(
+            page.locator("input[x-model='aiUI.pluginConfigDraft.AUTO_OLLAMA_MODEL']").first
+        ).to_have_value("llama3.1")
+        expect(
+            page.locator("input[x-model='aiUI.pluginConfigDraft.AUTO_CODEX_MODEL']").first
+        ).to_have_value("gpt-5")
+        expect(
+            page.locator("input[x-model='aiUI.pluginConfigDraft.AUTO_QWEN_MODEL']").first
+        ).to_have_value("qwen3-coder-plus")
+        expect(
+            page.locator("input[x-model='aiUI.pluginConfigDraft.AUTO_GEMINI_MODEL']").first
+        ).to_have_value("gemini-2.5-flash")
 
     def test_discover_install_disabled_for_unsupported_app(self, page: Page, dashboard_url: str):
         """Unsupported gallery app should render disabled Install action."""

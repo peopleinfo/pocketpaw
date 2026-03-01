@@ -732,6 +732,11 @@ window.PocketPaw.AiUI = {
           GEMINI_MODEL: "gemini-2.5-flash",
           AUTO_MAX_ROTATE_RETRY: "4",
           AUTO_ROTATE_BACKENDS: "g4f,ollama,codex,qwen,gemini",
+          AUTO_G4F_MODEL: "gpt-4o-mini",
+          AUTO_OLLAMA_MODEL: "llama3.1",
+          AUTO_CODEX_MODEL: "gpt-5",
+          AUTO_QWEN_MODEL: "qwen3-coder-plus",
+          AUTO_GEMINI_MODEL: "gemini-2.5-flash",
           DEBUG: "true",
           HOST: "0.0.0.0",
           PORT: "8000",
@@ -756,7 +761,7 @@ window.PocketPaw.AiUI = {
         }
         if (pluginId === "ai-fast-api") {
           const backend = (this.aiUI.pluginConfigDraft.LLM_BACKEND || "g4f").toLowerCase();
-          if (!["codex", "qwen", "gemini"].includes(backend)) {
+          if (!["auto", "codex", "qwen", "gemini"].includes(backend)) {
             const host = this.aiUI.pluginConfigDraft.HOST || "0.0.0.0";
             const port = this.aiUI.pluginConfigDraft.PORT || "8000";
             const params = new URLSearchParams();
@@ -850,7 +855,7 @@ window.PocketPaw.AiUI = {
       getAiUiPluginModel(plugin) {
         const env = plugin?.env || {};
         const backend = (env.LLM_BACKEND || "g4f").toLowerCase();
-        if (backend === "auto") return env.AUTO_MODEL || env.G4F_MODEL || "gpt-4o-mini";
+        if (backend === "auto") return env.AUTO_G4F_MODEL || env.G4F_MODEL || "gpt-4o-mini";
         if (backend === "codex") return env.CODEX_MODEL || "gpt-5";
         if (backend === "qwen") return env.QWEN_MODEL || "qwen3-coder-plus";
         if (backend === "gemini") return env.GEMINI_MODEL || "gemini-2.5-flash";

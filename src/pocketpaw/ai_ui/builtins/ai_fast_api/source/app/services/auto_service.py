@@ -144,20 +144,20 @@ class AutoRotateService(BaseLLMService):
     @staticmethod
     def _default_model_for_backend(backend: str) -> str:
         if backend == "ollama":
-            return os.getenv("OLLAMA_DEFAULT_MODEL", "llama3.1")
+            return settings.auto_ollama_model or os.getenv("OLLAMA_DEFAULT_MODEL", "llama3.1")
         if backend == "codex":
-            return settings.codex_model or "gpt-5"
+            return settings.auto_codex_model or settings.codex_model or "gpt-5"
         if backend == "qwen":
-            return settings.qwen_model or "qwen3-coder-plus"
+            return settings.auto_qwen_model or settings.qwen_model or "qwen3-coder-plus"
         if backend == "gemini":
-            return settings.gemini_model or "gemini-2.5-flash"
-        return settings.g4f_model or "gpt-4o-mini"
+            return settings.auto_gemini_model or settings.gemini_model or "gemini-2.5-flash"
+        return settings.auto_g4f_model or settings.g4f_model or "gpt-4o-mini"
 
     def _prepare_request(
         self, request: ChatCompletionRequest, backend: str, attempt_index: int
     ) -> ChatCompletionRequest:
-        # Keep caller model for first attempt; then switch to backend defaults.
-        model = request.model if attempt_index == 0 else self._default_model_for_backend(backend)
+        # In auto mode, each backend uses its own configured default model.
+        model = self._default_model_for_backend(backend)
         update = {"model": model}
         if backend != "g4f":
             # Non-G4F backends ignore g4f-specific provider hints.

@@ -39,6 +39,11 @@ _MANIFEST = {
         "GEMINI_MODEL": "gemini-2.5-flash",
         "AUTO_MAX_ROTATE_RETRY": "4",
         "AUTO_ROTATE_BACKENDS": "g4f,ollama,codex,qwen,gemini",
+        "AUTO_G4F_MODEL": "gpt-4o-mini",
+        "AUTO_OLLAMA_MODEL": "llama3.1",
+        "AUTO_CODEX_MODEL": "gpt-5",
+        "AUTO_QWEN_MODEL": "qwen3-coder-plus",
+        "AUTO_GEMINI_MODEL": "gemini-2.5-flash",
     },
     "openapi": "openapi.json",
 }

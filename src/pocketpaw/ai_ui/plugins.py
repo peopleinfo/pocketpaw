@@ -261,7 +261,7 @@ def get_plugins_dir() -> Path:
 def _resolve_chat_model_from_env(env: dict[str, Any]) -> str:
     backend = str(env.get("LLM_BACKEND", "g4f")).lower()
     if backend == "auto":
-        return str(env.get("AUTO_MODEL", env.get("G4F_MODEL", "gpt-4o-mini")))
+        return str(env.get("AUTO_G4F_MODEL", env.get("G4F_MODEL", "gpt-4o-mini")))
     if backend == "codex":
         return str(env.get("CODEX_MODEL", "gpt-5"))
     if backend == "qwen":
@@ -1284,6 +1284,45 @@ def _get_pid_on_port(port: int) -> int | None:
     return None
 
 
+def _pid_cwd(pid: int) -> Path | None:
+    """Best-effort process cwd lookup for ownership checks."""
+    if platform.system() == "Windows":
+        return None
+    try:
+        proc = subprocess.run(
+            ["lsof", "-a", "-p", str(pid), "-d", "cwd", "-Fn"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+    except (subprocess.TimeoutExpired, OSError):
+        return None
+
+    for line in (proc.stdout or "").splitlines():
+        if line.startswith("n"):
+            raw_path = line[1:].strip()
+            if raw_path:
+                return Path(raw_path).resolve()
+    return None
+
+
+def _pid_belongs_to_plugin(pid: int, plugin_dir: Path) -> bool:
+    """Return True when process cwd points inside the plugin directory."""
+    cwd = _pid_cwd(pid)
+    if cwd is None:
+        return False
+    try:
+        plugin_root = plugin_dir.resolve()
+    except OSError:
+        return False
+    try:
+        cwd.relative_to(plugin_root)
+        return True
+    except ValueError:
+        return False
+
+
 def _is_port_unique_to_plugin(plugin_id: str, port: int) -> bool:
     """Return True when only this plugin is configured to use ``port``."""
     plugins_dir = get_plugins_dir()
@@ -1950,9 +1989,13 @@ async def stop_plugin(plugin_id: str) -> dict:
         try:
             p = int(port) if port is not None else 0
             if p > 0 and _is_port_listening(p):
-                if _is_port_unique_to_plugin(plugin_id, p):
-                    pid = _get_pid_on_port(p)
-                else:
+                pid_on_port = _get_pid_on_port(p)
+                if pid_on_port is not None and (
+                    _is_port_unique_to_plugin(plugin_id, p)
+                    or _pid_belongs_to_plugin(pid_on_port, plugin_dir)
+                ):
+                    pid = pid_on_port
+                elif pid_on_port is not None:
                     return {
                         "status": "ambiguous",
                         "message": (
