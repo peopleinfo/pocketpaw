@@ -11,7 +11,7 @@ import re
 import uuid
 from collections.abc import Callable
 
-from pocketpaw.bus.events import InboundMessage, OutboundMessage
+from pocketpaw.bus.events import Channel, InboundMessage, OutboundMessage
 from pocketpaw.memory import get_memory_manager
 
 logger = logging.getLogger(__name__)
@@ -31,6 +31,7 @@ _COMMANDS = frozenset(
         "/model",
         "/tools",
         "/plugins",
+        "/anti-browser",
         "/stop",
     }
 )
@@ -48,7 +49,7 @@ _BACKEND_MODEL_FIELDS: dict[str, str] = {
 # Matches "/cmd" or "!cmd" (with optional @BotName suffix) and trailing args.
 # The "!" prefix is a fallback for channels where "/" is intercepted client-side
 # (e.g. Matrix/Element treats unknown /commands locally).
-_CMD_RE = re.compile(r"^([/!]\w+)(?:@\S+)?\s*(.*)", re.DOTALL)
+_CMD_RE = re.compile(r"^([/!][\\w-]+)(?:@\\S+)?\\s*(.*)", re.DOTALL)
 
 
 def _normalize_cmd(raw: str) -> str:

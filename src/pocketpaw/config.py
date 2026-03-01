@@ -12,6 +12,7 @@ Changes:
 
 import json
 import logging
+import os
 from functools import lru_cache
 from pathlib import Path
 
@@ -63,9 +64,13 @@ def _warn_old_config() -> None:
 
 def get_config_dir() -> Path:
     """Get the config directory, creating if needed."""
-    config_dir = Path.home() / ".pocketpaw"
-    config_dir.mkdir(exist_ok=True)
-    _chmod_safe(config_dir, 0o700)
+    override = os.environ.get("POCKETPAW_CONFIG_DIR", "").strip()
+    config_dir = (Path(override).expanduser() if override else (Path.home() / ".pocketpaw"))
+    try:
+        config_dir.mkdir(exist_ok=True, parents=False)
+        _chmod_safe(config_dir, 0o700)
+    except OSError:
+        logger.warning("Could not create config dir %s (restricted environment?)", config_dir)
     _warn_old_config()
     return config_dir
 
