@@ -22,6 +22,10 @@ def main():
             logger.info(f"  G4F Model: {settings.g4f_model}")
         elif settings.llm_backend.lower() == "codex":
             logger.info(f"  Codex Model: {settings.codex_model}")
+        elif settings.llm_backend.lower() == "qwen":
+            logger.info(f"  Qwen Model: {settings.qwen_model}")
+        elif settings.llm_backend.lower() == "gemini":
+            logger.info(f"  Gemini Model: {settings.gemini_model}")
         logger.info(
             f"  Rate Limit: {settings.rate_limit_requests} req/{settings.rate_limit_window}s"
         )

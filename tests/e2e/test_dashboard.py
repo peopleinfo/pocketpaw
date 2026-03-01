@@ -929,6 +929,274 @@ class TestAiUIDiscoveryInstall:
         assert state["start_calls"] == 1
         assert state["poll_calls"] >= 1
 
+    def test_ai_fast_api_config_supports_qwen_oauth(self, page: Page, dashboard_url: str):
+        """AI Fast API config modal should expose qwen backend + OAuth controls."""
+        state = {"start_calls": 0, "poll_calls": 0}
+
+        def handle_plugins(route):
+            route.fulfill(
+                status=200,
+                content_type="application/json",
+                body=json.dumps(
+                    {
+                        "plugins": [
+                            {
+                                "id": "ai-fast-api",
+                                "name": "AI Fast API",
+                                "description": "API server",
+                                "icon": "zap",
+                                "version": "2.0.0",
+                                "port": 8000,
+                                "status": "running",
+                                "path": "/tmp/ai-fast-api",
+                                "start_cmd": "bash start.sh",
+                                "has_install": True,
+                                "requires": ["uv", "python"],
+                                "env": {
+                                    "LLM_BACKEND": "qwen",
+                                    "QWEN_MODEL": "qwen3-coder-plus",
+                                },
+                                "openapi": "openapi.json",
+                                "web_view": "native",
+                                "web_view_path": "/",
+                            }
+                        ]
+                    }
+                ),
+            )
+
+        def handle_config(route):
+            if route.request.method == "GET":
+                route.fulfill(
+                    status=200,
+                    content_type="application/json",
+                    body=json.dumps(
+                        {
+                            "config": {
+                                "LLM_BACKEND": "qwen",
+                                "QWEN_MODEL": "qwen3-coder-plus",
+                                "HOST": "0.0.0.0",
+                                "PORT": "8000",
+                                "DEBUG": "true",
+                            }
+                        }
+                    ),
+                )
+                return
+            route.continue_()
+
+        def handle_qwen_auth_status(route):
+            route.fulfill(
+                status=200,
+                content_type="application/json",
+                body='{"ok":false,"logged_in":false,"message":"Not logged in"}',
+            )
+
+        def handle_qwen_auth_start(route):
+            state["start_calls"] += 1
+            route.fulfill(
+                status=200,
+                content_type="application/json",
+                body=(
+                    '{"ok":true,"status":"pending","session_id":"sess-q1",'
+                    '"verification_uri":"https://chat.qwen.ai/authorize?user_code=QWEN-5678",'
+                    '"user_code":"QWEN-5678","message":"Open authorization URL and login"}'
+                ),
+            )
+
+        def handle_qwen_auth_poll(route):
+            state["poll_calls"] += 1
+            route.fulfill(
+                status=200,
+                content_type="application/json",
+                body='{"ok":true,"status":"completed","session_id":"sess-q1","message":"Done"}',
+            )
+
+        page.route(
+            re.compile(r".*/api/ai-ui/plugins/ai-fast-api/qwen/auth/status(?:\?.*)?$"),
+            handle_qwen_auth_status,
+        )
+        page.route(
+            re.compile(r".*/api/ai-ui/plugins/ai-fast-api/qwen/auth/start(?:\?.*)?$"),
+            handle_qwen_auth_start,
+        )
+        page.route(
+            re.compile(r".*/api/ai-ui/plugins/ai-fast-api/qwen/auth/poll(?:\?.*)?$"),
+            handle_qwen_auth_poll,
+        )
+        page.route(re.compile(r".*/api/ai-ui/plugins/ai-fast-api/config(?:\?.*)?$"), handle_config)
+        page.route(re.compile(r".*/api/ai-ui/plugins(?:\?.*)?$"), handle_plugins)
+
+        page.goto(dashboard_url)
+        page.locator("button:has-text('AI UI Local Cloud')").click()
+        opened = page.evaluate(
+            """
+            async () => {
+                const root = document.querySelector("body");
+                const data = root?._x_dataStack?.[0];
+                if (!data || typeof data.openPluginConfigModal !== "function") return false;
+                await data.openPluginConfigModal("ai-fast-api");
+                return true;
+            }
+            """
+        )
+        assert opened is True
+
+        backend_select = page.locator("select[x-model='aiUI.pluginConfigDraft.LLM_BACKEND']").first
+        expect(backend_select).to_be_visible()
+        qwen_option = page.locator(
+            "select[x-model='aiUI.pluginConfigDraft.LLM_BACKEND'] option[value='qwen']"
+        )
+        expect(qwen_option).to_have_count(1)
+        backend_select.select_option("qwen")
+
+        qwen_model_input = page.locator("input[x-model='aiUI.pluginConfigDraft.QWEN_MODEL']").first
+        expect(qwen_model_input).to_be_visible()
+        expect(qwen_model_input).to_have_value("qwen3-coder-plus")
+
+        start_button = page.get_by_role("button", name="Start OAuth Login")
+        expect(start_button).to_be_visible()
+        start_button.click()
+
+        expect(page.locator("span.font-mono.text-white", has_text="QWEN-5678")).to_be_visible()
+        assert state["start_calls"] == 1
+        assert state["poll_calls"] >= 1
+
+    def test_ai_fast_api_config_supports_gemini_oauth(self, page: Page, dashboard_url: str):
+        """AI Fast API config modal should expose gemini backend + OAuth controls."""
+        state = {"start_calls": 0, "poll_calls": 0}
+
+        def handle_plugins(route):
+            route.fulfill(
+                status=200,
+                content_type="application/json",
+                body=json.dumps(
+                    {
+                        "plugins": [
+                            {
+                                "id": "ai-fast-api",
+                                "name": "AI Fast API",
+                                "description": "API server",
+                                "icon": "zap",
+                                "version": "2.0.0",
+                                "port": 8000,
+                                "status": "running",
+                                "path": "/tmp/ai-fast-api",
+                                "start_cmd": "bash start.sh",
+                                "has_install": True,
+                                "requires": ["uv", "python"],
+                                "env": {
+                                    "LLM_BACKEND": "gemini",
+                                    "GEMINI_MODEL": "gemini-2.5-flash",
+                                },
+                                "openapi": "openapi.json",
+                                "web_view": "native",
+                                "web_view_path": "/",
+                            }
+                        ]
+                    }
+                ),
+            )
+
+        def handle_config(route):
+            if route.request.method == "GET":
+                route.fulfill(
+                    status=200,
+                    content_type="application/json",
+                    body=json.dumps(
+                        {
+                            "config": {
+                                "LLM_BACKEND": "gemini",
+                                "GEMINI_MODEL": "gemini-2.5-flash",
+                                "HOST": "0.0.0.0",
+                                "PORT": "8000",
+                                "DEBUG": "true",
+                            }
+                        }
+                    ),
+                )
+                return
+            route.continue_()
+
+        def handle_gemini_auth_status(route):
+            route.fulfill(
+                status=200,
+                content_type="application/json",
+                body='{"ok":false,"logged_in":false,"message":"Not logged in"}',
+            )
+
+        def handle_gemini_auth_start(route):
+            state["start_calls"] += 1
+            route.fulfill(
+                status=200,
+                content_type="application/json",
+                body=(
+                    '{"ok":true,"status":"pending","session_id":"sess-g1",'
+                    '"verification_uri":"https://accounts.google.com/o/oauth2/v2/auth?x=1",'
+                    '"message":"Open browser and complete Google sign-in"}'
+                ),
+            )
+
+        def handle_gemini_auth_poll(route):
+            state["poll_calls"] += 1
+            route.fulfill(
+                status=200,
+                content_type="application/json",
+                body='{"ok":true,"status":"completed","session_id":"sess-g1","message":"Done"}',
+            )
+
+        page.route(
+            re.compile(r".*/api/ai-ui/plugins/ai-fast-api/gemini/auth/status(?:\?.*)?$"),
+            handle_gemini_auth_status,
+        )
+        page.route(
+            re.compile(r".*/api/ai-ui/plugins/ai-fast-api/gemini/auth/start(?:\?.*)?$"),
+            handle_gemini_auth_start,
+        )
+        page.route(
+            re.compile(r".*/api/ai-ui/plugins/ai-fast-api/gemini/auth/poll(?:\?.*)?$"),
+            handle_gemini_auth_poll,
+        )
+        page.route(re.compile(r".*/api/ai-ui/plugins/ai-fast-api/config(?:\?.*)?$"), handle_config)
+        page.route(re.compile(r".*/api/ai-ui/plugins(?:\?.*)?$"), handle_plugins)
+
+        page.goto(dashboard_url)
+        page.locator("button:has-text('AI UI Local Cloud')").click()
+        opened = page.evaluate(
+            """
+            async () => {
+                const root = document.querySelector("body");
+                const data = root?._x_dataStack?.[0];
+                if (!data || typeof data.openPluginConfigModal !== "function") return false;
+                await data.openPluginConfigModal("ai-fast-api");
+                return true;
+            }
+            """
+        )
+        assert opened is True
+
+        backend_select = page.locator("select[x-model='aiUI.pluginConfigDraft.LLM_BACKEND']").first
+        expect(backend_select).to_be_visible()
+        gemini_option = page.locator(
+            "select[x-model='aiUI.pluginConfigDraft.LLM_BACKEND'] option[value='gemini']"
+        )
+        expect(gemini_option).to_have_count(1)
+        backend_select.select_option("gemini")
+
+        gemini_model_input = page.locator(
+            "input[x-model='aiUI.pluginConfigDraft.GEMINI_MODEL']"
+        ).first
+        expect(gemini_model_input).to_be_visible()
+        expect(gemini_model_input).to_have_value("gemini-2.5-flash")
+
+        start_button = page.get_by_role("button", name="Start OAuth Login")
+        expect(start_button).to_be_visible()
+        start_button.click()
+
+        expect(page.get_by_text("accounts.google.com")).to_be_visible()
+        assert state["start_calls"] == 1
+        assert state["poll_calls"] >= 1
+
     def test_discover_install_disabled_for_unsupported_app(self, page: Page, dashboard_url: str):
         """Unsupported gallery app should render disabled Install action."""
         state = {"install_calls": 0}

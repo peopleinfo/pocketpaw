@@ -51,6 +51,7 @@ import subprocess
 import sys
 import threading
 import time
+import urllib.parse
 import uuid
 import zipfile
 from pathlib import Path
@@ -67,6 +68,10 @@ PLUGINS_DIR = _PROJECT_ROOT / "plugins"
 _running_processes: dict[str, asyncio.subprocess.Process] = {}
 _codex_auth_sessions: dict[str, dict[str, Any]] = {}
 _codex_auth_lock = threading.Lock()
+_qwen_auth_sessions: dict[str, dict[str, Any]] = {}
+_qwen_auth_lock = threading.Lock()
+_gemini_auth_sessions: dict[str, dict[str, Any]] = {}
+_gemini_auth_lock = threading.Lock()
 
 # Shared uv cache — all plugins hardlink from here so identical
 # packages are stored only once on disk (like pnpm for Python).
@@ -257,6 +262,10 @@ def _resolve_chat_model_from_env(env: dict[str, Any]) -> str:
     backend = str(env.get("LLM_BACKEND", "g4f")).lower()
     if backend == "codex":
         return str(env.get("CODEX_MODEL", "gpt-5"))
+    if backend == "qwen":
+        return str(env.get("QWEN_MODEL", "qwen3-coder-plus"))
+    if backend == "gemini":
+        return str(env.get("GEMINI_MODEL", "gemini-2.5-flash"))
     return str(env.get("G4F_MODEL", "gpt-4o-mini"))
 
 
@@ -292,6 +301,84 @@ def _resolve_codex_bin(explicit_bin: str | None = None) -> str | None:
     return None
 
 
+def _resolve_qwen_command(explicit_bin: str | None = None) -> list[str] | None:
+    if explicit_bin:
+        candidate = Path(explicit_bin).expanduser()
+        if candidate.exists():
+            return [str(candidate)]
+
+    qwen_bin = shutil.which("qwen")
+    if qwen_bin:
+        return [qwen_bin]
+
+    candidates: list[str] = []
+    if platform.system() == "Darwin":
+        candidates.extend(
+            [
+                "/opt/homebrew/bin/qwen",
+                "/usr/local/bin/qwen",
+            ]
+        )
+    elif platform.system() == "Windows":
+        local_app_data = os.environ.get("LOCALAPPDATA")
+        if local_app_data:
+            candidates.append(str(Path(local_app_data) / "Programs" / "qwen" / "qwen.exe"))
+    else:
+        candidates.extend(["/usr/local/bin/qwen", "/usr/bin/qwen"])
+
+    for candidate in candidates:
+        if Path(candidate).exists():
+            return [candidate]
+
+    npx_bin = shutil.which("npx")
+    if npx_bin:
+        return [npx_bin, "-y", "@qwen-code/qwen-code"]
+    for candidate in ("/opt/homebrew/bin/npx", "/usr/local/bin/npx", "/usr/bin/npx"):
+        if Path(candidate).exists():
+            return [candidate, "-y", "@qwen-code/qwen-code"]
+
+    return None
+
+
+def _resolve_gemini_command(explicit_bin: str | None = None) -> list[str] | None:
+    if explicit_bin:
+        candidate = Path(explicit_bin).expanduser()
+        if candidate.exists():
+            return [str(candidate)]
+
+    gemini_bin = shutil.which("gemini")
+    if gemini_bin:
+        return [gemini_bin]
+
+    candidates: list[str] = []
+    if platform.system() == "Darwin":
+        candidates.extend(
+            [
+                "/opt/homebrew/bin/gemini",
+                "/usr/local/bin/gemini",
+            ]
+        )
+    elif platform.system() == "Windows":
+        local_app_data = os.environ.get("LOCALAPPDATA")
+        if local_app_data:
+            candidates.append(str(Path(local_app_data) / "Programs" / "gemini" / "gemini.exe"))
+    else:
+        candidates.extend(["/usr/local/bin/gemini", "/usr/bin/gemini"])
+
+    for candidate in candidates:
+        if Path(candidate).exists():
+            return [candidate]
+
+    npx_bin = shutil.which("npx")
+    if npx_bin:
+        return [npx_bin, "-y", "@google/gemini-cli"]
+    for candidate in ("/opt/homebrew/bin/npx", "/usr/local/bin/npx", "/usr/bin/npx"):
+        if Path(candidate).exists():
+            return [candidate, "-y", "@google/gemini-cli"]
+
+    return None
+
+
 def _parse_codex_auth_output_line(session: dict[str, Any], line: str) -> None:
     clean = line.strip()
     if not clean:
@@ -310,6 +397,47 @@ def _parse_codex_auth_output_line(session: dict[str, Any], line: str) -> None:
         match_code = re.search(r"\b[A-Z0-9]{4,}-[A-Z0-9]{4,}\b", clean)
         if match_code:
             session["user_code"] = match_code.group(0)
+
+
+def _parse_qwen_auth_output_line(session: dict[str, Any], line: str) -> None:
+    clean = line.strip()
+    if not clean:
+        return
+    lines: list[str] = session.setdefault("lines", [])
+    lines.append(clean)
+    if len(lines) > 120:
+        del lines[:-120]
+
+    if not session.get("verification_uri"):
+        match_url = re.search(r"https://chat\.qwen\.ai/authorize\?[^\s]+", clean)
+        if match_url:
+            verification_uri = match_url.group(0)
+            session["verification_uri"] = verification_uri
+            parsed = urllib.parse.urlparse(verification_uri)
+            query = urllib.parse.parse_qs(parsed.query)
+            user_code = (query.get("user_code") or [None])[0]
+            if user_code and not session.get("user_code"):
+                session["user_code"] = user_code
+
+    if not session.get("user_code"):
+        match_code = re.search(r"\b[A-Z0-9]{4,}-[A-Z0-9]{2,}\b", clean)
+        if match_code:
+            session["user_code"] = match_code.group(0)
+
+
+def _parse_gemini_auth_output_line(session: dict[str, Any], line: str) -> None:
+    clean = line.strip()
+    if not clean:
+        return
+    lines: list[str] = session.setdefault("lines", [])
+    lines.append(clean)
+    if len(lines) > 120:
+        del lines[:-120]
+
+    if not session.get("verification_uri"):
+        match_url = re.search(r"https://[^\s]+", clean)
+        if match_url:
+            session["verification_uri"] = match_url.group(0)
 
 
 def _drain_codex_auth_output(session: dict[str, Any], timeout_seconds: float) -> None:
@@ -332,6 +460,52 @@ def _drain_codex_auth_output(session: dict[str, Any], timeout_seconds: float) ->
         _parse_codex_auth_output_line(session, item)
 
         if session.get("verification_uri") and session.get("user_code"):
+            break
+
+
+def _drain_qwen_auth_output(session: dict[str, Any], timeout_seconds: float) -> None:
+    q: queue.Queue[str | None] = session["queue"]
+    process: subprocess.Popen[str] = session["process"]
+    deadline = time.time() + max(timeout_seconds, 0.0)
+
+    while time.time() < deadline:
+        wait = min(0.2, max(0.0, deadline - time.time()))
+        if wait <= 0:
+            break
+        try:
+            item = q.get(timeout=wait)
+        except queue.Empty:
+            if process.poll() is not None:
+                break
+            continue
+        if item is None:
+            break
+        _parse_qwen_auth_output_line(session, item)
+
+        if session.get("verification_uri") and session.get("user_code"):
+            break
+
+
+def _drain_gemini_auth_output(session: dict[str, Any], timeout_seconds: float) -> None:
+    q: queue.Queue[str | None] = session["queue"]
+    process: subprocess.Popen[str] = session["process"]
+    deadline = time.time() + max(timeout_seconds, 0.0)
+
+    while time.time() < deadline:
+        wait = min(0.2, max(0.0, deadline - time.time()))
+        if wait <= 0:
+            break
+        try:
+            item = q.get(timeout=wait)
+        except queue.Empty:
+            if process.poll() is not None:
+                break
+            continue
+        if item is None:
+            break
+        _parse_gemini_auth_output_line(session, item)
+
+        if session.get("verification_uri"):
             break
 
 
@@ -366,6 +540,109 @@ def get_codex_auth_status() -> dict[str, Any]:
         "ok": logged_in,
         "logged_in": logged_in,
         "message": message or ("Logged in" if logged_in else "Not logged in"),
+    }
+
+
+def get_qwen_auth_status() -> dict[str, Any]:
+    qwen_cmd = _resolve_qwen_command()
+    if not qwen_cmd:
+        return {
+            "ok": False,
+            "logged_in": False,
+            "message": "qwen CLI not found (install @qwen-code/qwen-code)",
+        }
+
+    creds_path = Path.home() / ".qwen" / "oauth_creds.json"
+    if not creds_path.exists():
+        return {
+            "ok": False,
+            "logged_in": False,
+            "message": "No Qwen OAuth credentials found",
+            "credentials_path": str(creds_path),
+        }
+
+    try:
+        creds = json.loads(creds_path.read_text(encoding="utf-8"))
+    except Exception as e:
+        return {
+            "ok": False,
+            "logged_in": False,
+            "message": str(e) or "Failed to read Qwen OAuth credentials",
+            "credentials_path": str(creds_path),
+        }
+
+    access_token = str(creds.get("access_token", "")).strip()
+    expiry_date = creds.get("expiry_date")
+    logged_in = bool(access_token)
+    expired = False
+    if isinstance(expiry_date, (int, float)) and expiry_date > 0:
+        expired = expiry_date <= (time.time() * 1000)
+        if expired:
+            logged_in = False
+
+    resource = str(creds.get("resource_url", "")).strip()
+    message = "Logged in" if logged_in else "OAuth credentials missing or expired"
+    if expired:
+        message = "OAuth credentials expired"
+    if resource and logged_in:
+        message = f"Logged in ({resource})"
+
+    return {
+        "ok": logged_in,
+        "logged_in": logged_in,
+        "expired": expired,
+        "message": message,
+        "credentials_path": str(creds_path),
+    }
+
+
+def get_gemini_auth_status() -> dict[str, Any]:
+    gemini_cmd = _resolve_gemini_command()
+    if not gemini_cmd:
+        return {
+            "ok": False,
+            "logged_in": False,
+            "message": "gemini CLI not found (install @google/gemini-cli)",
+        }
+
+    creds_path = Path.home() / ".gemini" / "oauth_creds.json"
+    if not creds_path.exists():
+        return {
+            "ok": False,
+            "logged_in": False,
+            "message": "No Gemini OAuth credentials found",
+            "credentials_path": str(creds_path),
+        }
+
+    try:
+        creds = json.loads(creds_path.read_text(encoding="utf-8"))
+    except Exception as e:
+        return {
+            "ok": False,
+            "logged_in": False,
+            "message": str(e) or "Failed to read Gemini OAuth credentials",
+            "credentials_path": str(creds_path),
+        }
+
+    access_token = str(creds.get("access_token", "")).strip()
+    expiry_date = creds.get("expiry_date")
+    logged_in = bool(access_token)
+    expired = False
+    if isinstance(expiry_date, (int, float)) and expiry_date > 0:
+        expired = expiry_date <= (time.time() * 1000)
+        if expired:
+            logged_in = False
+
+    message = "Logged in with Google" if logged_in else "OAuth credentials missing or expired"
+    if expired:
+        message = "OAuth credentials expired"
+
+    return {
+        "ok": logged_in,
+        "logged_in": logged_in,
+        "expired": expired,
+        "message": message,
+        "credentials_path": str(creds_path),
     }
 
 
@@ -445,6 +722,191 @@ def start_codex_device_auth() -> dict[str, Any]:
     }
 
 
+def start_qwen_device_auth() -> dict[str, Any]:
+    with _qwen_auth_lock:
+        for sid, session in _qwen_auth_sessions.items():
+            proc = session.get("process")
+            if isinstance(proc, subprocess.Popen) and proc.poll() is None:
+                _drain_qwen_auth_output(session, timeout_seconds=0.2)
+                return {
+                    "ok": True,
+                    "status": "pending",
+                    "session_id": sid,
+                    "verification_uri": session.get("verification_uri"),
+                    "user_code": session.get("user_code"),
+                    "message": "Qwen OAuth is already in progress",
+                }
+
+    qwen_cmd = _resolve_qwen_command()
+    if not qwen_cmd:
+        return {
+            "ok": False,
+            "status": "error",
+            "message": "qwen CLI not found (install @qwen-code/qwen-code)",
+        }
+
+    try:
+        process = subprocess.Popen(
+            [
+                *qwen_cmd,
+                "--auth-type",
+                "qwen-oauth",
+                "--output-format",
+                "json",
+                "Reply with exactly: pong",
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            stdin=subprocess.DEVNULL,
+            text=True,
+            bufsize=1,
+        )
+    except Exception as e:
+        return {"ok": False, "status": "error", "message": str(e) or "Failed to start OAuth"}
+
+    read_queue: queue.Queue[str | None] = queue.Queue()
+
+    def _reader() -> None:
+        stream = process.stdout
+        if stream is None:
+            read_queue.put(None)
+            return
+        try:
+            for raw_line in stream:
+                read_queue.put(raw_line.rstrip("\n"))
+        finally:
+            read_queue.put(None)
+
+    thread = threading.Thread(target=_reader, daemon=True)
+    thread.start()
+
+    session_id = uuid.uuid4().hex
+    session: dict[str, Any] = {
+        "process": process,
+        "queue": read_queue,
+        "thread": thread,
+        "lines": [],
+        "verification_uri": None,
+        "user_code": None,
+        "started_at": time.time(),
+    }
+    with _qwen_auth_lock:
+        _qwen_auth_sessions[session_id] = session
+
+    _drain_qwen_auth_output(session, timeout_seconds=4.0)
+
+    return {
+        "ok": True,
+        "status": "pending" if process.poll() is None else "completed",
+        "session_id": session_id,
+        "verification_uri": session.get("verification_uri"),
+        "user_code": session.get("user_code"),
+        "message": (
+            "Open Qwen authorization URL and complete sign-in"
+            if session.get("verification_uri")
+            else "OAuth started. Waiting for login to complete."
+        ),
+    }
+
+
+def start_gemini_device_auth() -> dict[str, Any]:
+    with _gemini_auth_lock:
+        for sid, session in _gemini_auth_sessions.items():
+            proc = session.get("process")
+            if isinstance(proc, subprocess.Popen) and proc.poll() is None:
+                _drain_gemini_auth_output(session, timeout_seconds=0.2)
+                return {
+                    "ok": True,
+                    "status": "pending",
+                    "session_id": sid,
+                    "verification_uri": session.get("verification_uri"),
+                    "user_code": None,
+                    "message": "Gemini OAuth is already in progress",
+                }
+
+    gemini_cmd = _resolve_gemini_command()
+    if not gemini_cmd:
+        return {
+            "ok": False,
+            "status": "error",
+            "message": "gemini CLI not found (install @google/gemini-cli)",
+        }
+
+    env = dict(os.environ)
+    env["GOOGLE_GENAI_USE_GCA"] = "true"
+
+    try:
+        process = subprocess.Popen(
+            [
+                *gemini_cmd,
+                "-p",
+                "Reply with exactly: pong",
+                "--output-format",
+                "json",
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            stdin=subprocess.PIPE,
+            text=True,
+            bufsize=1,
+            env=env,
+        )
+    except Exception as e:
+        return {"ok": False, "status": "error", "message": str(e) or "Failed to start OAuth"}
+
+    if process.stdin is not None:
+        try:
+            process.stdin.write("y\n")
+            process.stdin.flush()
+            process.stdin.close()
+        except Exception:
+            pass
+
+    read_queue: queue.Queue[str | None] = queue.Queue()
+
+    def _reader() -> None:
+        stream = process.stdout
+        if stream is None:
+            read_queue.put(None)
+            return
+        try:
+            for raw_line in stream:
+                read_queue.put(raw_line.rstrip("\n"))
+        finally:
+            read_queue.put(None)
+
+    thread = threading.Thread(target=_reader, daemon=True)
+    thread.start()
+
+    session_id = uuid.uuid4().hex
+    session: dict[str, Any] = {
+        "process": process,
+        "queue": read_queue,
+        "thread": thread,
+        "lines": [],
+        "verification_uri": None,
+        "user_code": None,
+        "started_at": time.time(),
+    }
+    with _gemini_auth_lock:
+        _gemini_auth_sessions[session_id] = session
+
+    _drain_gemini_auth_output(session, timeout_seconds=4.0)
+
+    return {
+        "ok": True,
+        "status": "pending" if process.poll() is None else "completed",
+        "session_id": session_id,
+        "verification_uri": session.get("verification_uri"),
+        "user_code": None,
+        "message": (
+            "Follow the browser prompt and complete Google sign-in"
+            if not session.get("verification_uri")
+            else "Open Gemini authorization URL and complete sign-in"
+        ),
+    }
+
+
 def get_codex_device_auth_status(session_id: str) -> dict[str, Any]:
     with _codex_auth_lock:
         session = _codex_auth_sessions.get(session_id)
@@ -490,6 +952,104 @@ def get_codex_device_auth_status(session_id: str) -> dict[str, Any]:
     if rc is not None:
         with _codex_auth_lock:
             _codex_auth_sessions.pop(session_id, None)
+    return result
+
+
+def get_qwen_device_auth_status(session_id: str) -> dict[str, Any]:
+    with _qwen_auth_lock:
+        session = _qwen_auth_sessions.get(session_id)
+    if not session:
+        return {
+            "ok": False,
+            "status": "not_found",
+            "message": "OAuth session not found",
+        }
+
+    process: subprocess.Popen[str] = session["process"]
+    _drain_qwen_auth_output(session, timeout_seconds=0.2)
+
+    rc = process.poll()
+    lines: list[str] = session.get("lines", [])
+    last_message = lines[-1] if lines else ""
+
+    if rc is None:
+        return {
+            "ok": True,
+            "status": "pending",
+            "session_id": session_id,
+            "verification_uri": session.get("verification_uri"),
+            "user_code": session.get("user_code"),
+            "message": "Waiting for browser authorization",
+            "last_message": last_message,
+        }
+
+    auth_status = get_qwen_auth_status()
+    status = "completed" if rc == 0 and auth_status.get("logged_in") else "error"
+    result = {
+        "ok": status == "completed",
+        "status": status,
+        "session_id": session_id,
+        "verification_uri": session.get("verification_uri"),
+        "user_code": session.get("user_code"),
+        "message": (
+            "Qwen OAuth login completed"
+            if status == "completed"
+            else (auth_status.get("message") or last_message or f"qwen login exited with code {rc}")
+        ),
+        "last_message": last_message,
+    }
+    with _qwen_auth_lock:
+        _qwen_auth_sessions.pop(session_id, None)
+    return result
+
+
+def get_gemini_device_auth_status(session_id: str) -> dict[str, Any]:
+    with _gemini_auth_lock:
+        session = _gemini_auth_sessions.get(session_id)
+    if not session:
+        return {
+            "ok": False,
+            "status": "not_found",
+            "message": "OAuth session not found",
+        }
+
+    process: subprocess.Popen[str] = session["process"]
+    _drain_gemini_auth_output(session, timeout_seconds=0.2)
+
+    rc = process.poll()
+    lines: list[str] = session.get("lines", [])
+    last_message = lines[-1] if lines else ""
+
+    if rc is None:
+        return {
+            "ok": True,
+            "status": "pending",
+            "session_id": session_id,
+            "verification_uri": session.get("verification_uri"),
+            "user_code": None,
+            "message": "Waiting for browser authorization",
+            "last_message": last_message,
+        }
+
+    auth_status = get_gemini_auth_status()
+    status = "completed" if rc == 0 and auth_status.get("logged_in") else "error"
+    result = {
+        "ok": status == "completed",
+        "status": status,
+        "session_id": session_id,
+        "verification_uri": session.get("verification_uri"),
+        "user_code": None,
+        "message": (
+            "Gemini OAuth login completed"
+            if status == "completed"
+            else (
+                auth_status.get("message") or last_message or f"gemini login exited with code {rc}"
+            )
+        ),
+        "last_message": last_message,
+    }
+    with _gemini_auth_lock:
+        _gemini_auth_sessions.pop(session_id, None)
     return result
 
 
@@ -941,7 +1501,7 @@ def test_plugin_connection(
     try:
         import httpx
 
-        timeout = 60.0 if backend == "codex" else 15.0
+        timeout = 60.0 if backend in {"codex", "qwen", "gemini"} else 15.0
         with httpx.Client(timeout=timeout) as client:
             resp = client.post(url, json=payload)
             if resp.status_code == 200:

@@ -226,6 +226,72 @@ async def codex_auth_poll_endpoint(plugin_id: str, session_id: str):
     return _poll(session_id)
 
 
+@router.get("/plugins/{plugin_id}/qwen/auth/status")
+async def qwen_auth_status_endpoint(plugin_id: str):
+    """Return qwen OAuth login status for AI Fast API."""
+    from pocketpaw.ai_ui.plugins import get_qwen_auth_status as _status
+
+    if plugin_id != "ai-fast-api":
+        raise HTTPException(status_code=400, detail="Qwen OAuth is only available for ai-fast-api")
+    return _status()
+
+
+@router.post("/plugins/{plugin_id}/qwen/auth/start")
+async def qwen_auth_start_endpoint(plugin_id: str):
+    """Start qwen device OAuth flow and return verification URL/code."""
+    from pocketpaw.ai_ui.plugins import start_qwen_device_auth as _start
+
+    if plugin_id != "ai-fast-api":
+        raise HTTPException(status_code=400, detail="Qwen OAuth is only available for ai-fast-api")
+    return _start()
+
+
+@router.get("/plugins/{plugin_id}/qwen/auth/poll")
+async def qwen_auth_poll_endpoint(plugin_id: str, session_id: str):
+    """Poll a running qwen OAuth device-auth session."""
+    from pocketpaw.ai_ui.plugins import get_qwen_device_auth_status as _poll
+
+    if plugin_id != "ai-fast-api":
+        raise HTTPException(status_code=400, detail="Qwen OAuth is only available for ai-fast-api")
+    return _poll(session_id)
+
+
+@router.get("/plugins/{plugin_id}/gemini/auth/status")
+async def gemini_auth_status_endpoint(plugin_id: str):
+    """Return gemini OAuth login status for AI Fast API."""
+    from pocketpaw.ai_ui.plugins import get_gemini_auth_status as _status
+
+    if plugin_id != "ai-fast-api":
+        raise HTTPException(
+            status_code=400, detail="Gemini OAuth is only available for ai-fast-api"
+        )
+    return _status()
+
+
+@router.post("/plugins/{plugin_id}/gemini/auth/start")
+async def gemini_auth_start_endpoint(plugin_id: str):
+    """Start gemini OAuth flow and return session info."""
+    from pocketpaw.ai_ui.plugins import start_gemini_device_auth as _start
+
+    if plugin_id != "ai-fast-api":
+        raise HTTPException(
+            status_code=400, detail="Gemini OAuth is only available for ai-fast-api"
+        )
+    return _start()
+
+
+@router.get("/plugins/{plugin_id}/gemini/auth/poll")
+async def gemini_auth_poll_endpoint(plugin_id: str, session_id: str):
+    """Poll a running gemini OAuth session."""
+    from pocketpaw.ai_ui.plugins import get_gemini_device_auth_status as _poll
+
+    if plugin_id != "ai-fast-api":
+        raise HTTPException(
+            status_code=400, detail="Gemini OAuth is only available for ai-fast-api"
+        )
+    return _poll(session_id)
+
+
 @router.put("/plugins/{plugin_id}/config")
 async def update_plugin_config_endpoint(plugin_id: str, request: Request):
     """Update a plugin's config (env vars). Restart required for changes to apply."""

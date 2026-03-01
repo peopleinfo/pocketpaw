@@ -82,6 +82,16 @@ window.PocketPaw.AiUI = {
         codexVerificationUri: "",
         codexUserCode: "",
         codexAuthPolling: false,
+        qwenAuthStatus: null,
+        qwenOauthSessionId: null,
+        qwenVerificationUri: "",
+        qwenUserCode: "",
+        qwenAuthPolling: false,
+        geminiAuthStatus: null,
+        geminiOauthSessionId: null,
+        geminiVerificationUri: "",
+        geminiUserCode: "",
+        geminiAuthPolling: false,
       },
     };
   },
@@ -718,6 +728,8 @@ window.PocketPaw.AiUI = {
           G4F_PROVIDER: "auto",
           G4F_MODEL: "gpt-4o-mini",
           CODEX_MODEL: "gpt-5",
+          QWEN_MODEL: "qwen3-coder-plus",
+          GEMINI_MODEL: "gemini-2.5-flash",
           DEBUG: "true",
           HOST: "0.0.0.0",
           PORT: "8000",
@@ -742,7 +754,7 @@ window.PocketPaw.AiUI = {
         }
         if (pluginId === "ai-fast-api") {
           const backend = (this.aiUI.pluginConfigDraft.LLM_BACKEND || "g4f").toLowerCase();
-          if (backend !== "codex") {
+          if (!["codex", "qwen", "gemini"].includes(backend)) {
             const host = this.aiUI.pluginConfigDraft.HOST || "0.0.0.0";
             const port = this.aiUI.pluginConfigDraft.PORT || "8000";
             const params = new URLSearchParams();
@@ -797,6 +809,10 @@ window.PocketPaw.AiUI = {
             }
           } else if (backend === "codex") {
             await this.fetchCodexAuthStatus(pluginId);
+          } else if (backend === "qwen") {
+            await this.fetchQwenAuthStatus(pluginId);
+          } else if (backend === "gemini") {
+            await this.fetchGeminiAuthStatus(pluginId);
           }
         }
         this.$nextTick(() => {
@@ -817,12 +833,24 @@ window.PocketPaw.AiUI = {
         this.aiUI.codexVerificationUri = "";
         this.aiUI.codexUserCode = "";
         this.aiUI.codexAuthPolling = false;
+        this.aiUI.qwenAuthStatus = null;
+        this.aiUI.qwenOauthSessionId = null;
+        this.aiUI.qwenVerificationUri = "";
+        this.aiUI.qwenUserCode = "";
+        this.aiUI.qwenAuthPolling = false;
+        this.aiUI.geminiAuthStatus = null;
+        this.aiUI.geminiOauthSessionId = null;
+        this.aiUI.geminiVerificationUri = "";
+        this.aiUI.geminiUserCode = "";
+        this.aiUI.geminiAuthPolling = false;
       },
 
       getAiUiPluginModel(plugin) {
         const env = plugin?.env || {};
         const backend = (env.LLM_BACKEND || "g4f").toLowerCase();
         if (backend === "codex") return env.CODEX_MODEL || "gpt-5";
+        if (backend === "qwen") return env.QWEN_MODEL || "qwen3-coder-plus";
+        if (backend === "gemini") return env.GEMINI_MODEL || "gemini-2.5-flash";
         return env.G4F_MODEL || "gpt-4o-mini";
       },
 
@@ -906,6 +934,186 @@ window.PocketPaw.AiUI = {
               await this.fetchCodexAuthStatus(pluginId);
               if (this.aiUI.codexAuthStatus?.logged_in) {
                 this.showToast("Codex OAuth connected", "success");
+              }
+              return;
+            }
+          } catch (_e) {
+            // Ignore and retry.
+          }
+          await new Promise((resolve) => setTimeout(resolve, 2000));
+        }
+      },
+
+      async fetchQwenAuthStatus(pluginId) {
+        const id = pluginId || this.aiUI.configModalPluginId;
+        if (!id) return;
+        try {
+          const res = await fetch(`/api/ai-ui/plugins/${id}/qwen/auth/status`);
+          if (!res.ok) return;
+          this.aiUI.qwenAuthStatus = await res.json();
+        } catch (_e) {
+          // Ignore transient status errors
+        }
+      },
+
+      async startQwenOAuth() {
+        const pluginId = this.aiUI.configModalPluginId;
+        if (!pluginId) return;
+        this.aiUI.qwenAuthStatus = { ok: false, logged_in: false, message: "Starting OAuth..." };
+        try {
+          const res = await fetch(`/api/ai-ui/plugins/${pluginId}/qwen/auth/start`, {
+            method: "POST",
+          });
+          const data = await res.json();
+          if (!res.ok || data.ok === false) {
+            this.aiUI.qwenAuthStatus = {
+              ok: false,
+              logged_in: false,
+              message: data.detail || data.message || "Failed to start OAuth",
+            };
+            this.showToast("Failed to start Qwen OAuth", "error");
+            return;
+          }
+          this.aiUI.qwenOauthSessionId = data.session_id || null;
+          this.aiUI.qwenVerificationUri = data.verification_uri || "";
+          this.aiUI.qwenUserCode = data.user_code || "";
+          this.aiUI.qwenAuthStatus = {
+            ok: false,
+            logged_in: false,
+            message: data.message || "OAuth started",
+          };
+          this.showToast("Qwen OAuth started", "success");
+
+          if (this.aiUI.qwenOauthSessionId) {
+            this.aiUI.qwenAuthPolling = true;
+            await this.pollQwenOAuth(this.aiUI.qwenOauthSessionId);
+          }
+        } catch (e) {
+          console.error("Qwen OAuth start error:", e);
+          this.aiUI.qwenAuthStatus = { ok: false, logged_in: false, message: "Request failed" };
+          this.showToast("Failed to start Qwen OAuth", "error");
+        }
+      },
+
+      async pollQwenOAuth(sessionId) {
+        const pluginId = this.aiUI.configModalPluginId;
+        if (!pluginId || !sessionId) return;
+        while (
+          this.aiUI.qwenAuthPolling &&
+          this.aiUI.configModalOpen &&
+          this.aiUI.qwenOauthSessionId === sessionId
+        ) {
+          try {
+            const qs = new URLSearchParams({ session_id: sessionId }).toString();
+            const res = await fetch(`/api/ai-ui/plugins/${pluginId}/qwen/auth/poll?${qs}`);
+            const data = await res.json();
+            if (!res.ok || data.status === "error" || data.status === "not_found") {
+              this.aiUI.qwenAuthStatus = {
+                ok: false,
+                logged_in: false,
+                message: data.detail || data.message || "Qwen OAuth failed",
+              };
+              this.aiUI.qwenAuthPolling = false;
+              this.showToast("Qwen OAuth failed", "error");
+              return;
+            }
+            if (data.verification_uri) this.aiUI.qwenVerificationUri = data.verification_uri;
+            if (data.user_code) this.aiUI.qwenUserCode = data.user_code;
+            if (data.status === "completed") {
+              this.aiUI.qwenAuthPolling = false;
+              await this.fetchQwenAuthStatus(pluginId);
+              if (this.aiUI.qwenAuthStatus?.logged_in) {
+                this.showToast("Qwen OAuth connected", "success");
+              }
+              return;
+            }
+          } catch (_e) {
+            // Ignore and retry.
+          }
+          await new Promise((resolve) => setTimeout(resolve, 2000));
+        }
+      },
+
+      async fetchGeminiAuthStatus(pluginId) {
+        const id = pluginId || this.aiUI.configModalPluginId;
+        if (!id) return;
+        try {
+          const res = await fetch(`/api/ai-ui/plugins/${id}/gemini/auth/status`);
+          if (!res.ok) return;
+          this.aiUI.geminiAuthStatus = await res.json();
+        } catch (_e) {
+          // Ignore transient status errors
+        }
+      },
+
+      async startGeminiOAuth() {
+        const pluginId = this.aiUI.configModalPluginId;
+        if (!pluginId) return;
+        this.aiUI.geminiAuthStatus = { ok: false, logged_in: false, message: "Starting OAuth..." };
+        try {
+          const res = await fetch(`/api/ai-ui/plugins/${pluginId}/gemini/auth/start`, {
+            method: "POST",
+          });
+          const data = await res.json();
+          if (!res.ok || data.ok === false) {
+            this.aiUI.geminiAuthStatus = {
+              ok: false,
+              logged_in: false,
+              message: data.detail || data.message || "Failed to start OAuth",
+            };
+            this.showToast("Failed to start Gemini OAuth", "error");
+            return;
+          }
+          this.aiUI.geminiOauthSessionId = data.session_id || null;
+          this.aiUI.geminiVerificationUri = data.verification_uri || "";
+          this.aiUI.geminiUserCode = data.user_code || "";
+          this.aiUI.geminiAuthStatus = {
+            ok: false,
+            logged_in: false,
+            message: data.message || "OAuth started",
+          };
+          this.showToast("Gemini OAuth started", "success");
+
+          if (this.aiUI.geminiOauthSessionId) {
+            this.aiUI.geminiAuthPolling = true;
+            await this.pollGeminiOAuth(this.aiUI.geminiOauthSessionId);
+          }
+        } catch (e) {
+          console.error("Gemini OAuth start error:", e);
+          this.aiUI.geminiAuthStatus = { ok: false, logged_in: false, message: "Request failed" };
+          this.showToast("Failed to start Gemini OAuth", "error");
+        }
+      },
+
+      async pollGeminiOAuth(sessionId) {
+        const pluginId = this.aiUI.configModalPluginId;
+        if (!pluginId || !sessionId) return;
+        while (
+          this.aiUI.geminiAuthPolling &&
+          this.aiUI.configModalOpen &&
+          this.aiUI.geminiOauthSessionId === sessionId
+        ) {
+          try {
+            const qs = new URLSearchParams({ session_id: sessionId }).toString();
+            const res = await fetch(`/api/ai-ui/plugins/${pluginId}/gemini/auth/poll?${qs}`);
+            const data = await res.json();
+            if (!res.ok || data.status === "error" || data.status === "not_found") {
+              this.aiUI.geminiAuthStatus = {
+                ok: false,
+                logged_in: false,
+                message: data.detail || data.message || "Gemini OAuth failed",
+              };
+              this.aiUI.geminiAuthPolling = false;
+              this.showToast("Gemini OAuth failed", "error");
+              return;
+            }
+            if (data.verification_uri) this.aiUI.geminiVerificationUri = data.verification_uri;
+            if (data.user_code) this.aiUI.geminiUserCode = data.user_code;
+            if (data.status === "completed") {
+              this.aiUI.geminiAuthPolling = false;
+              await this.fetchGeminiAuthStatus(pluginId);
+              if (this.aiUI.geminiAuthStatus?.logged_in) {
+                this.showToast("Gemini OAuth connected", "success");
               }
               return;
             }

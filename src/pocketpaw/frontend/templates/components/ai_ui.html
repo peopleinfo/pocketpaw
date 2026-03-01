@@ -1479,12 +1479,14 @@
               >
               <select
                 x-model="aiUI.pluginConfigDraft.LLM_BACKEND"
-                @change="if ((aiUI.pluginConfigDraft.LLM_BACKEND || '').toLowerCase() === 'codex') fetchCodexAuthStatus(aiUI.configModalPluginId)"
+                @change="const b=(aiUI.pluginConfigDraft.LLM_BACKEND||'').toLowerCase(); if (b==='codex') fetchCodexAuthStatus(aiUI.configModalPluginId); if (b==='qwen') fetchQwenAuthStatus(aiUI.configModalPluginId); if (b==='gemini') fetchGeminiAuthStatus(aiUI.configModalPluginId)"
                 class="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-[14px] focus:border-accent focus:outline-none"
               >
                 <option value="g4f">g4f (GPT4Free)</option>
                 <option value="ollama">ollama</option>
                 <option value="codex">codex (OAuth)</option>
+                <option value="qwen">qwen (OAuth)</option>
+                <option value="gemini">gemini (OAuth)</option>
               </select>
             </div>
             <div x-show="(aiUI.pluginConfigDraft.LLM_BACKEND || 'g4f').toLowerCase() === 'g4f'">
@@ -1530,7 +1532,7 @@
               </p>
             </div>
             <div
-              x-show="(aiUI.pluginConfigDraft.LLM_BACKEND || 'g4f').toLowerCase() !== 'codex'"
+              x-show="!['codex','qwen','gemini'].includes((aiUI.pluginConfigDraft.LLM_BACKEND || 'g4f').toLowerCase())"
             >
               <label
                 class="block text-[12px] font-semibold text-white/70 mb-1.5"
@@ -1594,6 +1596,50 @@
                 </button>
               </div>
             </div>
+            <div x-show="(aiUI.pluginConfigDraft.LLM_BACKEND || 'g4f').toLowerCase() === 'qwen'">
+              <label
+                class="block text-[12px] font-semibold text-white/70 mb-1.5"
+                >Qwen Model</label
+              >
+              <div class="flex gap-2">
+                <input
+                  type="text"
+                  x-model="aiUI.pluginConfigDraft.QWEN_MODEL"
+                  placeholder="qwen3-coder-plus"
+                  class="flex-1 min-w-0 px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/30 text-[14px] focus:border-accent focus:outline-none"
+                />
+                <button
+                  type="button"
+                  title="Copy model"
+                  class="flex-shrink-0 px-3 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white/60 hover:text-white hover:bg-white/10 transition-colors"
+                  @click="copyConfigValue(aiUI.pluginConfigDraft.QWEN_MODEL, 'Model')"
+                >
+                  <i data-lucide="copy" class="w-4 h-4"></i>
+                </button>
+              </div>
+            </div>
+            <div x-show="(aiUI.pluginConfigDraft.LLM_BACKEND || 'g4f').toLowerCase() === 'gemini'">
+              <label
+                class="block text-[12px] font-semibold text-white/70 mb-1.5"
+                >Gemini Model</label
+              >
+              <div class="flex gap-2">
+                <input
+                  type="text"
+                  x-model="aiUI.pluginConfigDraft.GEMINI_MODEL"
+                  placeholder="gemini-2.5-flash"
+                  class="flex-1 min-w-0 px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/30 text-[14px] focus:border-accent focus:outline-none"
+                />
+                <button
+                  type="button"
+                  title="Copy model"
+                  class="flex-shrink-0 px-3 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white/60 hover:text-white hover:bg-white/10 transition-colors"
+                  @click="copyConfigValue(aiUI.pluginConfigDraft.GEMINI_MODEL, 'Model')"
+                >
+                  <i data-lucide="copy" class="w-4 h-4"></i>
+                </button>
+              </div>
+            </div>
             <div
               x-show="(aiUI.pluginConfigDraft.LLM_BACKEND || 'g4f').toLowerCase() === 'codex'"
               class="rounded-xl border border-white/10 bg-white/5 p-3 space-y-2"
@@ -1638,6 +1684,98 @@
               </div>
               <div class="text-[11px] text-white/60" x-show="aiUI.codexUserCode">
                 Code: <span class="font-mono text-white" x-text="aiUI.codexUserCode"></span>
+              </div>
+            </div>
+            <div
+              x-show="(aiUI.pluginConfigDraft.LLM_BACKEND || 'g4f').toLowerCase() === 'qwen'"
+              class="rounded-xl border border-white/10 bg-white/5 p-3 space-y-2"
+            >
+              <div class="text-[12px] text-white/70 font-semibold">Qwen OAuth</div>
+              <div class="text-[11px] text-white/50" x-show="!aiUI.qwenAuthStatus">
+                Click Start OAuth Login, then complete browser sign-in.
+              </div>
+              <div class="text-[11px]" x-show="aiUI.qwenAuthStatus">
+                <span
+                  :class="aiUI.qwenAuthStatus?.logged_in ? 'text-green-400' : 'text-yellow-400'"
+                  x-text="aiUI.qwenAuthStatus?.logged_in ? 'Connected' : 'Not connected'"
+                ></span>
+                <span class="text-white/40"> · </span>
+                <span class="text-white/60" x-text="aiUI.qwenAuthStatus?.message || ''"></span>
+              </div>
+              <div class="flex gap-2 items-center">
+                <button
+                  type="button"
+                  class="px-3 py-2 rounded-lg bg-accent text-white text-[12px] font-semibold hover:bg-accent/90 transition-colors disabled:opacity-60"
+                  :disabled="aiUI.qwenAuthPolling"
+                  @click="startQwenOAuth()"
+                >
+                  <span x-show="!aiUI.qwenAuthPolling">Start OAuth Login</span>
+                  <span x-show="aiUI.qwenAuthPolling">Waiting...</span>
+                </button>
+                <button
+                  type="button"
+                  class="px-3 py-2 rounded-lg bg-white/10 text-white/80 text-[12px] font-medium hover:bg-white/15 transition-colors"
+                  @click="fetchQwenAuthStatus(aiUI.configModalPluginId)"
+                >
+                  Refresh
+                </button>
+              </div>
+              <div class="text-[11px] text-white/60 break-all" x-show="aiUI.qwenVerificationUri">
+                URL:
+                <a
+                  :href="aiUI.qwenVerificationUri"
+                  class="text-accent hover:underline"
+                  x-text="aiUI.qwenVerificationUri"
+                ></a>
+              </div>
+              <div class="text-[11px] text-white/60" x-show="aiUI.qwenUserCode">
+                Code: <span class="font-mono text-white" x-text="aiUI.qwenUserCode"></span>
+              </div>
+            </div>
+            <div
+              x-show="(aiUI.pluginConfigDraft.LLM_BACKEND || 'g4f').toLowerCase() === 'gemini'"
+              class="rounded-xl border border-white/10 bg-white/5 p-3 space-y-2"
+            >
+              <div class="text-[12px] text-white/70 font-semibold">Gemini OAuth</div>
+              <div class="text-[11px] text-white/50" x-show="!aiUI.geminiAuthStatus">
+                Click Start OAuth Login, then complete browser sign-in.
+              </div>
+              <div class="text-[11px]" x-show="aiUI.geminiAuthStatus">
+                <span
+                  :class="aiUI.geminiAuthStatus?.logged_in ? 'text-green-400' : 'text-yellow-400'"
+                  x-text="aiUI.geminiAuthStatus?.logged_in ? 'Connected' : 'Not connected'"
+                ></span>
+                <span class="text-white/40"> · </span>
+                <span class="text-white/60" x-text="aiUI.geminiAuthStatus?.message || ''"></span>
+              </div>
+              <div class="flex gap-2 items-center">
+                <button
+                  type="button"
+                  class="px-3 py-2 rounded-lg bg-accent text-white text-[12px] font-semibold hover:bg-accent/90 transition-colors disabled:opacity-60"
+                  :disabled="aiUI.geminiAuthPolling"
+                  @click="startGeminiOAuth()"
+                >
+                  <span x-show="!aiUI.geminiAuthPolling">Start OAuth Login</span>
+                  <span x-show="aiUI.geminiAuthPolling">Waiting...</span>
+                </button>
+                <button
+                  type="button"
+                  class="px-3 py-2 rounded-lg bg-white/10 text-white/80 text-[12px] font-medium hover:bg-white/15 transition-colors"
+                  @click="fetchGeminiAuthStatus(aiUI.configModalPluginId)"
+                >
+                  Refresh
+                </button>
+              </div>
+              <div class="text-[11px] text-white/60 break-all" x-show="aiUI.geminiVerificationUri">
+                URL:
+                <a
+                  :href="aiUI.geminiVerificationUri"
+                  class="text-accent hover:underline"
+                  x-text="aiUI.geminiVerificationUri"
+                ></a>
+              </div>
+              <div class="text-[11px] text-white/60" x-show="aiUI.geminiUserCode">
+                Code: <span class="font-mono text-white" x-text="aiUI.geminiUserCode"></span>
               </div>
             </div>
             <div>

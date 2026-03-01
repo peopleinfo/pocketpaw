@@ -14,7 +14,8 @@ _SOURCE_DIR = Path(__file__).resolve().parent / "source"
 _MANIFEST = {
     "name": "AI Fast API",
     "description": (
-        "OpenAI-compatible API with pluggable LLM backends (G4F, Ollama, Codex OAuth). "
+        "OpenAI-compatible API with pluggable LLM backends "
+        "(G4F, Ollama, Codex OAuth, Qwen OAuth, Gemini OAuth). "
         "Chat completions, image generation, streaming — "
         "all through a unified local endpoint."
     ),
@@ -34,6 +35,8 @@ _MANIFEST = {
         "G4F_PROVIDER": "auto",
         "G4F_MODEL": "gpt-4o-mini",
         "CODEX_MODEL": "gpt-5",
+        "QWEN_MODEL": "qwen3-coder-plus",
+        "GEMINI_MODEL": "gemini-2.5-flash",
     },
     "openapi": "openapi.json",
 }
@@ -47,7 +50,8 @@ DEFINITION: BuiltinDefinition = {
         "id": "ai-fast-api",
         "name": "AI Fast API",
         "description": (
-            "OpenAI-compatible API with pluggable backends (G4F, Ollama, Codex OAuth). "
+            "OpenAI-compatible API with pluggable backends "
+            "(G4F, Ollama, Codex OAuth, Qwen OAuth, Gemini OAuth). "
             "Chat, images, streaming — zero API keys needed."
         ),
         "icon": "zap",

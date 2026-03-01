@@ -30,6 +30,12 @@ class Settings:
         self.codex_model: str = os.getenv("CODEX_MODEL", "gpt-5")
         self.codex_timeout: int = int(os.getenv("CODEX_TIMEOUT", "90"))
         self.codex_bin: str = os.getenv("CODEX_BIN", "")
+        self.qwen_model: str = os.getenv("QWEN_MODEL", "qwen3-coder-plus")
+        self.qwen_timeout: int = int(os.getenv("QWEN_TIMEOUT", "90"))
+        self.qwen_bin: str = os.getenv("QWEN_BIN", "")
+        self.gemini_model: str = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+        self.gemini_timeout: int = int(os.getenv("GEMINI_TIMEOUT", "90"))
+        self.gemini_bin: str = os.getenv("GEMINI_BIN", "")
 
         self.rate_limit_requests: int = int(os.getenv("RATE_LIMIT_REQUESTS", "60"))
         self.rate_limit_window: int = int(os.getenv("RATE_LIMIT_WINDOW", "60"))

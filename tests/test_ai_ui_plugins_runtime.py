@@ -2,6 +2,7 @@ import asyncio
 import json
 import os
 import subprocess
+import time
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -42,10 +43,18 @@ def _clear_running_processes():
     plugins._running_processes.clear()
     with plugins._codex_auth_lock:
         plugins._codex_auth_sessions.clear()
+    with plugins._qwen_auth_lock:
+        plugins._qwen_auth_sessions.clear()
+    with plugins._gemini_auth_lock:
+        plugins._gemini_auth_sessions.clear()
     yield
     plugins._running_processes.clear()
     with plugins._codex_auth_lock:
         plugins._codex_auth_sessions.clear()
+    with plugins._qwen_auth_lock:
+        plugins._qwen_auth_sessions.clear()
+    with plugins._gemini_auth_lock:
+        plugins._gemini_auth_sessions.clear()
 
 
 def test_is_plugin_running_ignores_shared_port_fallback(tmp_path):
@@ -332,6 +341,16 @@ def test_resolve_chat_model_from_env_codex():
     assert plugins._resolve_chat_model_from_env(env) == "gpt-5.2"
 
 
+def test_resolve_chat_model_from_env_qwen():
+    env = {"LLM_BACKEND": "qwen", "QWEN_MODEL": "qwen3-coder-plus"}
+    assert plugins._resolve_chat_model_from_env(env) == "qwen3-coder-plus"
+
+
+def test_resolve_chat_model_from_env_gemini():
+    env = {"LLM_BACKEND": "gemini", "GEMINI_MODEL": "gemini-2.5-pro"}
+    assert plugins._resolve_chat_model_from_env(env) == "gemini-2.5-pro"
+
+
 def test_test_plugin_connection_uses_codex_model(tmp_path):
     plugin_id = "ai-fast-api"
     plugin_dir = tmp_path / plugin_id
@@ -383,6 +402,114 @@ def test_test_plugin_connection_uses_codex_model(tmp_path):
 
     assert result["ok"] is True
     assert captured["model"] == "gpt-5.2"
+    assert captured["url"].startswith("http://127.0.0.1:8000")
+
+
+def test_test_plugin_connection_uses_qwen_model(tmp_path):
+    plugin_id = "ai-fast-api"
+    plugin_dir = tmp_path / plugin_id
+    plugin_dir.mkdir(parents=True)
+    (plugin_dir / "pocketpaw.json").write_text(
+        json.dumps(
+            {
+                "name": "AI Fast API",
+                "env": {
+                    "HOST": "0.0.0.0",
+                    "PORT": "8000",
+                    "LLM_BACKEND": "qwen",
+                    "QWEN_MODEL": "qwen3-coder-plus",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    captured: dict[str, str] = {}
+
+    class DummyResponse:
+        status_code = 200
+
+        @staticmethod
+        def json():
+            return {"choices": [{"message": {"content": "pong"}}]}
+
+    class DummyClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def post(self, url, json):
+            captured["url"] = url
+            captured["model"] = json.get("model")
+            return DummyResponse()
+
+    with (
+        patch("pocketpaw.ai_ui.plugins.get_plugins_dir", return_value=tmp_path),
+        patch("httpx.Client", DummyClient),
+    ):
+        result = plugins.test_plugin_connection(plugin_id)
+
+    assert result["ok"] is True
+    assert captured["model"] == "qwen3-coder-plus"
+    assert captured["url"].startswith("http://127.0.0.1:8000")
+
+
+def test_test_plugin_connection_uses_gemini_model(tmp_path):
+    plugin_id = "ai-fast-api"
+    plugin_dir = tmp_path / plugin_id
+    plugin_dir.mkdir(parents=True)
+    (plugin_dir / "pocketpaw.json").write_text(
+        json.dumps(
+            {
+                "name": "AI Fast API",
+                "env": {
+                    "HOST": "0.0.0.0",
+                    "PORT": "8000",
+                    "LLM_BACKEND": "gemini",
+                    "GEMINI_MODEL": "gemini-2.5-flash",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    captured: dict[str, str] = {}
+
+    class DummyResponse:
+        status_code = 200
+
+        @staticmethod
+        def json():
+            return {"choices": [{"message": {"content": "pong"}}]}
+
+    class DummyClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def post(self, url, json):
+            captured["url"] = url
+            captured["model"] = json.get("model")
+            return DummyResponse()
+
+    with (
+        patch("pocketpaw.ai_ui.plugins.get_plugins_dir", return_value=tmp_path),
+        patch("httpx.Client", DummyClient),
+    ):
+        result = plugins.test_plugin_connection(plugin_id)
+
+    assert result["ok"] is True
+    assert captured["model"] == "gemini-2.5-flash"
     assert captured["url"].startswith("http://127.0.0.1:8000")
 
 
@@ -462,5 +589,93 @@ def test_start_codex_device_auth_without_codex_binary():
 
 def test_get_codex_device_auth_status_not_found():
     result = plugins.get_codex_device_auth_status("missing-session")
+    assert result["ok"] is False
+    assert result["status"] == "not_found"
+
+
+def test_get_qwen_auth_status_no_cli():
+    with patch("pocketpaw.ai_ui.plugins._resolve_qwen_command", return_value=None):
+        status = plugins.get_qwen_auth_status()
+    assert status["ok"] is False
+    assert status["logged_in"] is False
+
+
+def test_get_qwen_auth_status_logged_in_from_creds(tmp_path):
+    qwen_dir = tmp_path / ".qwen"
+    qwen_dir.mkdir(parents=True)
+    creds_path = qwen_dir / "oauth_creds.json"
+    creds_path.write_text(
+        json.dumps(
+            {
+                "access_token": "token",
+                "refresh_token": "refresh",
+                "expiry_date": int((time.time() + 3600) * 1000),
+                "resource_url": "portal.qwen.ai",
+            }
+        ),
+        encoding="utf-8",
+    )
+    with (
+        patch("pocketpaw.ai_ui.plugins._resolve_qwen_command", return_value=["qwen"]),
+        patch("pathlib.Path.home", return_value=tmp_path),
+    ):
+        status = plugins.get_qwen_auth_status()
+    assert status["ok"] is True
+    assert status["logged_in"] is True
+
+
+def test_start_qwen_device_auth_without_qwen_binary():
+    with patch("pocketpaw.ai_ui.plugins._resolve_qwen_command", return_value=None):
+        result = plugins.start_qwen_device_auth()
+    assert result["ok"] is False
+    assert result["status"] == "error"
+
+
+def test_get_qwen_device_auth_status_not_found():
+    result = plugins.get_qwen_device_auth_status("missing-session")
+    assert result["ok"] is False
+    assert result["status"] == "not_found"
+
+
+def test_get_gemini_auth_status_no_cli():
+    with patch("pocketpaw.ai_ui.plugins._resolve_gemini_command", return_value=None):
+        status = plugins.get_gemini_auth_status()
+    assert status["ok"] is False
+    assert status["logged_in"] is False
+
+
+def test_get_gemini_auth_status_logged_in_from_creds(tmp_path):
+    gemini_dir = tmp_path / ".gemini"
+    gemini_dir.mkdir(parents=True)
+    creds_path = gemini_dir / "oauth_creds.json"
+    creds_path.write_text(
+        json.dumps(
+            {
+                "access_token": "token",
+                "refresh_token": "refresh",
+                "expiry_date": int((time.time() + 3600) * 1000),
+                "token_type": "Bearer",
+            }
+        ),
+        encoding="utf-8",
+    )
+    with (
+        patch("pocketpaw.ai_ui.plugins._resolve_gemini_command", return_value=["gemini"]),
+        patch("pathlib.Path.home", return_value=tmp_path),
+    ):
+        status = plugins.get_gemini_auth_status()
+    assert status["ok"] is True
+    assert status["logged_in"] is True
+
+
+def test_start_gemini_device_auth_without_gemini_binary():
+    with patch("pocketpaw.ai_ui.plugins._resolve_gemini_command", return_value=None):
+        result = plugins.start_gemini_device_auth()
+    assert result["ok"] is False
+    assert result["status"] == "error"
+
+
+def test_get_gemini_device_auth_status_not_found():
+    result = plugins.get_gemini_device_auth_status("missing-session")
     assert result["ok"] is False
     assert result["status"] == "not_found"

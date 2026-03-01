@@ -84,10 +84,18 @@ def get_service() -> BaseLLMService:
         from .codex_service import CodexService
 
         _active_service = CodexService()
+    elif backend == "qwen":
+        from .qwen_service import QwenService
+
+        _active_service = QwenService()
+    elif backend == "gemini":
+        from .gemini_service import GeminiService
+
+        _active_service = GeminiService()
     else:
         raise ValueError(
             f"Unknown LLM_BACKEND '{backend}'. "
-            "Available: 'g4f', 'ollama', 'codex'. Implement BaseLLMService to add more."
+            "Available: 'g4f', 'ollama', 'codex', 'qwen', 'gemini'. Implement BaseLLMService to add more."
         )
 
     return _active_service
