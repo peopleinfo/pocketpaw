@@ -53,6 +53,7 @@ _AI_UI_PLUGIN_START_INTENT_RE = re.compile(
     r"([a-z0-9][a-z0-9_\-\s]*)\s*[.!?]?\s*$",
     re.IGNORECASE,
 )
+_SEARCH_CONTEXT_LINE_RE = re.compile(r"^\s*(PocketPaw - Search [^\n]+)", re.MULTILINE)
 
 
 def _extract_media_paths(text: str) -> list[str]:
@@ -63,6 +64,16 @@ def _extract_media_paths(text: str) -> list[str]:
 def _extract_generated_paths(text: str) -> list[str]:
     """Fallback: extract file paths under ~/.pocketpaw/generated/ from agent text."""
     return _GENERATED_PATH_RE.findall(text)
+
+
+def _extract_search_context_line(text: str) -> str | None:
+    """Extract a normalized search context header line from tool output."""
+    if not text:
+        return None
+    match = _SEARCH_CONTEXT_LINE_RE.search(text)
+    if not match:
+        return None
+    return match.group(1).strip()
 
 
 class AgentLoop:
@@ -603,6 +614,19 @@ class AgentLoop:
                                 },
                             )
                         )
+                        if tool_name == "web_search":
+                            context_line = _extract_search_context_line(econtent)
+                            if context_line:
+                                context_chunk = f"{context_line}\n\n"
+                                full_response += context_chunk
+                                await self.bus.publish_outbound(
+                                    OutboundMessage(
+                                        channel=message.channel,
+                                        chat_id=message.chat_id,
+                                        content=redact_output(context_chunk),
+                                        is_stream_chunk=True,
+                                    )
+                                )
                         media_paths.extend(_extract_media_paths(econtent))
 
                     elif etype == "error":

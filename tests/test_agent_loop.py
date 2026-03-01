@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from pocketpaw.agents.loop import AgentLoop
+from pocketpaw.agents.loop import AgentLoop, _extract_search_context_line
 from pocketpaw.agents.protocol import AgentEvent
 from pocketpaw.bus import Channel, InboundMessage
 
@@ -532,3 +532,78 @@ async def test_agent_loop_builds_context_and_passes_to_router(
             mock_memory.get_compacted_history.assert_called_once()
             assert captured_kwargs["system_prompt"] == "You are PocketPaw with identity and memory."
             assert captured_kwargs["history"] == session_history
+
+
+def test_extract_search_context_line():
+    text = (
+        "PocketPaw - Search Tavily - 2026-03-01 08:00 AM\n\n"
+        "Search results for: ai news\n"
+        "1. **Example**"
+    )
+    assert _extract_search_context_line(text) == "PocketPaw - Search Tavily - 2026-03-01 08:00 AM"
+    assert _extract_search_context_line("no search header here") is None
+
+
+@patch("pocketpaw.agents.loop.get_message_bus")
+@patch("pocketpaw.agents.loop.get_memory_manager")
+@patch("pocketpaw.agents.loop.AgentContextBuilder")
+@patch("pocketpaw.agents.loop.AgentRouter")
+@pytest.mark.asyncio
+async def test_agent_loop_streams_web_search_context_line_to_chat(
+    mock_router_cls,
+    mock_builder_cls,
+    mock_get_memory,
+    mock_get_bus,
+    mock_bus,
+    mock_memory,
+):
+    mock_get_bus.return_value = mock_bus
+    mock_get_memory.return_value = mock_memory
+
+    async def mock_run(message, *, system_prompt=None, history=None, session_key=None):
+        yield AgentEvent(
+            type="tool_result",
+            content=(
+                "PocketPaw - Search Tavily - 2026-03-01 08:00 AM\n\n"
+                "Search results for: latest ai news"
+            ),
+            metadata={"name": "web_search"},
+        )
+        yield AgentEvent(type="message", content="Here are the highlights.")
+        yield AgentEvent(type="done", content="")
+
+    router = MagicMock()
+    router.run = mock_run
+    router.stop = AsyncMock()
+    mock_router_cls.return_value = router
+
+    mock_builder_instance = mock_builder_cls.return_value
+    mock_builder_instance.build_system_prompt = AsyncMock(return_value="System Prompt")
+
+    with patch("pocketpaw.agents.loop.get_settings") as mock_settings:
+        settings = MagicMock()
+        settings.agent_backend = "claude_agent_sdk"
+        settings.max_concurrent_conversations = 5
+        mock_settings.return_value = settings
+
+        with patch("pocketpaw.agents.loop.Settings") as mock_settings_cls:
+            mock_settings_cls.load.return_value = settings
+            loop = AgentLoop()
+
+            msg = InboundMessage(
+                channel=Channel.CLI,
+                sender_id="user1",
+                chat_id="chat1",
+                content="get ai news",
+            )
+            await loop._process_message(msg)
+
+    streamed_chunks = [
+        call.args[0]
+        for call in mock_bus.publish_outbound.call_args_list
+        if call.args and getattr(call.args[0], "is_stream_chunk", False)
+    ]
+    assert any(
+        "PocketPaw - Search Tavily - 2026-03-01 08:00 AM" in chunk.content
+        for chunk in streamed_chunks
+    )

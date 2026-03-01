@@ -71,6 +71,11 @@
           x-show="!streamingContent && isThinking"
           class="text-white/40 italic"
         >
+          <span
+            x-show="thinkingContextLine"
+            class="block text-[11px] md:text-xs not-italic text-white/50 mb-1"
+            x-text="thinkingContextLine"
+          ></span>
           Thinking<span class="animate-pulse">...</span>
         </span>
         <span x-show="!streamingContent && !isThinking" class="text-white/40">

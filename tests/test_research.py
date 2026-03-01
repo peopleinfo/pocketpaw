@@ -23,6 +23,7 @@ class TestToolDefinition:
         tool = ResearchTool()
         assert "topic" in tool.parameters["properties"]
         assert "depth" in tool.parameters["properties"]
+        assert "search_provider" in tool.parameters["properties"]
         assert "save_to_memory" in tool.parameters["properties"]
 
 
@@ -115,3 +116,22 @@ async def test_research_happy_path():
     ):
         result = await tool.execute(topic="quantum computing")
         assert "Research: quantum computing" in result
+
+
+async def test_research_passes_search_provider_override():
+    tool = ResearchTool()
+
+    mock_search_tool = MagicMock()
+    mock_search_tool.execute = AsyncMock(return_value="No results found for: quantum computing")
+
+    with patch(
+        "pocketpaw.tools.builtin.research.WebSearchTool",
+        return_value=mock_search_tool,
+    ):
+        await tool.execute(topic="quantum computing", search_provider="brave")
+
+    mock_search_tool.execute.assert_awaited_once_with(
+        query="quantum computing",
+        num_results=5,
+        provider="brave",
+    )

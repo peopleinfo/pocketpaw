@@ -26,6 +26,7 @@ window.PocketPaw.Chat = {
             isStopRequested: false,
             streamingContent: '',
             streamingMessageId: null,
+            thinkingContextLine: '',
             hasShownWelcome: false,
             showComposerHelp: false,
             quickCommands: [
@@ -125,6 +126,7 @@ window.PocketPaw.Chat = {
                 this.isThinking = true;
                 this.isStopRequested = false;
                 this.streamingContent = '';
+                this.setThinkingContextDefault();
             },
 
             /**
@@ -138,6 +140,7 @@ window.PocketPaw.Chat = {
                 this.isThinking = false;
                 this.isStopRequested = false;
                 this.streamingContent = '';
+                this.thinkingContextLine = '';
 
                 // Refresh sidebar sessions and auto-title
                 if (this.loadSessions) this.loadSessions();
@@ -159,6 +162,40 @@ window.PocketPaw.Chat = {
                 this.$nextTick(() => {
                     this.scrollToBottom();
                 });
+            },
+
+            /**
+             * Build timestamp like: 2026-03-01 08:00 AM
+             */
+            formatThinkingTimestamp(date = new Date()) {
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                const time = Tools.formatTime(date);
+                return `${year}-${month}-${day} ${time}`;
+            },
+
+            /**
+             * Set default thinking context.
+             */
+            setThinkingContextDefault() {
+                this.thinkingContextLine = `PocketPaw - Thinking - ${this.formatThinkingTimestamp()}`;
+            },
+
+            /**
+             * Set search thinking context using current configured provider.
+             */
+            setThinkingContextSearch() {
+                const providerRaw = (this.settings?.webSearchProvider || 'tavily').toLowerCase();
+                const providerMap = {
+                    tavily: 'Tavily',
+                    brave: 'Brave',
+                    parallel: 'Parallel'
+                };
+                const providerLabel =
+                    providerMap[providerRaw] || (providerRaw.charAt(0).toUpperCase() + providerRaw.slice(1));
+                this.thinkingContextLine =
+                    `PocketPaw - Search ${providerLabel} - ${this.formatThinkingTimestamp()}`;
             },
 
             /**

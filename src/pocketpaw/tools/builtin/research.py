@@ -58,6 +58,14 @@ class ResearchTool(BaseTool):
                     "enum": ["quick", "standard", "deep"],
                     "default": "standard",
                 },
+                "search_provider": {
+                    "type": "string",
+                    "description": (
+                        "Optional web search provider override: "
+                        "'auto', 'tavily', 'brave', or 'parallel'."
+                    ),
+                    "enum": ["auto", "tavily", "brave", "parallel"],
+                },
                 "save_to_memory": {
                     "type": "boolean",
                     "description": "Save research summary to long-term memory (default: false)",
@@ -67,10 +75,11 @@ class ResearchTool(BaseTool):
             "required": ["topic"],
         }
 
-    async def execute(
+    async def execute(  # type: ignore[override]
         self,
         topic: str,
         depth: str = "standard",
+        search_provider: str | None = None,
         save_to_memory: bool = False,
     ) -> str:
         num_sources = _DEPTH_SOURCES.get(depth, 5)
@@ -78,7 +87,11 @@ class ResearchTool(BaseTool):
         try:
             # Step 1: Web Search
             search_tool = WebSearchTool()
-            search_results = await search_tool.execute(query=topic, num_results=num_sources)
+            search_results = await search_tool.execute(
+                query=topic,
+                num_results=num_sources,
+                provider=search_provider,
+            )
 
             if search_results.startswith("Error"):
                 return self._error(f"Search failed: {search_results}")

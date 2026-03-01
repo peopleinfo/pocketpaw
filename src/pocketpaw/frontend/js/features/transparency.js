@@ -444,6 +444,9 @@ window.PocketPaw.Transparency = {
                     const toolParams = JSON.stringify(data.data.params || {}).replace(/&/g, '&amp;').replace(/</g, '&lt;');
                     message = `🔧 <b>${toolName}</b> <span class="text-white/50">${toolParams}</span>`;
                     level = 'warning';
+                    if (data.data?.name === 'web_search' && typeof this.setThinkingContextSearch === 'function') {
+                        this.setThinkingContextSearch();
+                    }
                 } else if (eventType === 'tool_result') {
                     const isError = data.data.status === 'error';
                     level = isError ? 'error' : 'success';
