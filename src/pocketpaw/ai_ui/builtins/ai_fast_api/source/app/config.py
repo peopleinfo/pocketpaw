@@ -27,15 +27,16 @@ class Settings:
         self.g4f_model: str = os.getenv("G4F_MODEL", "gpt-4o-mini")
         self.g4f_timeout: int = int(os.getenv("G4F_TIMEOUT", "60"))
         self.g4f_retries: int = int(os.getenv("G4F_RETRIES", "3"))
+        self.codex_model: str = os.getenv("CODEX_MODEL", "gpt-5")
+        self.codex_timeout: int = int(os.getenv("CODEX_TIMEOUT", "90"))
+        self.codex_bin: str = os.getenv("CODEX_BIN", "")
 
         self.rate_limit_requests: int = int(os.getenv("RATE_LIMIT_REQUESTS", "60"))
         self.rate_limit_window: int = int(os.getenv("RATE_LIMIT_WINDOW", "60"))
 
         self.cors_enabled: bool = os.getenv("CORS_ENABLED", "true").lower() == "true"
         cors_origins_str = os.getenv("CORS_ORIGINS", "*")
-        self.cors_origins: List[str] = [
-            origin.strip() for origin in cors_origins_str.split(",")
-        ]
+        self.cors_origins: List[str] = [origin.strip() for origin in cors_origins_str.split(",")]
 
         self.openai_api_base: str = os.getenv("OPENAI_API_BASE", "/v1")
 

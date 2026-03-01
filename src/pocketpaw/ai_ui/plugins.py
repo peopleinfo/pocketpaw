@@ -42,11 +42,16 @@ import json
 import logging
 import os
 import platform
+import queue
+import re
 import shutil
 import signal
 import socket
 import subprocess
 import sys
+import threading
+import time
+import uuid
 import zipfile
 from pathlib import Path
 from typing import Any
@@ -60,6 +65,8 @@ _PROJECT_ROOT = Path(__file__).resolve().parents[3]
 PLUGINS_DIR = _PROJECT_ROOT / "plugins"
 
 _running_processes: dict[str, asyncio.subprocess.Process] = {}
+_codex_auth_sessions: dict[str, dict[str, Any]] = {}
+_codex_auth_lock = threading.Lock()
 
 # Shared uv cache — all plugins hardlink from here so identical
 # packages are stored only once on disk (like pnpm for Python).
@@ -194,6 +201,12 @@ def _sandbox_env(plugin_dir: Path, manifest: dict) -> dict[str, str]:
         "LC_ALL": "en_US.UTF-8",
     }
 
+    host_home = os.environ.get("HOME", "").strip()
+    if host_home:
+        # Allow selected backends (e.g. Codex OAuth) to access host-level auth stores
+        # while still keeping plugin runtime HOME isolated by default.
+        env["POCKETPAW_HOST_HOME"] = host_home
+
     # Layer manifest "env" on top (explicit config from pocketpaw.json)
     for key, val in (manifest.get("env") or {}).items():
         env[key] = str(val)
@@ -238,6 +251,246 @@ def get_plugins_dir() -> Path:
     """Get and ensure the plugins directory exists."""
     PLUGINS_DIR.mkdir(parents=True, exist_ok=True)
     return PLUGINS_DIR
+
+
+def _resolve_chat_model_from_env(env: dict[str, Any]) -> str:
+    backend = str(env.get("LLM_BACKEND", "g4f")).lower()
+    if backend == "codex":
+        return str(env.get("CODEX_MODEL", "gpt-5"))
+    return str(env.get("G4F_MODEL", "gpt-4o-mini"))
+
+
+def _resolve_codex_bin(explicit_bin: str | None = None) -> str | None:
+    if explicit_bin:
+        candidate = Path(explicit_bin).expanduser()
+        if candidate.exists():
+            return str(candidate)
+
+    path_bin = shutil.which("codex")
+    if path_bin:
+        return path_bin
+
+    candidates: list[str] = []
+    if platform.system() == "Darwin":
+        candidates.extend(
+            [
+                "/opt/homebrew/bin/codex",
+                "/usr/local/bin/codex",
+            ]
+        )
+    elif platform.system() == "Windows":
+        local_app_data = os.environ.get("LOCALAPPDATA")
+        if local_app_data:
+            candidates.append(str(Path(local_app_data) / "Programs" / "codex" / "codex.exe"))
+    else:
+        candidates.extend(["/usr/local/bin/codex", "/usr/bin/codex"])
+
+    for candidate in candidates:
+        if Path(candidate).exists():
+            return candidate
+
+    return None
+
+
+def _parse_codex_auth_output_line(session: dict[str, Any], line: str) -> None:
+    clean = line.strip()
+    if not clean:
+        return
+    lines: list[str] = session.setdefault("lines", [])
+    lines.append(clean)
+    if len(lines) > 120:
+        del lines[:-120]
+
+    if not session.get("verification_uri"):
+        match_url = re.search(r"https://auth\.openai\.com/codex/device", clean)
+        if match_url:
+            session["verification_uri"] = match_url.group(0)
+
+    if not session.get("user_code"):
+        match_code = re.search(r"\b[A-Z0-9]{4,}-[A-Z0-9]{4,}\b", clean)
+        if match_code:
+            session["user_code"] = match_code.group(0)
+
+
+def _drain_codex_auth_output(session: dict[str, Any], timeout_seconds: float) -> None:
+    q: queue.Queue[str | None] = session["queue"]
+    process: subprocess.Popen[str] = session["process"]
+    deadline = time.time() + max(timeout_seconds, 0.0)
+
+    while time.time() < deadline:
+        wait = min(0.2, max(0.0, deadline - time.time()))
+        if wait <= 0:
+            break
+        try:
+            item = q.get(timeout=wait)
+        except queue.Empty:
+            if process.poll() is not None:
+                break
+            continue
+        if item is None:
+            break
+        _parse_codex_auth_output_line(session, item)
+
+        if session.get("verification_uri") and session.get("user_code"):
+            break
+
+
+def get_codex_auth_status() -> dict[str, Any]:
+    codex_bin = _resolve_codex_bin()
+    if not codex_bin:
+        return {
+            "ok": False,
+            "logged_in": False,
+            "message": "codex CLI not found on PATH",
+        }
+
+    try:
+        result = subprocess.run(
+            [codex_bin, "login", "status"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
+        )
+    except Exception as e:
+        return {
+            "ok": False,
+            "logged_in": False,
+            "message": str(e) or "Failed to query codex login status",
+        }
+
+    message = (result.stdout or result.stderr or "").strip()
+    combined = f"{result.stdout or ''}\n{result.stderr or ''}"
+    logged_in = result.returncode == 0 and "Logged in" in combined
+    return {
+        "ok": logged_in,
+        "logged_in": logged_in,
+        "message": message or ("Logged in" if logged_in else "Not logged in"),
+    }
+
+
+def start_codex_device_auth() -> dict[str, Any]:
+    with _codex_auth_lock:
+        for sid, session in _codex_auth_sessions.items():
+            proc = session.get("process")
+            if isinstance(proc, subprocess.Popen) and proc.poll() is None:
+                _drain_codex_auth_output(session, timeout_seconds=0.2)
+                return {
+                    "ok": True,
+                    "status": "pending",
+                    "session_id": sid,
+                    "verification_uri": session.get("verification_uri"),
+                    "user_code": session.get("user_code"),
+                    "message": "Codex OAuth is already in progress",
+                }
+
+    codex_bin = _resolve_codex_bin()
+    if not codex_bin:
+        return {"ok": False, "status": "error", "message": "codex CLI not found on PATH"}
+
+    try:
+        process = subprocess.Popen(
+            [codex_bin, "login", "--device-auth"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            stdin=subprocess.DEVNULL,
+            text=True,
+            bufsize=1,
+        )
+    except Exception as e:
+        return {"ok": False, "status": "error", "message": str(e) or "Failed to start OAuth"}
+
+    read_queue: queue.Queue[str | None] = queue.Queue()
+
+    def _reader() -> None:
+        stream = process.stdout
+        if stream is None:
+            read_queue.put(None)
+            return
+        try:
+            for raw_line in stream:
+                read_queue.put(raw_line.rstrip("\n"))
+        finally:
+            read_queue.put(None)
+
+    thread = threading.Thread(target=_reader, daemon=True)
+    thread.start()
+
+    session_id = uuid.uuid4().hex
+    session: dict[str, Any] = {
+        "process": process,
+        "queue": read_queue,
+        "thread": thread,
+        "lines": [],
+        "verification_uri": None,
+        "user_code": None,
+        "started_at": time.time(),
+    }
+    with _codex_auth_lock:
+        _codex_auth_sessions[session_id] = session
+
+    _drain_codex_auth_output(session, timeout_seconds=4.0)
+
+    return {
+        "ok": True,
+        "status": "pending" if process.poll() is None else "completed",
+        "session_id": session_id,
+        "verification_uri": session.get("verification_uri"),
+        "user_code": session.get("user_code"),
+        "message": (
+            "Open verification URL and enter the one-time code"
+            if session.get("verification_uri") and session.get("user_code")
+            else "OAuth started. Waiting for login to complete."
+        ),
+    }
+
+
+def get_codex_device_auth_status(session_id: str) -> dict[str, Any]:
+    with _codex_auth_lock:
+        session = _codex_auth_sessions.get(session_id)
+    if not session:
+        return {
+            "ok": False,
+            "status": "not_found",
+            "message": "OAuth session not found",
+        }
+
+    process: subprocess.Popen[str] = session["process"]
+    _drain_codex_auth_output(session, timeout_seconds=0.2)
+
+    rc = process.poll()
+    lines: list[str] = session.get("lines", [])
+    last_message = lines[-1] if lines else ""
+
+    if rc is None:
+        return {
+            "ok": True,
+            "status": "pending",
+            "session_id": session_id,
+            "verification_uri": session.get("verification_uri"),
+            "user_code": session.get("user_code"),
+            "message": "Waiting for browser authorization",
+            "last_message": last_message,
+        }
+
+    status = "completed" if rc == 0 else "error"
+    result = {
+        "ok": rc == 0,
+        "status": status,
+        "session_id": session_id,
+        "verification_uri": session.get("verification_uri"),
+        "user_code": session.get("user_code"),
+        "message": (
+            "Codex OAuth login completed"
+            if rc == 0
+            else (last_message or f"codex login exited with code {rc}")
+        ),
+        "last_message": last_message,
+    }
+    if rc is not None:
+        with _codex_auth_lock:
+            _codex_auth_sessions.pop(session_id, None)
+    return result
 
 
 def _read_manifest(plugin_dir: Path) -> dict | None:
@@ -671,6 +924,7 @@ def test_plugin_connection(
         raise FileNotFoundError(f"Plugin '{plugin_id}' not found")
 
     env = manifest.get("env", {})
+    backend = str(env.get("LLM_BACKEND", "g4f")).lower()
     h = host or env.get("HOST", "0.0.0.0")
     # Use 127.0.0.1 for connect; 0.0.0.0 is bind-only
     if h in ("0.0.0.0", ""):
@@ -679,7 +933,7 @@ def test_plugin_connection(
     url = f"http://{h}:{p}/v1/chat/completions"
 
     payload = {
-        "model": env.get("G4F_MODEL", "gpt-4o-mini"),
+        "model": _resolve_chat_model_from_env(env),
         "messages": [{"role": "user", "content": "Hi"}],
         "stream": False,
     }
@@ -687,7 +941,8 @@ def test_plugin_connection(
     try:
         import httpx
 
-        with httpx.Client(timeout=15.0) as client:
+        timeout = 60.0 if backend == "codex" else 15.0
+        with httpx.Client(timeout=timeout) as client:
             resp = client.post(url, json=payload)
             if resp.status_code == 200:
                 data = resp.json()
@@ -792,7 +1047,7 @@ def chat_completion_proxy(plugin_id: str, messages: list[dict]) -> dict:
     url = f"http://{h}:{p}/v1/chat/completions"
 
     payload = {
-        "model": env.get("G4F_MODEL", "gpt-4o-mini"),
+        "model": _resolve_chat_model_from_env(env),
         "messages": messages,
         "stream": False,
     }

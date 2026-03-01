@@ -16,7 +16,12 @@ def main():
         logger.info(f"  Host: {settings.host}")
         logger.info(f"  Port: {settings.port}")
         logger.info(f"  Debug: {settings.debug}")
-        logger.info(f"  G4F Provider: {settings.g4f_provider}")
+        logger.info(f"  LLM Backend: {settings.llm_backend}")
+        if settings.llm_backend.lower() == "g4f":
+            logger.info(f"  G4F Provider: {settings.g4f_provider}")
+            logger.info(f"  G4F Model: {settings.g4f_model}")
+        elif settings.llm_backend.lower() == "codex":
+            logger.info(f"  Codex Model: {settings.codex_model}")
         logger.info(
             f"  Rate Limit: {settings.rate_limit_requests} req/{settings.rate_limit_window}s"
         )

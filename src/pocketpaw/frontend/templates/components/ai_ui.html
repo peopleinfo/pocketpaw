@@ -669,7 +669,7 @@
                 <button
                   type="button"
                   class="px-2 py-0.5 bg-white/5 text-white hover:bg-white/10 rounded text-[11px] font-medium transition-all border border-white/10 flex items-center gap-1 disabled:opacity-50"
-                  :title="'Test LLM (' + (aiUI.selectedPlugin?.env?.G4F_MODEL || 'gpt-4o-mini') + ')'"
+                  :title="'Test LLM (' + getAiUiPluginModel(aiUI.selectedPlugin) + ')'"
                   :disabled="aiUI.testingDetailConnection"
                   @click="testPluginConnectionFromDetail()"
                 >
@@ -690,8 +690,8 @@
                 </button>
                 <span
                   class="text-[10px] text-white/40 font-mono truncate max-w-[120px]"
-                  :title="aiUI.selectedPlugin?.env?.G4F_MODEL || 'gpt-4o-mini'"
-                  x-text="aiUI.selectedPlugin?.env?.G4F_MODEL || 'gpt-4o-mini'"
+                  :title="getAiUiPluginModel(aiUI.selectedPlugin)"
+                  x-text="getAiUiPluginModel(aiUI.selectedPlugin)"
                 ></span>
               </div>
             </template>
@@ -1479,13 +1479,15 @@
               >
               <select
                 x-model="aiUI.pluginConfigDraft.LLM_BACKEND"
+                @change="if ((aiUI.pluginConfigDraft.LLM_BACKEND || '').toLowerCase() === 'codex') fetchCodexAuthStatus(aiUI.configModalPluginId)"
                 class="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-[14px] focus:border-accent focus:outline-none"
               >
                 <option value="g4f">g4f (GPT4Free)</option>
                 <option value="ollama">ollama</option>
+                <option value="codex">codex (OAuth)</option>
               </select>
             </div>
-            <div>
+            <div x-show="(aiUI.pluginConfigDraft.LLM_BACKEND || 'g4f').toLowerCase() === 'g4f'">
               <label
                 class="block text-[12px] font-semibold text-white/70 mb-1.5"
                 >G4F Provider</label
@@ -1527,11 +1529,13 @@
                 Start the plugin to load options from API
               </p>
             </div>
-            <div>
+            <div
+              x-show="(aiUI.pluginConfigDraft.LLM_BACKEND || 'g4f').toLowerCase() !== 'codex'"
+            >
               <label
                 class="block text-[12px] font-semibold text-white/70 mb-1.5"
-                >G4F Model</label
-              >
+                x-text="(aiUI.pluginConfigDraft.LLM_BACKEND || 'g4f').toLowerCase() === 'ollama' ? 'Model' : 'G4F Model'"
+              ></label>
               <div class="flex gap-2">
                 <template x-if="aiUI.configModels.length > 0">
                   <select
@@ -1567,6 +1571,74 @@
               >
                 Start the plugin to load options from API
               </p>
+            </div>
+            <div x-show="(aiUI.pluginConfigDraft.LLM_BACKEND || 'g4f').toLowerCase() === 'codex'">
+              <label
+                class="block text-[12px] font-semibold text-white/70 mb-1.5"
+                >Codex Model</label
+              >
+              <div class="flex gap-2">
+                <input
+                  type="text"
+                  x-model="aiUI.pluginConfigDraft.CODEX_MODEL"
+                  placeholder="gpt-5"
+                  class="flex-1 min-w-0 px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/30 text-[14px] focus:border-accent focus:outline-none"
+                />
+                <button
+                  type="button"
+                  title="Copy model"
+                  class="flex-shrink-0 px-3 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white/60 hover:text-white hover:bg-white/10 transition-colors"
+                  @click="copyConfigValue(aiUI.pluginConfigDraft.CODEX_MODEL, 'Model')"
+                >
+                  <i data-lucide="copy" class="w-4 h-4"></i>
+                </button>
+              </div>
+            </div>
+            <div
+              x-show="(aiUI.pluginConfigDraft.LLM_BACKEND || 'g4f').toLowerCase() === 'codex'"
+              class="rounded-xl border border-white/10 bg-white/5 p-3 space-y-2"
+            >
+              <div class="text-[12px] text-white/70 font-semibold">Codex OAuth</div>
+              <div class="text-[11px] text-white/50" x-show="!aiUI.codexAuthStatus">
+                Click Start OAuth Login, then complete browser sign-in.
+              </div>
+              <div class="text-[11px]" x-show="aiUI.codexAuthStatus">
+                <span
+                  :class="aiUI.codexAuthStatus?.logged_in ? 'text-green-400' : 'text-yellow-400'"
+                  x-text="aiUI.codexAuthStatus?.logged_in ? 'Connected' : 'Not connected'"
+                ></span>
+                <span class="text-white/40"> · </span>
+                <span class="text-white/60" x-text="aiUI.codexAuthStatus?.message || ''"></span>
+              </div>
+              <div class="flex gap-2 items-center">
+                <button
+                  type="button"
+                  class="px-3 py-2 rounded-lg bg-accent text-white text-[12px] font-semibold hover:bg-accent/90 transition-colors disabled:opacity-60"
+                  :disabled="aiUI.codexAuthPolling"
+                  @click="startCodexOAuth()"
+                >
+                  <span x-show="!aiUI.codexAuthPolling">Start OAuth Login</span>
+                  <span x-show="aiUI.codexAuthPolling">Waiting...</span>
+                </button>
+                <button
+                  type="button"
+                  class="px-3 py-2 rounded-lg bg-white/10 text-white/80 text-[12px] font-medium hover:bg-white/15 transition-colors"
+                  @click="fetchCodexAuthStatus(aiUI.configModalPluginId)"
+                >
+                  Refresh
+                </button>
+              </div>
+              <div class="text-[11px] text-white/60 break-all" x-show="aiUI.codexVerificationUri">
+                URL:
+                <a
+                  :href="aiUI.codexVerificationUri"
+                  class="text-accent hover:underline"
+                  x-text="aiUI.codexVerificationUri"
+                ></a>
+              </div>
+              <div class="text-[11px] text-white/60" x-show="aiUI.codexUserCode">
+                Code: <span class="font-mono text-white" x-text="aiUI.codexUserCode"></span>
+              </div>
             </div>
             <div>
               <label

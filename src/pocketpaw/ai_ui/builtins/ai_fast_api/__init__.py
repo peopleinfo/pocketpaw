@@ -14,7 +14,7 @@ _SOURCE_DIR = Path(__file__).resolve().parent / "source"
 _MANIFEST = {
     "name": "AI Fast API",
     "description": (
-        "OpenAI-compatible API with pluggable LLM backends (G4F, Ollama, etc.). "
+        "OpenAI-compatible API with pluggable LLM backends (G4F, Ollama, Codex OAuth). "
         "Chat completions, image generation, streaming — "
         "all through a unified local endpoint."
     ),
@@ -30,8 +30,10 @@ _MANIFEST = {
         "HOST": "0.0.0.0",
         "PORT": "8000",
         "DEBUG": "true",
+        "LLM_BACKEND": "g4f",
         "G4F_PROVIDER": "auto",
         "G4F_MODEL": "gpt-4o-mini",
+        "CODEX_MODEL": "gpt-5",
     },
     "openapi": "openapi.json",
 }
@@ -45,7 +47,7 @@ DEFINITION: BuiltinDefinition = {
         "id": "ai-fast-api",
         "name": "AI Fast API",
         "description": (
-            "OpenAI-compatible API with pluggable backends (G4F default). "
+            "OpenAI-compatible API with pluggable backends (G4F, Ollama, Codex OAuth). "
             "Chat, images, streaming — zero API keys needed."
         ),
         "icon": "zap",

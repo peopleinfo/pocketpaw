@@ -2,6 +2,7 @@ import asyncio
 import json
 import os
 import subprocess
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
@@ -39,18 +40,23 @@ async def _wait_for_log_contains(log_path, needle: str, timeout: float = 3.0) ->
 @pytest.fixture(autouse=True)
 def _clear_running_processes():
     plugins._running_processes.clear()
+    with plugins._codex_auth_lock:
+        plugins._codex_auth_sessions.clear()
     yield
     plugins._running_processes.clear()
+    with plugins._codex_auth_lock:
+        plugins._codex_auth_sessions.clear()
 
 
 def test_is_plugin_running_ignores_shared_port_fallback(tmp_path):
     plugin_dir = tmp_path / "counter-template"
     _write_manifest(plugin_dir, 8000)
 
-    with patch("pocketpaw.ai_ui.plugins.get_plugins_dir", return_value=tmp_path), patch(
-        "pocketpaw.ai_ui.plugins._read_pid", return_value=None
-    ), patch("pocketpaw.ai_ui.plugins._is_port_listening", return_value=True), patch(
-        "pocketpaw.ai_ui.plugins._is_port_unique_to_plugin", return_value=False
+    with (
+        patch("pocketpaw.ai_ui.plugins.get_plugins_dir", return_value=tmp_path),
+        patch("pocketpaw.ai_ui.plugins._read_pid", return_value=None),
+        patch("pocketpaw.ai_ui.plugins._is_port_listening", return_value=True),
+        patch("pocketpaw.ai_ui.plugins._is_port_unique_to_plugin", return_value=False),
     ):
         assert plugins._is_plugin_running("counter-template", plugin_dir) is False
 
@@ -62,11 +68,13 @@ async def test_stop_plugin_shared_port_returns_ambiguous(tmp_path):
     _write_manifest(plugin_a, 8000)
     _write_manifest(plugin_b, 8000)
 
-    with patch("pocketpaw.ai_ui.plugins.get_plugins_dir", return_value=tmp_path), patch(
-        "pocketpaw.ai_ui.plugins._read_pid", return_value=None
-    ), patch("pocketpaw.ai_ui.plugins._is_port_listening", return_value=True), patch(
-        "pocketpaw.ai_ui.plugins._get_pid_on_port"
-    ) as mock_pid_on_port, patch("os.kill") as mock_kill:
+    with (
+        patch("pocketpaw.ai_ui.plugins.get_plugins_dir", return_value=tmp_path),
+        patch("pocketpaw.ai_ui.plugins._read_pid", return_value=None),
+        patch("pocketpaw.ai_ui.plugins._is_port_listening", return_value=True),
+        patch("pocketpaw.ai_ui.plugins._get_pid_on_port") as mock_pid_on_port,
+        patch("os.kill") as mock_kill,
+    ):
         result = await plugins.stop_plugin("counter-template")
 
     assert result["status"] == "ambiguous"
@@ -100,6 +108,20 @@ def test_sandbox_env_posix_creates_python_shims(tmp_path):
     assert shim_python.exists()
     assert shim_python3.exists()
     assert str(plugin_dir / "bin") in env["PATH"].split(os.pathsep)
+
+
+def test_sandbox_env_includes_host_home_hint(tmp_path):
+    plugin_dir = tmp_path / "demo"
+    plugin_dir.mkdir(parents=True)
+
+    with (
+        patch.dict(os.environ, {"HOME": "/Users/example"}, clear=False),
+        patch("platform.system", return_value="Darwin"),
+    ):
+        env = plugins._sandbox_env(plugin_dir, {})
+
+    assert env["HOME"] == str(plugin_dir)
+    assert env["POCKETPAW_HOST_HOME"] == "/Users/example"
 
 
 def test_posix_python3_shim_does_not_self_recurse(tmp_path):
@@ -139,9 +161,7 @@ def test_resolve_phase_command_windows_extracts_exec_from_start_sh(tmp_path):
     )
     manifest = {"start": "bash start.sh"}
 
-    with patch("platform.system", return_value="Windows"), patch(
-        "shutil.which", return_value=None
-    ):
+    with patch("platform.system", return_value="Windows"), patch("shutil.which", return_value=None):
         cmd = plugins._resolve_phase_command(plugin_dir, manifest, "start")
 
     assert cmd == "python app.py --port 8000"
@@ -184,8 +204,9 @@ async def test_launch_plugin_python_shim_fallback_without_system_python(tmp_path
         encoding="utf-8",
     )
 
-    with patch("pocketpaw.ai_ui.plugins.get_plugins_dir", return_value=tmp_path), patch(
-        "pocketpaw.ai_ui.plugins._SYSTEM_PATHS", ""
+    with (
+        patch("pocketpaw.ai_ui.plugins.get_plugins_dir", return_value=tmp_path),
+        patch("pocketpaw.ai_ui.plugins._SYSTEM_PATHS", ""),
     ):
         result = await plugins.launch_plugin(plugin_id)
         assert result["status"] == "ok"
@@ -210,8 +231,7 @@ async def test_launch_plugin_prefers_python_wrapper_over_shell_manifest(tmp_path
     )
     (plugin_dir / "start.sh").write_text("echo should-not-run && exit 1\n", encoding="utf-8")
     (plugin_dir / "pocketpaw_start.py").write_text(
-        "import time\n"
-        "time.sleep(2)\n",
+        "import time\ntime.sleep(2)\n",
         encoding="utf-8",
     )
 
@@ -242,11 +262,13 @@ async def test_launch_wan2gp_on_macos_injects_allow_mac_env(tmp_path):
         encoding="utf-8",
     )
 
-    with patch("pocketpaw.ai_ui.plugins.get_plugins_dir", return_value=tmp_path), patch(
-        "platform.system", return_value="Darwin"
-    ), patch(
-        "pocketpaw.ai_ui.builtins.get_registry",
-        return_value={},
+    with (
+        patch("pocketpaw.ai_ui.plugins.get_plugins_dir", return_value=tmp_path),
+        patch("platform.system", return_value="Darwin"),
+        patch(
+            "pocketpaw.ai_ui.builtins.get_registry",
+            return_value={},
+        ),
     ):
         result = await plugins.launch_plugin(plugin_id)
         assert result["status"] == "ok"
@@ -278,11 +300,13 @@ async def test_launch_wan2gp_refreshes_builtin_overlay_files(tmp_path):
 
     fresh_script = "import time\nprint('fresh-script-ran')\ntime.sleep(2)\n"
 
-    with patch("pocketpaw.ai_ui.plugins.get_plugins_dir", return_value=tmp_path), patch(
-        "platform.system", return_value="Darwin"
-    ), patch(
-        "pocketpaw.ai_ui.builtins.get_registry",
-        return_value={plugin_id: {"files": {"pocketpaw_start.py": fresh_script}}},
+    with (
+        patch("pocketpaw.ai_ui.plugins.get_plugins_dir", return_value=tmp_path),
+        patch("platform.system", return_value="Darwin"),
+        patch(
+            "pocketpaw.ai_ui.builtins.get_registry",
+            return_value={plugin_id: {"files": {"pocketpaw_start.py": fresh_script}}},
+        ),
     ):
         result = await plugins.launch_plugin(plugin_id)
         assert result["status"] == "ok"
@@ -294,8 +318,149 @@ async def test_launch_wan2gp_refreshes_builtin_overlay_files(tmp_path):
 
 @pytest.mark.asyncio
 async def test_install_plugin_blocks_unsupported_builtin(tmp_path):
-    with patch("pocketpaw.ai_ui.plugins.get_plugins_dir", return_value=tmp_path), patch(
-        "pocketpaw.ai_ui.builtins.platform.system", return_value="Darwin"
-    ), patch("pocketpaw.ai_ui.builtins.platform.machine", return_value="arm64"):
+    with (
+        patch("pocketpaw.ai_ui.plugins.get_plugins_dir", return_value=tmp_path),
+        patch("pocketpaw.ai_ui.builtins.platform.system", return_value="Darwin"),
+        patch("pocketpaw.ai_ui.builtins.platform.machine", return_value="arm64"),
+    ):
         with pytest.raises(ValueError, match="unavailable on macOS arm64"):
             await plugins.install_plugin("builtin:wan2gp")
+
+
+def test_resolve_chat_model_from_env_codex():
+    env = {"LLM_BACKEND": "codex", "CODEX_MODEL": "gpt-5.2"}
+    assert plugins._resolve_chat_model_from_env(env) == "gpt-5.2"
+
+
+def test_test_plugin_connection_uses_codex_model(tmp_path):
+    plugin_id = "ai-fast-api"
+    plugin_dir = tmp_path / plugin_id
+    plugin_dir.mkdir(parents=True)
+    (plugin_dir / "pocketpaw.json").write_text(
+        json.dumps(
+            {
+                "name": "AI Fast API",
+                "env": {
+                    "HOST": "0.0.0.0",
+                    "PORT": "8000",
+                    "LLM_BACKEND": "codex",
+                    "CODEX_MODEL": "gpt-5.2",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    captured: dict[str, str] = {}
+
+    class DummyResponse:
+        status_code = 200
+
+        @staticmethod
+        def json():
+            return {"choices": [{"message": {"content": "pong"}}]}
+
+    class DummyClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def post(self, url, json):
+            captured["url"] = url
+            captured["model"] = json.get("model")
+            return DummyResponse()
+
+    with (
+        patch("pocketpaw.ai_ui.plugins.get_plugins_dir", return_value=tmp_path),
+        patch("httpx.Client", DummyClient),
+    ):
+        result = plugins.test_plugin_connection(plugin_id)
+
+    assert result["ok"] is True
+    assert captured["model"] == "gpt-5.2"
+    assert captured["url"].startswith("http://127.0.0.1:8000")
+
+
+def test_chat_completion_proxy_uses_codex_model(tmp_path):
+    plugin_id = "ai-fast-api"
+    plugin_dir = tmp_path / plugin_id
+    plugin_dir.mkdir(parents=True)
+    (plugin_dir / "pocketpaw.json").write_text(
+        json.dumps(
+            {
+                "name": "AI Fast API",
+                "env": {
+                    "HOST": "0.0.0.0",
+                    "PORT": "8000",
+                    "LLM_BACKEND": "codex",
+                    "CODEX_MODEL": "gpt-5.2",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    captured: dict[str, str] = {}
+
+    class DummyResponse:
+        @staticmethod
+        def raise_for_status():
+            return None
+
+        @staticmethod
+        def json():
+            return {"choices": [{"message": {"content": "ok"}}]}
+
+    class DummyClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def post(self, url, json):
+            captured["url"] = url
+            captured["model"] = json.get("model")
+            return DummyResponse()
+
+    with (
+        patch("pocketpaw.ai_ui.plugins.get_plugins_dir", return_value=tmp_path),
+        patch("httpx.Client", DummyClient),
+    ):
+        response = plugins.chat_completion_proxy(plugin_id, [{"role": "user", "content": "hi"}])
+
+    assert response["choices"][0]["message"]["content"] == "ok"
+    assert captured["model"] == "gpt-5.2"
+    assert captured["url"].startswith("http://127.0.0.1:8000")
+
+
+def test_get_codex_auth_status_logged_in():
+    completed = SimpleNamespace(returncode=0, stdout="", stderr="Logged in using ChatGPT\n")
+    with (
+        patch("pocketpaw.ai_ui.plugins._resolve_codex_bin", return_value="/usr/local/bin/codex"),
+        patch("subprocess.run", return_value=completed),
+    ):
+        status = plugins.get_codex_auth_status()
+    assert status["ok"] is True
+    assert status["logged_in"] is True
+
+
+def test_start_codex_device_auth_without_codex_binary():
+    with patch("pocketpaw.ai_ui.plugins._resolve_codex_bin", return_value=None):
+        result = plugins.start_codex_device_auth()
+    assert result["ok"] is False
+    assert result["status"] == "error"
+
+
+def test_get_codex_device_auth_status_not_found():
+    result = plugins.get_codex_device_auth_status("missing-session")
+    assert result["ok"] is False
+    assert result["status"] == "not_found"

@@ -76,10 +76,18 @@ def get_service() -> BaseLLMService:
         from .g4f_service import G4FService
 
         _active_service = G4FService()
+    elif backend == "ollama":
+        from .ollama_service import OllamaService
+
+        _active_service = OllamaService()
+    elif backend == "codex":
+        from .codex_service import CodexService
+
+        _active_service = CodexService()
     else:
         raise ValueError(
             f"Unknown LLM_BACKEND '{backend}'. "
-            "Available: 'g4f'. Implement BaseLLMService to add more."
+            "Available: 'g4f', 'ollama', 'codex'. Implement BaseLLMService to add more."
         )
 
     return _active_service

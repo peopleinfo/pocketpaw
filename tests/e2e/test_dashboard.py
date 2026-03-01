@@ -794,9 +794,142 @@ class TestAiUIDiscoveryInstall:
         expect(codex_model_input).to_be_visible()
         expect(codex_model_input).to_have_value("gpt-5.2")
 
-    def test_discover_install_disabled_for_unsupported_app(
-        self, page: Page, dashboard_url: str
-    ):
+    def test_ai_fast_api_config_supports_codex_oauth(self, page: Page, dashboard_url: str):
+        """AI Fast API config modal should expose codex backend + OAuth controls."""
+        state = {"start_calls": 0, "poll_calls": 0}
+
+        def handle_plugins(route):
+            route.fulfill(
+                status=200,
+                content_type="application/json",
+                body=json.dumps(
+                    {
+                        "plugins": [
+                            {
+                                "id": "ai-fast-api",
+                                "name": "AI Fast API",
+                                "description": "API server",
+                                "icon": "zap",
+                                "version": "2.0.0",
+                                "port": 8000,
+                                "status": "running",
+                                "path": "/tmp/ai-fast-api",
+                                "start_cmd": "bash start.sh",
+                                "has_install": True,
+                                "requires": ["uv", "python"],
+                                "env": {
+                                    "LLM_BACKEND": "codex",
+                                    "CODEX_MODEL": "gpt-5",
+                                },
+                                "openapi": "openapi.json",
+                                "web_view": "native",
+                                "web_view_path": "/",
+                            }
+                        ]
+                    }
+                ),
+            )
+
+        def handle_config(route):
+            if route.request.method == "GET":
+                route.fulfill(
+                    status=200,
+                    content_type="application/json",
+                    body=json.dumps(
+                        {
+                            "config": {
+                                "LLM_BACKEND": "codex",
+                                "CODEX_MODEL": "gpt-5",
+                                "HOST": "0.0.0.0",
+                                "PORT": "8000",
+                                "DEBUG": "true",
+                            }
+                        }
+                    ),
+                )
+                return
+            route.continue_()
+
+        def handle_codex_auth_status(route):
+            route.fulfill(
+                status=200,
+                content_type="application/json",
+                body='{"ok":false,"logged_in":false,"message":"Not logged in"}',
+            )
+
+        def handle_codex_auth_start(route):
+            state["start_calls"] += 1
+            route.fulfill(
+                status=200,
+                content_type="application/json",
+                body=(
+                    '{"ok":true,"status":"pending","session_id":"sess-1",'
+                    '"verification_uri":"https://auth.openai.com/codex/device",'
+                    '"user_code":"ABCD-1234","message":"Open verification URL and enter code"}'
+                ),
+            )
+
+        def handle_codex_auth_poll(route):
+            state["poll_calls"] += 1
+            route.fulfill(
+                status=200,
+                content_type="application/json",
+                body='{"ok":true,"status":"completed","session_id":"sess-1","message":"Done"}',
+            )
+
+        page.route(
+            re.compile(r".*/api/ai-ui/plugins/ai-fast-api/codex/auth/status(?:\?.*)?$"),
+            handle_codex_auth_status,
+        )
+        page.route(
+            re.compile(r".*/api/ai-ui/plugins/ai-fast-api/codex/auth/start(?:\?.*)?$"),
+            handle_codex_auth_start,
+        )
+        page.route(
+            re.compile(r".*/api/ai-ui/plugins/ai-fast-api/codex/auth/poll(?:\?.*)?$"),
+            handle_codex_auth_poll,
+        )
+        page.route(re.compile(r".*/api/ai-ui/plugins/ai-fast-api/config(?:\?.*)?$"), handle_config)
+        page.route(re.compile(r".*/api/ai-ui/plugins(?:\?.*)?$"), handle_plugins)
+
+        page.goto(dashboard_url)
+        page.locator("button:has-text('AI UI Local Cloud')").click()
+        opened = page.evaluate(
+            """
+            async () => {
+                const root = document.querySelector("body");
+                const data = root?._x_dataStack?.[0];
+                if (!data || typeof data.openPluginConfigModal !== "function") return false;
+                await data.openPluginConfigModal("ai-fast-api");
+                return true;
+            }
+            """
+        )
+        assert opened is True
+
+        backend_select = page.locator("select[x-model='aiUI.pluginConfigDraft.LLM_BACKEND']").first
+        expect(backend_select).to_be_visible()
+        codex_option = page.locator(
+            "select[x-model='aiUI.pluginConfigDraft.LLM_BACKEND'] option[value='codex']"
+        )
+        expect(codex_option).to_have_count(1)
+        backend_select.select_option("codex")
+
+        codex_model_input = page.locator(
+            "input[x-model='aiUI.pluginConfigDraft.CODEX_MODEL']"
+        ).first
+        expect(codex_model_input).to_be_visible()
+        expect(codex_model_input).to_have_value("gpt-5")
+
+        start_button = page.get_by_role("button", name="Start OAuth Login")
+        expect(start_button).to_be_visible()
+        start_button.click()
+
+        expect(page.get_by_text("ABCD-1234")).to_be_visible()
+        assert state["start_calls"] == 1
+        assert state["poll_calls"] >= 1
+
+    def test_discover_install_disabled_for_unsupported_app(self, page: Page, dashboard_url: str):
         """Unsupported gallery app should render disabled Install action."""
         state = {"install_calls": 0}
 

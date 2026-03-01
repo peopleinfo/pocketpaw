@@ -77,6 +77,11 @@ window.PocketPaw.AiUI = {
         connectionTestResult: null,
         detailTestResult: null,
         testingDetailConnection: false,
+        codexAuthStatus: null,
+        codexOauthSessionId: null,
+        codexVerificationUri: "",
+        codexUserCode: "",
+        codexAuthPolling: false,
       },
     };
   },
@@ -712,6 +717,7 @@ window.PocketPaw.AiUI = {
           LLM_BACKEND: "g4f",
           G4F_PROVIDER: "auto",
           G4F_MODEL: "gpt-4o-mini",
+          CODEX_MODEL: "gpt-5",
           DEBUG: "true",
           HOST: "0.0.0.0",
           PORT: "8000",
@@ -735,51 +741,62 @@ window.PocketPaw.AiUI = {
           this.aiUI.pluginConfigDraft = { ...aiFastApiDefaults };
         }
         if (pluginId === "ai-fast-api") {
-          const host = this.aiUI.pluginConfigDraft.HOST || "0.0.0.0";
-          const port = this.aiUI.pluginConfigDraft.PORT || "8000";
-          const params = new URLSearchParams();
-          if (host && host !== "0.0.0.0") params.set("host", host);
-          if (port) params.set("port", String(port));
-          const qs = params.toString() ? "?" + params.toString() : "";
-          try {
-            const [modelsRes, providersRes] = await Promise.all([
-              fetch(`/api/ai-ui/plugins/${pluginId}/models${qs}`),
-              fetch(`/api/ai-ui/plugins/${pluginId}/providers${qs}`),
-            ]);
-            if (modelsRes.ok) {
-              const data = await modelsRes.json();
-              const models = data.models || [];
-              const savedModel = this.aiUI.pluginConfig?.G4F_MODEL || this.aiUI.pluginConfigDraft.G4F_MODEL;
-              if (savedModel && !models.some((m) => m.id === savedModel)) {
-                models.unshift({ id: savedModel });
+          const backend = (this.aiUI.pluginConfigDraft.LLM_BACKEND || "g4f").toLowerCase();
+          if (backend !== "codex") {
+            const host = this.aiUI.pluginConfigDraft.HOST || "0.0.0.0";
+            const port = this.aiUI.pluginConfigDraft.PORT || "8000";
+            const params = new URLSearchParams();
+            if (host && host !== "0.0.0.0") params.set("host", host);
+            if (port) params.set("port", String(port));
+            const qs = params.toString() ? "?" + params.toString() : "";
+            try {
+              const modelsRes = await fetch(`/api/ai-ui/plugins/${pluginId}/models${qs}`);
+              if (modelsRes.ok) {
+                const data = await modelsRes.json();
+                const models = data.models || [];
+                const savedModel =
+                  this.aiUI.pluginConfig?.G4F_MODEL || this.aiUI.pluginConfigDraft.G4F_MODEL;
+                if (savedModel && !models.some((m) => m.id === savedModel)) {
+                  models.unshift({ id: savedModel });
+                }
+                this.aiUI.configModels = models;
+                if (savedModel) {
+                  this.aiUI.pluginConfigDraft.G4F_MODEL = savedModel;
+                }
+                this.$nextTick(() => {
+                  if (savedModel) this.aiUI.pluginConfigDraft.G4F_MODEL = savedModel;
+                });
               }
-              this.aiUI.configModels = models;
-              // Re-apply saved model so select binding picks it up after async options load
-              if (savedModel) {
-                this.aiUI.pluginConfigDraft.G4F_MODEL = savedModel;
+              if (backend === "g4f") {
+                const providersRes = await fetch(`/api/ai-ui/plugins/${pluginId}/providers${qs}`);
+                if (providersRes.ok) {
+                  const data = await providersRes.json();
+                  const providers = data.providers || [];
+                  const savedProvider =
+                    this.aiUI.pluginConfig?.G4F_PROVIDER || this.aiUI.pluginConfigDraft.G4F_PROVIDER;
+                  if (
+                    savedProvider &&
+                    savedProvider !== "auto" &&
+                    !providers.some((p) => p.id === savedProvider)
+                  ) {
+                    providers.unshift({ id: savedProvider });
+                  }
+                  this.aiUI.configProviders = providers;
+                  if (savedProvider) {
+                    this.aiUI.pluginConfigDraft.G4F_PROVIDER = savedProvider;
+                  }
+                  this.$nextTick(() => {
+                    if (savedProvider) this.aiUI.pluginConfigDraft.G4F_PROVIDER = savedProvider;
+                  });
+                }
+              } else {
+                this.aiUI.configProviders = [];
               }
-              this.$nextTick(() => {
-                if (savedModel) this.aiUI.pluginConfigDraft.G4F_MODEL = savedModel;
-              });
+            } catch (_e) {
+              // Plugin may not be running
             }
-            if (providersRes.ok) {
-              const data = await providersRes.json();
-              const providers = data.providers || [];
-              const savedProvider =
-                this.aiUI.pluginConfig?.G4F_PROVIDER || this.aiUI.pluginConfigDraft.G4F_PROVIDER;
-              if (savedProvider && savedProvider !== "auto" && !providers.some((p) => p.id === savedProvider)) {
-                providers.unshift({ id: savedProvider });
-              }
-              this.aiUI.configProviders = providers;
-              if (savedProvider) {
-                this.aiUI.pluginConfigDraft.G4F_PROVIDER = savedProvider;
-              }
-              this.$nextTick(() => {
-                if (savedProvider) this.aiUI.pluginConfigDraft.G4F_PROVIDER = savedProvider;
-              });
-            }
-          } catch (_e) {
-            // Plugin may not be running
+          } else if (backend === "codex") {
+            await this.fetchCodexAuthStatus(pluginId);
           }
         }
         this.$nextTick(() => {
@@ -795,6 +812,108 @@ window.PocketPaw.AiUI = {
         this.aiUI.configModels = [];
         this.aiUI.configProviders = [];
         this.aiUI.connectionTestResult = null;
+        this.aiUI.codexAuthStatus = null;
+        this.aiUI.codexOauthSessionId = null;
+        this.aiUI.codexVerificationUri = "";
+        this.aiUI.codexUserCode = "";
+        this.aiUI.codexAuthPolling = false;
+      },
+
+      getAiUiPluginModel(plugin) {
+        const env = plugin?.env || {};
+        const backend = (env.LLM_BACKEND || "g4f").toLowerCase();
+        if (backend === "codex") return env.CODEX_MODEL || "gpt-5";
+        return env.G4F_MODEL || "gpt-4o-mini";
+      },
+
+      async fetchCodexAuthStatus(pluginId) {
+        const id = pluginId || this.aiUI.configModalPluginId;
+        if (!id) return;
+        try {
+          const res = await fetch(`/api/ai-ui/plugins/${id}/codex/auth/status`);
+          if (!res.ok) return;
+          this.aiUI.codexAuthStatus = await res.json();
+        } catch (_e) {
+          // Ignore transient status errors
+        }
+      },
+
+      async startCodexOAuth() {
+        const pluginId = this.aiUI.configModalPluginId;
+        if (!pluginId) return;
+        this.aiUI.codexAuthStatus = { ok: false, logged_in: false, message: "Starting OAuth..." };
+        try {
+          const res = await fetch(`/api/ai-ui/plugins/${pluginId}/codex/auth/start`, {
+            method: "POST",
+          });
+          const data = await res.json();
+          if (!res.ok || data.ok === false) {
+            this.aiUI.codexAuthStatus = {
+              ok: false,
+              logged_in: false,
+              message: data.detail || data.message || "Failed to start OAuth",
+            };
+            this.showToast("Failed to start Codex OAuth", "error");
+            return;
+          }
+          this.aiUI.codexOauthSessionId = data.session_id || null;
+          this.aiUI.codexVerificationUri = data.verification_uri || "";
+          this.aiUI.codexUserCode = data.user_code || "";
+          this.aiUI.codexAuthStatus = {
+            ok: false,
+            logged_in: false,
+            message: data.message || "OAuth started",
+          };
+          this.showToast("Codex OAuth started", "success");
+
+          if (this.aiUI.codexOauthSessionId) {
+            this.aiUI.codexAuthPolling = true;
+            await this.pollCodexOAuth(this.aiUI.codexOauthSessionId);
+          }
+        } catch (e) {
+          console.error("Codex OAuth start error:", e);
+          this.aiUI.codexAuthStatus = { ok: false, logged_in: false, message: "Request failed" };
+          this.showToast("Failed to start Codex OAuth", "error");
+        }
+      },
+
+      async pollCodexOAuth(sessionId) {
+        const pluginId = this.aiUI.configModalPluginId;
+        if (!pluginId || !sessionId) return;
+        while (
+          this.aiUI.codexAuthPolling &&
+          this.aiUI.configModalOpen &&
+          this.aiUI.codexOauthSessionId === sessionId
+        ) {
+          try {
+            const qs = new URLSearchParams({ session_id: sessionId }).toString();
+            const res = await fetch(`/api/ai-ui/plugins/${pluginId}/codex/auth/poll?${qs}`);
+            const data = await res.json();
+            if (!res.ok || data.status === "error" || data.status === "not_found") {
+              this.aiUI.codexAuthStatus = {
+                ok: false,
+                logged_in: false,
+                message: data.detail || data.message || "Codex OAuth failed",
+              };
+              this.aiUI.codexAuthPolling = false;
+              this.showToast("Codex OAuth failed", "error");
+              return;
+            }
+            if (data.verification_uri) this.aiUI.codexVerificationUri = data.verification_uri;
+            if (data.user_code) this.aiUI.codexUserCode = data.user_code;
+            if (data.status === "completed") {
+              this.aiUI.codexAuthPolling = false;
+              await this.fetchCodexAuthStatus(pluginId);
+              if (this.aiUI.codexAuthStatus?.logged_in) {
+                this.showToast("Codex OAuth connected", "success");
+              }
+              return;
+            }
+          } catch (_e) {
+            // Ignore and retry.
+          }
+          await new Promise((resolve) => setTimeout(resolve, 2000));
+        }
       },
 
       async testPluginConnection() {

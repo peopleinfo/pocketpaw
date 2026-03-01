@@ -196,6 +196,36 @@ async def test_plugin_connection_endpoint(plugin_id: str, request: Request):
         raise HTTPException(status_code=400, detail=str(e))
 
 
+@router.get("/plugins/{plugin_id}/codex/auth/status")
+async def codex_auth_status_endpoint(plugin_id: str):
+    """Return codex OAuth login status for AI Fast API."""
+    from pocketpaw.ai_ui.plugins import get_codex_auth_status as _status
+
+    if plugin_id != "ai-fast-api":
+        raise HTTPException(status_code=400, detail="Codex OAuth is only available for ai-fast-api")
+    return _status()
+
+
+@router.post("/plugins/{plugin_id}/codex/auth/start")
+async def codex_auth_start_endpoint(plugin_id: str):
+    """Start codex device OAuth flow and return verification URL/code."""
+    from pocketpaw.ai_ui.plugins import start_codex_device_auth as _start
+
+    if plugin_id != "ai-fast-api":
+        raise HTTPException(status_code=400, detail="Codex OAuth is only available for ai-fast-api")
+    return _start()
+
+
+@router.get("/plugins/{plugin_id}/codex/auth/poll")
+async def codex_auth_poll_endpoint(plugin_id: str, session_id: str):
+    """Poll a running codex OAuth device-auth session."""
+    from pocketpaw.ai_ui.plugins import get_codex_device_auth_status as _poll
+
+    if plugin_id != "ai-fast-api":
+        raise HTTPException(status_code=400, detail="Codex OAuth is only available for ai-fast-api")
+    return _poll(session_id)
+
+
 @router.put("/plugins/{plugin_id}/config")
 async def update_plugin_config_endpoint(plugin_id: str, request: Request):
     """Update a plugin's config (env vars). Restart required for changes to apply."""
@@ -229,9 +259,7 @@ async def install_plugin_endpoint(request: Request):
         form = await request.form()
         file = form.get("file")
         if not isinstance(file, UploadFile) or file.filename == "":
-            raise HTTPException(
-                status_code=400, detail="No file provided. Upload a .zip plugin."
-            )
+            raise HTTPException(status_code=400, detail="No file provided. Upload a .zip plugin.")
         if not (file.filename or "").lower().endswith(".zip"):
             raise HTTPException(
                 status_code=400,
@@ -239,9 +267,7 @@ async def install_plugin_endpoint(request: Request):
             )
         zip_bytes = await file.read()
         if len(zip_bytes) > 100 * 1024 * 1024:
-            raise HTTPException(
-                status_code=400, detail="Zip file too large (max 100MB)."
-            )
+            raise HTTPException(status_code=400, detail="Zip file too large (max 100MB).")
         try:
             result = await install_plugin_from_zip(zip_bytes)
             return result
@@ -435,26 +461,27 @@ SwaggerUIBundle({{
 </html>"""
     return HTMLResponse(content=html)
 
+
 @router.get("/plugins/{plugin_id}/{filename:path}")
 async def serve_plugin_file(plugin_id: str, filename: str):
     """Serve arbitrary files from the plugin's directory (e.g. openapi.json)."""
     from fastapi.responses import FileResponse
 
     from pocketpaw.ai_ui.plugins import get_plugins_dir
-    
+
     plugins_dir = get_plugins_dir()
     plugin_path = plugins_dir / plugin_id
     if not plugin_path.exists():
         raise HTTPException(status_code=404, detail="Plugin not found")
-        
+
     file_path = (plugin_path / filename).resolve()
     # Security check to prevent directory traversal
     if not str(file_path).startswith(str(plugin_path)):
         raise HTTPException(status_code=403, detail="Forbidden path traversal")
-        
+
     if not file_path.exists() or not file_path.is_file():
         raise HTTPException(status_code=404, detail="File not found")
-        
+
     return FileResponse(file_path)
 
 

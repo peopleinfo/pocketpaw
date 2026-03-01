@@ -19,9 +19,7 @@ router = APIRouter(tags=["Health & Status"])
 )
 async def health_check() -> HealthResponse:
     try:
-        return HealthResponse(
-            status="healthy", version=__version__, timestamp=int(time.time())
-        )
+        return HealthResponse(status="healthy", version=__version__, timestamp=int(time.time()))
     except Exception as e:
         logger.error(f"Health check failed: {e}")
         raise HTTPException(status_code=503, detail="Service unavailable")
@@ -92,7 +90,7 @@ async def root() -> Dict[str, Any]:
         },
         "features": [
             "OpenAI-compatible API",
-            "Pluggable LLM backends (G4F, Ollama, etc.)",
+            "Pluggable LLM backends (G4F, Ollama, Codex OAuth)",
             "Streaming responses",
             "Image generation",
             "Web search integration",
