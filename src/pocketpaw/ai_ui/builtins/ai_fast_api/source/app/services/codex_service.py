@@ -5,6 +5,7 @@ import json
 import os
 import platform
 import shutil
+import sys
 import time
 import uuid
 from pathlib import Path
@@ -126,10 +127,13 @@ class CodexService(BaseLLMService):
         if not self._codex_bin:
             return False
         try:
+            cmd = [self._codex_bin, "login", "status"]
+            # On Windows, .cmd shims can't be exec'd directly
+            if sys.platform == "win32" and self._codex_bin.lower().endswith((".cmd", ".bat")):
+                cmd = ["cmd.exe", "/c", *cmd]
+
             proc = await asyncio.create_subprocess_exec(
-                self._codex_bin,
-                "login",
-                "status",
+                *cmd,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 cwd=str(self._workdir),
@@ -185,6 +189,10 @@ class CodexService(BaseLLMService):
             prompt,
         ]
         logger.info("Codex completion request with model: %s", model)
+
+        # On Windows, .cmd shims can't be exec'd directly
+        if sys.platform == "win32" and self._codex_bin.lower().endswith((".cmd", ".bat")):
+            cmd = ["cmd.exe", "/c", *cmd]
 
         proc = await asyncio.create_subprocess_exec(
             *cmd,

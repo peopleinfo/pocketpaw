@@ -8,6 +8,8 @@ import asyncio
 import json
 import logging
 import shutil
+import subprocess
+import sys
 from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
@@ -77,18 +79,36 @@ class ExternalAgentDelegate:
             )
 
         try:
-            proc = await asyncio.create_subprocess_exec(
-                "claude",
-                "--print",
-                "--output-format",
-                "json",
-                "-p",
-                prompt,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
+            cmd = ["claude", "--print", "--output-format", "json", "-p", prompt]
+            # On Windows, npm global installs create .cmd batch wrappers
+            # that can't be executed directly by create_subprocess_exec.
+            if sys.platform == "win32":
+                cmd = ["cmd.exe", "/c", *cmd]
 
-            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
+            try:
+                proc = await asyncio.create_subprocess_exec(
+                    *cmd,
+                    stdin=asyncio.subprocess.DEVNULL,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+                stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
+                returncode = proc.returncode
+            except NotImplementedError:
+                # Windows SelectorEventLoop (e.g. uvicorn reload mode)
+                # doesn't support async subprocess — use sync fallback.
+                def _sync_run() -> subprocess.CompletedProcess:
+                    return subprocess.run(
+                        cmd,
+                        stdin=subprocess.DEVNULL,
+                        capture_output=True,
+                        timeout=timeout,
+                    )
+
+                result = await asyncio.get_event_loop().run_in_executor(None, _sync_run)
+                stdout = result.stdout
+                stderr = result.stderr
+                returncode = result.returncode
 
             output = stdout.decode("utf-8", errors="replace")
             error = stderr.decode("utf-8", errors="replace")
@@ -115,8 +135,8 @@ class ExternalAgentDelegate:
             return DelegationResult(
                 agent="claude",
                 output=output,
-                exit_code=proc.returncode or 0,
-                error=error if proc.returncode else "",
+                exit_code=returncode or 0,
+                error=error if returncode else "",
             )
 
         except TimeoutError:

@@ -607,8 +607,10 @@ class TestCodexCLICrossBackend:
 
         assert captured_cmd is not None
         cmd_list = list(captured_cmd)
-        assert cmd_list[0] == "codex"
-        assert cmd_list[1] == "exec"
+        # On Windows the command is wrapped: cmd.exe /c codex exec ...
+        assert "codex" in cmd_list
+        codex_idx = cmd_list.index("codex")
+        assert cmd_list[codex_idx + 1] == "exec"
         assert "--json" in cmd_list
         assert "--full-auto" in cmd_list
         assert "--model" in cmd_list
