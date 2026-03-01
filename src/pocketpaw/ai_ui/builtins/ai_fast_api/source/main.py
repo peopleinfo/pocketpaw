@@ -20,6 +20,9 @@ def main():
         if settings.llm_backend.lower() == "g4f":
             logger.info(f"  G4F Provider: {settings.g4f_provider}")
             logger.info(f"  G4F Model: {settings.g4f_model}")
+        elif settings.llm_backend.lower() == "auto":
+            logger.info(f"  Auto Rotate Backends: {settings.auto_rotate_backends}")
+            logger.info(f"  Auto Max Rotate Retry: {settings.auto_max_rotate_retry}")
         elif settings.llm_backend.lower() == "codex":
             logger.info(f"  Codex Model: {settings.codex_model}")
         elif settings.llm_backend.lower() == "qwen":

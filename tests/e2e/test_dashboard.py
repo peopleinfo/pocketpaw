@@ -1197,6 +1197,101 @@ class TestAiUIDiscoveryInstall:
         assert state["start_calls"] == 1
         assert state["poll_calls"] >= 1
 
+    def test_ai_fast_api_config_supports_auto_rotate(self, page: Page, dashboard_url: str):
+        """AI Fast API config modal should expose auto rotator settings."""
+
+        def handle_plugins(route):
+            route.fulfill(
+                status=200,
+                content_type="application/json",
+                body=json.dumps(
+                    {
+                        "plugins": [
+                            {
+                                "id": "ai-fast-api",
+                                "name": "AI Fast API",
+                                "description": "API server",
+                                "icon": "zap",
+                                "version": "2.0.0",
+                                "port": 8000,
+                                "status": "running",
+                                "path": "/tmp/ai-fast-api",
+                                "start_cmd": "bash start.sh",
+                                "has_install": True,
+                                "requires": ["uv", "python"],
+                                "env": {
+                                    "LLM_BACKEND": "auto",
+                                    "AUTO_MAX_ROTATE_RETRY": "4",
+                                    "AUTO_ROTATE_BACKENDS": "g4f,ollama,codex,qwen,gemini",
+                                },
+                                "openapi": "openapi.json",
+                                "web_view": "native",
+                                "web_view_path": "/",
+                            }
+                        ]
+                    }
+                ),
+            )
+
+        def handle_config(route):
+            if route.request.method == "GET":
+                route.fulfill(
+                    status=200,
+                    content_type="application/json",
+                    body=json.dumps(
+                        {
+                            "config": {
+                                "LLM_BACKEND": "auto",
+                                "AUTO_MAX_ROTATE_RETRY": "4",
+                                "AUTO_ROTATE_BACKENDS": "g4f,ollama,codex,qwen,gemini",
+                                "HOST": "0.0.0.0",
+                                "PORT": "8000",
+                                "DEBUG": "true",
+                            }
+                        }
+                    ),
+                )
+                return
+            route.continue_()
+
+        page.route(re.compile(r".*/api/ai-ui/plugins/ai-fast-api/config(?:\?.*)?$"), handle_config)
+        page.route(re.compile(r".*/api/ai-ui/plugins(?:\?.*)?$"), handle_plugins)
+
+        page.goto(dashboard_url)
+        page.locator("button:has-text('AI UI Local Cloud')").click()
+        opened = page.evaluate(
+            """
+            async () => {
+                const root = document.querySelector("body");
+                const data = root?._x_dataStack?.[0];
+                if (!data || typeof data.openPluginConfigModal !== "function") return false;
+                await data.openPluginConfigModal("ai-fast-api");
+                return true;
+            }
+            """
+        )
+        assert opened is True
+
+        backend_select = page.locator("select[x-model='aiUI.pluginConfigDraft.LLM_BACKEND']").first
+        expect(backend_select).to_be_visible()
+        auto_option = page.locator(
+            "select[x-model='aiUI.pluginConfigDraft.LLM_BACKEND'] option[value='auto']"
+        )
+        expect(auto_option).to_have_count(1)
+        backend_select.select_option("auto")
+
+        max_retry_input = page.locator(
+            "input[x-model='aiUI.pluginConfigDraft.AUTO_MAX_ROTATE_RETRY']"
+        ).first
+        expect(max_retry_input).to_be_visible()
+        expect(max_retry_input).to_have_value("4")
+
+        rotate_backends_input = page.locator(
+            "input[x-model='aiUI.pluginConfigDraft.AUTO_ROTATE_BACKENDS']"
+        ).first
+        expect(rotate_backends_input).to_be_visible()
+        expect(rotate_backends_input).to_have_value("g4f,ollama,codex,qwen,gemini")
+
     def test_discover_install_disabled_for_unsupported_app(self, page: Page, dashboard_url: str):
         """Unsupported gallery app should render disabled Install action."""
         state = {"install_calls": 0}

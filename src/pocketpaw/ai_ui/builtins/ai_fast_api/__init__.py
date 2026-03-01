@@ -15,7 +15,7 @@ _MANIFEST = {
     "name": "AI Fast API",
     "description": (
         "OpenAI-compatible API with pluggable LLM backends "
-        "(G4F, Ollama, Codex OAuth, Qwen OAuth, Gemini OAuth). "
+        "(Auto Rotate, G4F, Ollama, Codex OAuth, Qwen OAuth, Gemini OAuth). "
         "Chat completions, image generation, streaming — "
         "all through a unified local endpoint."
     ),
@@ -37,6 +37,8 @@ _MANIFEST = {
         "CODEX_MODEL": "gpt-5",
         "QWEN_MODEL": "qwen3-coder-plus",
         "GEMINI_MODEL": "gemini-2.5-flash",
+        "AUTO_MAX_ROTATE_RETRY": "4",
+        "AUTO_ROTATE_BACKENDS": "g4f,ollama,codex,qwen,gemini",
     },
     "openapi": "openapi.json",
 }
@@ -51,7 +53,7 @@ DEFINITION: BuiltinDefinition = {
         "name": "AI Fast API",
         "description": (
             "OpenAI-compatible API with pluggable backends "
-            "(G4F, Ollama, Codex OAuth, Qwen OAuth, Gemini OAuth). "
+            "(Auto Rotate, G4F, Ollama, Codex OAuth, Qwen OAuth, Gemini OAuth). "
             "Chat, images, streaming — zero API keys needed."
         ),
         "icon": "zap",

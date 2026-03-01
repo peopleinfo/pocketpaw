@@ -730,6 +730,8 @@ window.PocketPaw.AiUI = {
           CODEX_MODEL: "gpt-5",
           QWEN_MODEL: "qwen3-coder-plus",
           GEMINI_MODEL: "gemini-2.5-flash",
+          AUTO_MAX_ROTATE_RETRY: "4",
+          AUTO_ROTATE_BACKENDS: "g4f,ollama,codex,qwen,gemini",
           DEBUG: "true",
           HOST: "0.0.0.0",
           PORT: "8000",
@@ -848,6 +850,7 @@ window.PocketPaw.AiUI = {
       getAiUiPluginModel(plugin) {
         const env = plugin?.env || {};
         const backend = (env.LLM_BACKEND || "g4f").toLowerCase();
+        if (backend === "auto") return env.AUTO_MODEL || env.G4F_MODEL || "gpt-4o-mini";
         if (backend === "codex") return env.CODEX_MODEL || "gpt-5";
         if (backend === "qwen") return env.QWEN_MODEL || "qwen3-coder-plus";
         if (backend === "gemini") return env.GEMINI_MODEL || "gemini-2.5-flash";

@@ -90,7 +90,7 @@ async def root() -> Dict[str, Any]:
         },
         "features": [
             "OpenAI-compatible API",
-            "Pluggable LLM backends (G4F, Ollama, Codex OAuth, Qwen OAuth, Gemini OAuth)",
+            "Pluggable LLM backends (Auto Rotate, G4F, Ollama, Codex OAuth, Qwen OAuth, Gemini OAuth)",
             "Streaming responses",
             "Image generation",
             "Web search integration",

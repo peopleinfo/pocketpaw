@@ -260,6 +260,8 @@ def get_plugins_dir() -> Path:
 
 def _resolve_chat_model_from_env(env: dict[str, Any]) -> str:
     backend = str(env.get("LLM_BACKEND", "g4f")).lower()
+    if backend == "auto":
+        return str(env.get("AUTO_MODEL", env.get("G4F_MODEL", "gpt-4o-mini")))
     if backend == "codex":
         return str(env.get("CODEX_MODEL", "gpt-5"))
     if backend == "qwen":
@@ -1501,7 +1503,7 @@ def test_plugin_connection(
     try:
         import httpx
 
-        timeout = 60.0 if backend in {"codex", "qwen", "gemini"} else 15.0
+        timeout = 60.0 if backend in {"auto", "codex", "qwen", "gemini"} else 15.0
         with httpx.Client(timeout=timeout) as client:
             resp = client.post(url, json=payload)
             if resp.status_code == 200:

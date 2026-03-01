@@ -72,7 +72,11 @@ def get_service() -> BaseLLMService:
 
     backend = os.getenv("LLM_BACKEND", "g4f").lower()
 
-    if backend == "g4f":
+    if backend == "auto":
+        from .auto_service import AutoRotateService
+
+        _active_service = AutoRotateService()
+    elif backend == "g4f":
         from .g4f_service import G4FService
 
         _active_service = G4FService()
@@ -95,7 +99,8 @@ def get_service() -> BaseLLMService:
     else:
         raise ValueError(
             f"Unknown LLM_BACKEND '{backend}'. "
-            "Available: 'g4f', 'ollama', 'codex', 'qwen', 'gemini'. Implement BaseLLMService to add more."
+            "Available: 'auto', 'g4f', 'ollama', 'codex', 'qwen', 'gemini'. "
+            "Implement BaseLLMService to add more."
         )
 
     return _active_service

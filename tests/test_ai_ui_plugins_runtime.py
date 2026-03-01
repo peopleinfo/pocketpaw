@@ -351,6 +351,11 @@ def test_resolve_chat_model_from_env_gemini():
     assert plugins._resolve_chat_model_from_env(env) == "gemini-2.5-pro"
 
 
+def test_resolve_chat_model_from_env_auto():
+    env = {"LLM_BACKEND": "auto", "AUTO_MODEL": "gpt-4.1"}
+    assert plugins._resolve_chat_model_from_env(env) == "gpt-4.1"
+
+
 def test_test_plugin_connection_uses_codex_model(tmp_path):
     plugin_id = "ai-fast-api"
     plugin_dir = tmp_path / plugin_id
@@ -510,6 +515,60 @@ def test_test_plugin_connection_uses_gemini_model(tmp_path):
 
     assert result["ok"] is True
     assert captured["model"] == "gemini-2.5-flash"
+    assert captured["url"].startswith("http://127.0.0.1:8000")
+
+
+def test_test_plugin_connection_uses_auto_model(tmp_path):
+    plugin_id = "ai-fast-api"
+    plugin_dir = tmp_path / plugin_id
+    plugin_dir.mkdir(parents=True)
+    (plugin_dir / "pocketpaw.json").write_text(
+        json.dumps(
+            {
+                "name": "AI Fast API",
+                "env": {
+                    "HOST": "0.0.0.0",
+                    "PORT": "8000",
+                    "LLM_BACKEND": "auto",
+                    "AUTO_MODEL": "gpt-4.1",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    captured: dict[str, str] = {}
+
+    class DummyResponse:
+        status_code = 200
+
+        @staticmethod
+        def json():
+            return {"choices": [{"message": {"content": "pong"}}]}
+
+    class DummyClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def post(self, url, json):
+            captured["url"] = url
+            captured["model"] = json.get("model")
+            return DummyResponse()
+
+    with (
+        patch("pocketpaw.ai_ui.plugins.get_plugins_dir", return_value=tmp_path),
+        patch("httpx.Client", DummyClient),
+    ):
+        result = plugins.test_plugin_connection(plugin_id)
+
+    assert result["ok"] is True
+    assert captured["model"] == "gpt-4.1"
     assert captured["url"].startswith("http://127.0.0.1:8000")
 
 

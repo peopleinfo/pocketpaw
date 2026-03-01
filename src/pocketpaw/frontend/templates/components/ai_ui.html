@@ -1482,6 +1482,7 @@
                 @change="const b=(aiUI.pluginConfigDraft.LLM_BACKEND||'').toLowerCase(); if (b==='codex') fetchCodexAuthStatus(aiUI.configModalPluginId); if (b==='qwen') fetchQwenAuthStatus(aiUI.configModalPluginId); if (b==='gemini') fetchGeminiAuthStatus(aiUI.configModalPluginId)"
                 class="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-[14px] focus:border-accent focus:outline-none"
               >
+                <option value="auto">auto (Rotator)</option>
                 <option value="g4f">g4f (GPT4Free)</option>
                 <option value="ollama">ollama</option>
                 <option value="codex">codex (OAuth)</option>
@@ -1777,6 +1778,38 @@
               <div class="text-[11px] text-white/60" x-show="aiUI.geminiUserCode">
                 Code: <span class="font-mono text-white" x-text="aiUI.geminiUserCode"></span>
               </div>
+            </div>
+            <div x-show="(aiUI.pluginConfigDraft.LLM_BACKEND || 'g4f').toLowerCase() === 'auto'">
+              <label
+                class="block text-[12px] font-semibold text-white/70 mb-1.5"
+                >Auto Max Rotate Retry</label
+              >
+              <input
+                type="number"
+                min="1"
+                max="20"
+                x-model="aiUI.pluginConfigDraft.AUTO_MAX_ROTATE_RETRY"
+                placeholder="4"
+                class="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/30 text-[14px] focus:border-accent focus:outline-none"
+              />
+              <p class="text-[11px] text-white/40 mt-1">
+                Failed request rotates to the next active backend only.
+              </p>
+            </div>
+            <div x-show="(aiUI.pluginConfigDraft.LLM_BACKEND || 'g4f').toLowerCase() === 'auto'">
+              <label
+                class="block text-[12px] font-semibold text-white/70 mb-1.5"
+                >Auto Rotate Backends</label
+              >
+              <input
+                type="text"
+                x-model="aiUI.pluginConfigDraft.AUTO_ROTATE_BACKENDS"
+                placeholder="g4f,ollama,codex,qwen,gemini"
+                class="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/30 text-[14px] focus:border-accent focus:outline-none"
+              />
+              <p class="text-[11px] text-white/40 mt-1">
+                Comma-separated order, for example: g4f,ollama,codex,qwen,gemini
+              </p>
             </div>
             <div>
               <label

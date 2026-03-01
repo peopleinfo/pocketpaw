@@ -36,6 +36,10 @@ class Settings:
         self.gemini_model: str = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
         self.gemini_timeout: int = int(os.getenv("GEMINI_TIMEOUT", "90"))
         self.gemini_bin: str = os.getenv("GEMINI_BIN", "")
+        self.auto_max_rotate_retry: int = int(os.getenv("AUTO_MAX_ROTATE_RETRY", "4"))
+        self.auto_rotate_backends: str = os.getenv(
+            "AUTO_ROTATE_BACKENDS", "g4f,ollama,codex,qwen,gemini"
+        )
 
         self.rate_limit_requests: int = int(os.getenv("RATE_LIMIT_REQUESTS", "60"))
         self.rate_limit_window: int = int(os.getenv("RATE_LIMIT_WINDOW", "60"))
