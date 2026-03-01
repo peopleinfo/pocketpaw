@@ -210,11 +210,11 @@ class CodexCLIBackend:
 
         if event_type == "error":
             error_msg = event_data.get("message", "Unknown Codex CLI error")
-            # Reconnection / fallback messages are transient — don't
-            # surface them as fatal errors to the user.
+            # Reconnection / fallback messages are transient — silently
+            # suppress them so the user doesn't see infrastructure noise.
             if "Reconnecting" in error_msg or "Falling back" in error_msg:
                 logger.debug("Codex CLI transient: %s", error_msg)
-                return AgentEvent(type="thinking", content=error_msg)
+                return None
             return AgentEvent(type="error", content=error_msg)
 
         return None
