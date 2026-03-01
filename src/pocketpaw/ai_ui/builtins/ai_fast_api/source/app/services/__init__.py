@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
-from typing import AsyncGenerator, List
+from collections.abc import AsyncGenerator
 
 from ..models import (
     ChatCompletionRequest,
@@ -39,7 +39,7 @@ class BaseLLMService(ABC):
     ) -> ChatCompletionResponse: ...
 
     @abstractmethod
-    async def create_chat_completion_stream(
+    def create_chat_completion_stream(
         self, request: ChatCompletionRequest
     ) -> AsyncGenerator[str, None]: ...
 
@@ -49,10 +49,10 @@ class BaseLLMService(ABC):
     ) -> ImageGenerationResponse: ...
 
     @abstractmethod
-    async def get_models(self) -> List[ModelInfo]: ...
+    async def get_models(self) -> list[ModelInfo]: ...
 
     @abstractmethod
-    async def get_providers(self) -> List[ProviderInfo]: ...
+    async def get_providers(self) -> list[ProviderInfo]: ...
 
 
 _active_service: BaseLLMService | None = None

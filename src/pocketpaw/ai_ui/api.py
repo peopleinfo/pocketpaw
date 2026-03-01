@@ -292,6 +292,26 @@ async def gemini_auth_poll_endpoint(plugin_id: str, session_id: str):
     return _poll(session_id)
 
 
+@router.post("/plugins/{plugin_id}/ollama/local/setup")
+async def setup_local_ollama_endpoint(plugin_id: str):
+    """Install/start built-in local Ollama for AI Fast API local backend."""
+    from pocketpaw.ai_ui.plugins import setup_local_ollama_for_ai_fast_api as _setup
+
+    if plugin_id != "ai-fast-api":
+        raise HTTPException(
+            status_code=400, detail="Local Ollama setup is only available for ai-fast-api"
+        )
+    try:
+        return await _setup()
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    except Exception as e:
+        logger.exception("Local Ollama setup failed")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.put("/plugins/{plugin_id}/config")
 async def update_plugin_config_endpoint(plugin_id: str, request: Request):
     """Update a plugin's config (env vars). Restart required for changes to apply."""

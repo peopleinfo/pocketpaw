@@ -3,7 +3,7 @@
 import json
 import os
 import time
-from typing import AsyncGenerator, List
+from collections.abc import AsyncGenerator
 
 from ..config import settings
 from ..models import (
@@ -144,7 +144,11 @@ class AutoRotateService(BaseLLMService):
     @staticmethod
     def _default_model_for_backend(backend: str) -> str:
         if backend == "ollama":
-            return settings.auto_ollama_model or os.getenv("OLLAMA_DEFAULT_MODEL", "llama3.1")
+            return (
+                settings.auto_ollama_model
+                or settings.ollama_model
+                or os.getenv("OLLAMA_DEFAULT_MODEL", "llama3.1")
+            )
         if backend == "codex":
             return settings.auto_codex_model or settings.codex_model or "gpt-5"
         if backend == "qwen":
@@ -158,7 +162,7 @@ class AutoRotateService(BaseLLMService):
     ) -> ChatCompletionRequest:
         # In auto mode, each backend uses its own configured default model.
         model = self._default_model_for_backend(backend)
-        update = {"model": model}
+        update: dict[str, str | None] = {"model": model}
         if backend != "g4f":
             # Non-G4F backends ignore g4f-specific provider hints.
             update["provider"] = None
@@ -258,7 +262,7 @@ class AutoRotateService(BaseLLMService):
             raise NotImplementedError("Auto rotate image generation requires g4f backend enabled")
         return await g4f.create_image_generation(request)
 
-    async def get_models(self) -> List[ModelInfo]:
+    async def get_models(self) -> list[ModelInfo]:
         merged: list[ModelInfo] = []
         seen: set[str] = set()
         for backend in self._backend_chain:
@@ -276,7 +280,7 @@ class AutoRotateService(BaseLLMService):
                 merged.append(model)
         return merged
 
-    async def get_providers(self) -> List[ProviderInfo]:
+    async def get_providers(self) -> list[ProviderInfo]:
         active_backends = await self._active_backends()
         providers: list[ProviderInfo] = [
             ProviderInfo(

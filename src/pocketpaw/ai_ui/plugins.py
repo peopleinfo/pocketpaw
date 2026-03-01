@@ -258,10 +258,29 @@ def get_plugins_dir() -> Path:
     return PLUGINS_DIR
 
 
+def _infer_ollama_deployment(env: dict[str, Any]) -> str:
+    deployment = str(env.get("OLLAMA_DEPLOYMENT", "")).strip().lower()
+    if deployment in {"local", "cloud"}:
+        return deployment
+    base_url = str(env.get("OLLAMA_BASE_URL", "")).strip().lower()
+    return "cloud" if "ollama.com" in base_url else "local"
+
+
+def _resolve_ollama_model_from_env(env: dict[str, Any]) -> str:
+    deployment = _infer_ollama_deployment(env)
+    legacy_model = str(env.get("OLLAMA_MODEL", "")).strip()
+    default_model = str(env.get("G4F_MODEL", "llama3.1")).strip() or "llama3.1"
+    if deployment == "cloud":
+        return str(env.get("OLLAMA_CLOUD_MODEL", "")).strip() or legacy_model or default_model
+    return str(env.get("OLLAMA_LOCAL_MODEL", "")).strip() or legacy_model or default_model
+
+
 def _resolve_chat_model_from_env(env: dict[str, Any]) -> str:
     backend = str(env.get("LLM_BACKEND", "g4f")).lower()
     if backend == "auto":
         return str(env.get("AUTO_G4F_MODEL", env.get("G4F_MODEL", "gpt-4o-mini")))
+    if backend == "ollama":
+        return _resolve_ollama_model_from_env(env)
     if backend == "codex":
         return str(env.get("CODEX_MODEL", "gpt-5"))
     if backend == "qwen":
@@ -269,6 +288,96 @@ def _resolve_chat_model_from_env(env: dict[str, Any]) -> str:
     if backend == "gemini":
         return str(env.get("GEMINI_MODEL", "gemini-2.5-flash"))
     return str(env.get("G4F_MODEL", "gpt-4o-mini"))
+
+
+def _auto_backend_default_model(env: dict[str, Any], backend: str) -> str:
+    if backend == "ollama":
+        return str(env.get("AUTO_OLLAMA_MODEL", _resolve_ollama_model_from_env(env)))
+    if backend == "codex":
+        return str(env.get("AUTO_CODEX_MODEL", env.get("CODEX_MODEL", "gpt-5")))
+    if backend == "qwen":
+        return str(env.get("AUTO_QWEN_MODEL", env.get("QWEN_MODEL", "qwen3-coder-plus")))
+    if backend == "gemini":
+        return str(env.get("AUTO_GEMINI_MODEL", env.get("GEMINI_MODEL", "gemini-2.5-flash")))
+    return str(env.get("AUTO_G4F_MODEL", env.get("G4F_MODEL", "gpt-4o-mini")))
+
+
+def _parse_auto_rotate_backends(raw: str) -> list[str]:
+    valid = {"g4f", "ollama", "codex", "qwen", "gemini"}
+    result: list[str] = []
+    for item in (raw or "").split(","):
+        backend = item.strip().lower()
+        if not backend or backend not in valid or backend in result:
+            continue
+        result.append(backend)
+    if result:
+        return result
+    return ["g4f", "ollama", "codex", "qwen", "gemini"]
+
+
+def _provider_label_for_backend(env: dict[str, Any], backend: str) -> str:
+    if backend == "codex":
+        return "CodexOAuth"
+    if backend == "qwen":
+        return "QwenOAuth"
+    if backend == "gemini":
+        return "GeminiOAuth"
+    if backend == "ollama":
+        deployment = _infer_ollama_deployment(env)
+        return "Cloud Ollama" if deployment == "cloud" else "Local Ollama"
+    if backend == "g4f":
+        return str(env.get("G4F_PROVIDER", "auto"))
+    return "AutoRotate"
+
+
+def _extract_active_auto_backends(providers: list[dict[str, Any]]) -> list[str]:
+    for provider in providers:
+        if str(provider.get("id", "")).lower() != "autorotate":
+            continue
+        params = provider.get("params")
+        if not isinstance(params, dict):
+            continue
+        active = params.get("active_backends")
+        if isinstance(active, list):
+            return _parse_auto_rotate_backends(",".join(str(x) for x in active))
+    return []
+
+
+def _infer_auto_backend_from_result(
+    env: dict[str, Any],
+    selected_model: str,
+    active_backends: list[str],
+    providers: list[dict[str, Any]],
+) -> str | None:
+    model = (selected_model or "").strip()
+    if not model:
+        return None
+
+    for backend in active_backends:
+        if model == _auto_backend_default_model(env, backend):
+            return backend
+
+    backend_provider_ids = {
+        "codex": {"codexoauth"},
+        "qwen": {"qwenoauth"},
+        "gemini": {"geminioauth"},
+        "ollama": {"local ollama", "cloud ollama"},
+    }
+    for provider in providers:
+        provider_id = str(provider.get("id", "")).strip().lower()
+        models = provider.get("models")
+        if not isinstance(models, list):
+            continue
+        model_ids = {str(m).strip() for m in models}
+        if model not in model_ids:
+            continue
+        for backend, provider_ids in backend_provider_ids.items():
+            if provider_id in provider_ids and backend in active_backends:
+                return backend
+
+    if len(active_backends) == 1:
+        return active_backends[0]
+    return None
 
 
 def _resolve_codex_bin(explicit_bin: str | None = None) -> str | None:
@@ -645,6 +754,47 @@ def get_gemini_auth_status() -> dict[str, Any]:
         "expired": expired,
         "message": message,
         "credentials_path": str(creds_path),
+    }
+
+
+async def setup_local_ollama_for_ai_fast_api() -> dict[str, Any]:
+    """Ensure built-in Ollama plugin is installed and running for local AI Fast API use."""
+    plugin_id = "ollama"
+    installed = False
+    started = False
+
+    plugin = get_plugin(plugin_id)
+    if plugin is None:
+        await install_plugin("builtin:ollama")
+        installed = True
+        plugin = get_plugin(plugin_id)
+        if plugin is None:
+            raise RuntimeError("Installed Ollama plugin but failed to load it afterwards")
+
+    if str(plugin.get("status", "")).lower() != "running":
+        launch_result = await launch_plugin(plugin_id)
+        if launch_result.get("status") in {"ok", "already_running"}:
+            started = launch_result.get("status") == "ok"
+        else:
+            raise RuntimeError("Failed to start local Ollama service")
+
+    if installed and started:
+        message = "Local Ollama installed and started."
+    elif installed:
+        message = "Local Ollama installed. Service is already running."
+    elif started:
+        message = "Local Ollama service started."
+    else:
+        message = "Local Ollama is already running."
+
+    return {
+        "ok": True,
+        "status": "ok",
+        "plugin_id": plugin_id,
+        "installed": installed,
+        "started": started,
+        "base_url": "http://127.0.0.1:11434/v1",
+        "message": message,
     }
 
 
@@ -1515,7 +1665,10 @@ def update_plugin_config(plugin_id: str, config: dict[str, str]) -> dict:
 def test_plugin_connection(
     plugin_id: str, host: str | None = None, port: int | None = None
 ) -> dict:
-    """Call POST /v1/chat/completions with a ping message. Returns { ok: bool, message: str }."""
+    """Call POST /v1/chat/completions with a ping message.
+
+    Returns { ok, message, requested_backend, selected_backend, selected_provider, selected_model }.
+    """
     if ".." in plugin_id or "/" in plugin_id or "\\" in plugin_id:
         raise ValueError("Invalid plugin ID")
 
@@ -1549,7 +1702,49 @@ def test_plugin_connection(
                 data = resp.json()
                 choices = data.get("choices") or []
                 if choices and choices[0].get("message"):
-                    return {"ok": True, "message": "Chat OK"}
+                    selected_model = str(data.get("model") or payload["model"])
+                    selected_backend = backend
+                    selected_provider = _provider_label_for_backend(env, backend)
+
+                    if backend == "auto":
+                        providers_data: list[dict[str, Any]] = []
+                        active_backends = _parse_auto_rotate_backends(
+                            str(env.get("AUTO_ROTATE_BACKENDS", ""))
+                        )
+                        try:
+                            providers_url = f"http://{h}:{p}/v1/providers"
+                            providers_resp = client.get(providers_url)
+                            if providers_resp.status_code == 200:
+                                providers_payload = providers_resp.json().get("data")
+                                if isinstance(providers_payload, list):
+                                    providers_data = providers_payload
+                                    detected_active = _extract_active_auto_backends(providers_data)
+                                    if detected_active:
+                                        active_backends = detected_active
+                        except Exception:
+                            providers_data = []
+
+                        inferred_backend = _infer_auto_backend_from_result(
+                            env, selected_model, active_backends, providers_data
+                        )
+                        if inferred_backend:
+                            selected_backend = inferred_backend
+                            selected_provider = _provider_label_for_backend(env, inferred_backend)
+                        else:
+                            selected_backend = "auto"
+                            selected_provider = "AutoRotate"
+
+                    return {
+                        "ok": True,
+                        "message": "Chat OK",
+                        "requested_backend": backend,
+                        "selected_backend": selected_backend,
+                        "selected_provider": selected_provider,
+                        "selected_model": selected_model,
+                        "route_label": (
+                            f"{selected_backend} | {selected_provider} | {selected_model}"
+                        ),
+                    }
                 return {"ok": False, "message": "Empty chat response"}
             # Capture 4xx/5xx body for debugging
             try:

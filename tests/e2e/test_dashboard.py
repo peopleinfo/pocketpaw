@@ -1197,6 +1197,145 @@ class TestAiUIDiscoveryInstall:
         assert state["start_calls"] == 1
         assert state["poll_calls"] >= 1
 
+    def test_ai_fast_api_config_supports_ollama_cloud_toggle(self, page: Page, dashboard_url: str):
+        """AI Fast API config modal should expose Ollama local/cloud controls."""
+        state = {"local_setup_calls": 0}
+
+        def handle_plugins(route):
+            route.fulfill(
+                status=200,
+                content_type="application/json",
+                body=json.dumps(
+                    {
+                        "plugins": [
+                            {
+                                "id": "ai-fast-api",
+                                "name": "AI Fast API",
+                                "description": "API server",
+                                "icon": "zap",
+                                "version": "2.0.0",
+                                "port": 8000,
+                                "status": "running",
+                                "path": "/tmp/ai-fast-api",
+                                "start_cmd": "bash start.sh",
+                                "has_install": True,
+                                "requires": ["uv", "python"],
+                                "env": {
+                                    "LLM_BACKEND": "ollama",
+                                    "OLLAMA_DEPLOYMENT": "cloud",
+                                    "OLLAMA_BASE_URL": "https://ollama.com/v1",
+                                    "OLLAMA_LOCAL_MODEL": "llama3.1:8b",
+                                    "OLLAMA_CLOUD_MODEL": "llama3.3:70b",
+                                },
+                                "openapi": "openapi.json",
+                                "web_view": "native",
+                                "web_view_path": "/",
+                            }
+                        ]
+                    }
+                ),
+            )
+
+        def handle_config(route):
+            if route.request.method == "GET":
+                route.fulfill(
+                    status=200,
+                    content_type="application/json",
+                    body=json.dumps(
+                        {
+                            "config": {
+                                "LLM_BACKEND": "ollama",
+                                "OLLAMA_DEPLOYMENT": "cloud",
+                                "OLLAMA_BASE_URL": "https://ollama.com/v1",
+                                "OLLAMA_LOCAL_MODEL": "llama3.1:8b",
+                                "OLLAMA_CLOUD_MODEL": "llama3.3:70b",
+                                "HOST": "0.0.0.0",
+                                "PORT": "8000",
+                                "DEBUG": "true",
+                            }
+                        }
+                    ),
+                )
+                return
+            route.continue_()
+
+        def handle_local_ollama_setup(route):
+            state["local_setup_calls"] += 1
+            route.fulfill(
+                status=200,
+                content_type="application/json",
+                body=json.dumps(
+                    {
+                        "ok": True,
+                        "status": "ok",
+                        "plugin_id": "ollama",
+                        "installed": True,
+                        "started": True,
+                        "base_url": "http://127.0.0.1:11434/v1",
+                        "message": "Local Ollama installed and started.",
+                    }
+                ),
+            )
+
+        page.route(
+            re.compile(r".*/api/ai-ui/plugins/ai-fast-api/ollama/local/setup(?:\?.*)?$"),
+            handle_local_ollama_setup,
+        )
+        page.route(re.compile(r".*/api/ai-ui/plugins/ai-fast-api/config(?:\?.*)?$"), handle_config)
+        page.route(re.compile(r".*/api/ai-ui/plugins(?:\?.*)?$"), handle_plugins)
+
+        page.goto(dashboard_url)
+        page.locator("button:has-text('AI UI Local Cloud')").click()
+        opened = page.evaluate(
+            """
+            async () => {
+                const root = document.querySelector("body");
+                const data = root?._x_dataStack?.[0];
+                if (!data || typeof data.openPluginConfigModal !== "function") return false;
+                await data.openPluginConfigModal("ai-fast-api");
+                return true;
+            }
+            """
+        )
+        assert opened is True
+
+        backend_select = page.locator("select[x-model='aiUI.pluginConfigDraft.LLM_BACKEND']").first
+        expect(backend_select).to_be_visible()
+        backend_select.select_option("ollama")
+
+        deploy_select = page.locator(
+            "select[x-model='aiUI.pluginConfigDraft.OLLAMA_DEPLOYMENT']"
+        ).first
+        expect(deploy_select).to_be_visible()
+        expect(deploy_select).to_have_value("cloud")
+
+        cloud_model_field = page.locator(
+            "select[x-model='aiUI.pluginConfigDraft.OLLAMA_CLOUD_MODEL'], "
+            "input[x-model='aiUI.pluginConfigDraft.OLLAMA_CLOUD_MODEL']"
+        ).first
+        expect(cloud_model_field).to_be_visible()
+        expect(cloud_model_field).to_have_value("llama3.3:70b")
+
+        base_url_input = page.locator(
+            "input[x-model='aiUI.pluginConfigDraft.OLLAMA_BASE_URL']"
+        ).first
+        expect(base_url_input).to_be_visible()
+        expect(base_url_input).to_have_value("https://ollama.com/v1")
+
+        deploy_select.select_option("local")
+        expect(base_url_input).to_have_value("http://127.0.0.1:11434/v1")
+        local_model_field = page.locator(
+            "select[x-model='aiUI.pluginConfigDraft.OLLAMA_LOCAL_MODEL'], "
+            "input[x-model='aiUI.pluginConfigDraft.OLLAMA_LOCAL_MODEL']"
+        ).first
+        expect(local_model_field).to_be_visible()
+        expect(local_model_field).to_have_value("llama3.1:8b")
+
+        setup_local_btn = page.get_by_role("button", name="Setup / Start Local Ollama")
+        expect(setup_local_btn).to_be_visible()
+        setup_local_btn.click()
+        assert state["local_setup_calls"] == 1
+
     def test_ai_fast_api_config_supports_auto_rotate(self, page: Page, dashboard_url: str):
         """AI Fast API config modal should expose auto rotator settings."""
 
@@ -1317,6 +1456,130 @@ class TestAiUIDiscoveryInstall:
         expect(
             page.locator("input[x-model='aiUI.pluginConfigDraft.AUTO_GEMINI_MODEL']").first
         ).to_have_value("gemini-2.5-flash")
+
+    def test_ai_fast_api_detail_shows_auto_route_backend_provider_model(
+        self, page: Page, dashboard_url: str
+    ):
+        """AI Fast API detail should show selected backend/provider/model after auto test."""
+
+        plugin_payload = {
+            "id": "ai-fast-api",
+            "name": "AI Fast API",
+            "description": "API server",
+            "icon": "zap",
+            "version": "2.0.0",
+            "port": 8000,
+            "status": "running",
+            "path": "/tmp/ai-fast-api",
+            "start_cmd": "bash start.sh",
+            "has_install": True,
+            "requires": ["uv", "python"],
+            "env": {
+                "LLM_BACKEND": "auto",
+                "AUTO_G4F_MODEL": "gpt-4o-mini",
+            },
+            "openapi": "openapi.json",
+            "web_view": "native",
+            "web_view_path": "/",
+        }
+
+        def handle_plugins(route):
+            route.fulfill(
+                status=200,
+                content_type="application/json",
+                body=json.dumps({"plugins": [plugin_payload]}),
+            )
+
+        def handle_plugin_detail(route):
+            route.fulfill(
+                status=200,
+                content_type="application/json",
+                body=json.dumps({"plugin": plugin_payload}),
+            )
+
+        def handle_test_connection(route):
+            route.fulfill(
+                status=200,
+                content_type="application/json",
+                body=json.dumps(
+                    {
+                        "ok": True,
+                        "message": "Chat OK",
+                        "requested_backend": "auto",
+                        "selected_backend": "codex",
+                        "selected_provider": "CodexOAuth",
+                        "selected_model": "gpt-5",
+                    }
+                ),
+            )
+
+        page.route(
+            re.compile(r".*/api/ai-ui/plugins/ai-fast-api/test-connection(?:\?.*)?$"),
+            handle_test_connection,
+        )
+        page.route(re.compile(r".*/api/ai-ui/plugins/ai-fast-api(?:\?.*)?$"), handle_plugin_detail)
+        page.route(re.compile(r".*/api/ai-ui/plugins(?:\?.*)?$"), handle_plugins)
+
+        page.goto(dashboard_url)
+        page.locator("button:has-text('AI UI Local Cloud')").click()
+        page.wait_for_function(
+            """
+            () => {
+                const root = document.querySelector("body");
+                const data = root?._x_dataStack?.[0];
+                return (data?.aiUI?.plugins || []).some((p) => p.id === "ai-fast-api");
+            }
+            """
+        )
+
+        initial_label = page.evaluate(
+            """
+            async () => {
+                const root = document.querySelector("body");
+                const data = root?._x_dataStack?.[0];
+                if (!data) return "";
+                const plugin = (data.aiUI?.plugins || []).find((p) => p.id === "ai-fast-api");
+                if (!plugin) return "";
+                await data.selectAiUIPlugin(plugin);
+                return data.getAiUiPluginRouteLabel(data.aiUI.selectedPlugin);
+            }
+            """
+        )
+        assert "auto" in initial_label.lower()
+        assert "gpt-4o-mini" in initial_label
+
+        test_btn = page.get_by_role("button", name="Test LLM")
+        expect(test_btn).to_be_visible()
+        test_btn.click()
+
+        page.wait_for_function(
+            """
+            () => {
+                const root = document.querySelector("body");
+                const data = root?._x_dataStack?.[0];
+                if (!data?.aiUI?.selectedPlugin) return false;
+                const label = data.getAiUiPluginRouteLabel(data.aiUI.selectedPlugin) || "";
+                return (
+                    label.toLowerCase().includes("codex") &&
+                    label.includes("CodexOAuth") &&
+                    label.includes("gpt-5")
+                );
+            }
+            """
+        )
+
+        final_label = page.evaluate(
+            """
+            () => {
+                const root = document.querySelector("body");
+                const data = root?._x_dataStack?.[0];
+                return data?.getAiUiPluginRouteLabel(data.aiUI.selectedPlugin) || "";
+            }
+            """
+        )
+        assert "codex" in final_label.lower()
+        assert "CodexOAuth" in final_label
+        assert "gpt-5" in final_label
 
     def test_discover_install_disabled_for_unsupported_app(self, page: Page, dashboard_url: str):
         """Unsupported gallery app should render disabled Install action."""

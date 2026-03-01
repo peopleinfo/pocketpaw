@@ -92,6 +92,7 @@ window.PocketPaw.AiUI = {
         geminiVerificationUri: "",
         geminiUserCode: "",
         geminiAuthPolling: false,
+        localOllamaSetupInProgress: false,
       },
     };
   },
@@ -718,6 +719,127 @@ window.PocketPaw.AiUI = {
 
       // ==================== Plugin Config ====================
 
+      getOllamaBaseUrlDefault(deployment) {
+        return deployment === "cloud" ? "https://ollama.com/v1" : "http://127.0.0.1:11434/v1";
+      },
+
+      inferOllamaDeployment(baseUrl) {
+        const url = (baseUrl || "").trim().toLowerCase();
+        return url.includes("ollama.com") ? "cloud" : "local";
+      },
+
+      normalizeOllamaDeployment(draft) {
+        const inferred = this.inferOllamaDeployment(draft?.OLLAMA_BASE_URL);
+        const deployment = (draft?.OLLAMA_DEPLOYMENT || "").toLowerCase();
+        if (deployment === "cloud" || deployment === "local") return deployment;
+        return inferred;
+      },
+
+      getOllamaDraftModel(draft, deploymentOverride = "") {
+        if (!draft || typeof draft !== "object") return "llama3.1";
+        const deployment = (deploymentOverride || this.normalizeOllamaDeployment(draft)).toLowerCase();
+        const fallback = draft.OLLAMA_MODEL || draft.G4F_MODEL || "llama3.1";
+        if (deployment === "cloud") {
+          return draft.OLLAMA_CLOUD_MODEL || draft.OLLAMA_MODEL || fallback;
+        }
+        return draft.OLLAMA_LOCAL_MODEL || draft.OLLAMA_MODEL || fallback;
+      },
+
+      setOllamaDraftModel(draft, model, deploymentOverride = "") {
+        if (!draft || typeof draft !== "object" || !model) return;
+        const deployment = (deploymentOverride || this.normalizeOllamaDeployment(draft)).toLowerCase();
+        if (deployment === "cloud") {
+          draft.OLLAMA_CLOUD_MODEL = model;
+        } else {
+          draft.OLLAMA_LOCAL_MODEL = model;
+        }
+      },
+
+      syncOllamaModelCompat(draft) {
+        if (!draft || typeof draft !== "object") return;
+        draft.OLLAMA_MODEL = this.getOllamaDraftModel(draft);
+      },
+
+      ensureOllamaConfigDraft(draft) {
+        if (!draft || typeof draft !== "object") return;
+
+        const fallbackModel = draft.OLLAMA_MODEL || draft.G4F_MODEL || "llama3.1";
+        if (!draft.OLLAMA_LOCAL_MODEL) {
+          draft.OLLAMA_LOCAL_MODEL = fallbackModel;
+        }
+        if (!draft.OLLAMA_CLOUD_MODEL) {
+          draft.OLLAMA_CLOUD_MODEL = fallbackModel;
+        }
+        let deployment = this.normalizeOllamaDeployment(draft);
+        draft.OLLAMA_DEPLOYMENT = deployment;
+        if (!draft.OLLAMA_BASE_URL) {
+          draft.OLLAMA_BASE_URL = this.getOllamaBaseUrlDefault(deployment);
+        }
+        if (draft.OLLAMA_API_KEY === undefined || draft.OLLAMA_API_KEY === null) {
+          draft.OLLAMA_API_KEY = "";
+        }
+        this.syncOllamaModelCompat(draft);
+      },
+
+      async onAiFastApiBackendChange() {
+        const backend = (this.aiUI.pluginConfigDraft.LLM_BACKEND || "").toLowerCase();
+        if (backend === "ollama") {
+          this.ensureOllamaConfigDraft(this.aiUI.pluginConfigDraft);
+          return;
+        }
+        if (backend === "codex") {
+          await this.fetchCodexAuthStatus(this.aiUI.configModalPluginId);
+          return;
+        }
+        if (backend === "qwen") {
+          await this.fetchQwenAuthStatus(this.aiUI.configModalPluginId);
+          return;
+        }
+        if (backend === "gemini") {
+          await this.fetchGeminiAuthStatus(this.aiUI.configModalPluginId);
+        }
+      },
+
+      onOllamaDeploymentChange() {
+        const draft = this.aiUI.pluginConfigDraft || {};
+        const deployment = (draft.OLLAMA_DEPLOYMENT || "local").toLowerCase();
+        const current = (draft.OLLAMA_BASE_URL || "").trim();
+        const currentDefault = this.getOllamaBaseUrlDefault(this.inferOllamaDeployment(current));
+        if (!current || current === currentDefault) {
+          draft.OLLAMA_BASE_URL = this.getOllamaBaseUrlDefault(deployment);
+        }
+        this.syncOllamaModelCompat(draft);
+      },
+
+      async setupLocalOllamaForAiFastApi() {
+        const pluginId = this.aiUI.configModalPluginId;
+        if (pluginId !== "ai-fast-api") return;
+
+        this.aiUI.localOllamaSetupInProgress = true;
+        try {
+          const res = await fetch(`/api/ai-ui/plugins/${pluginId}/ollama/local/setup`, {
+            method: "POST",
+          });
+          const data = await res.json();
+          if (!res.ok || data.ok === false) {
+            this.showToast(data.detail || data.message || "Local Ollama setup failed", "error");
+            return;
+          }
+
+          this.aiUI.pluginConfigDraft.OLLAMA_DEPLOYMENT = "local";
+          this.aiUI.pluginConfigDraft.OLLAMA_BASE_URL =
+            data.base_url || "http://127.0.0.1:11434/v1";
+          this.syncOllamaModelCompat(this.aiUI.pluginConfigDraft);
+          this.showToast(data.message || "Local Ollama is ready", "success");
+          await this.fetchPlugins();
+        } catch (e) {
+          console.error("Local Ollama setup error:", e);
+          this.showToast("Local Ollama setup failed", "error");
+        } finally {
+          this.aiUI.localOllamaSetupInProgress = false;
+        }
+      },
+
       async openPluginConfigModal(pluginId) {
         this.aiUI.configModalPluginId = pluginId;
         this.aiUI.configModalOpen = true;
@@ -727,6 +849,12 @@ window.PocketPaw.AiUI = {
           LLM_BACKEND: "g4f",
           G4F_PROVIDER: "auto",
           G4F_MODEL: "gpt-4o-mini",
+          OLLAMA_LOCAL_MODEL: "llama3.1",
+          OLLAMA_CLOUD_MODEL: "llama3.1",
+          OLLAMA_MODEL: "llama3.1",
+          OLLAMA_DEPLOYMENT: "local",
+          OLLAMA_BASE_URL: "http://127.0.0.1:11434/v1",
+          OLLAMA_API_KEY: "",
           CODEX_MODEL: "gpt-5",
           QWEN_MODEL: "qwen3-coder-plus",
           GEMINI_MODEL: "gemini-2.5-flash",
@@ -759,6 +887,7 @@ window.PocketPaw.AiUI = {
           this.aiUI.pluginConfig = {};
           this.aiUI.pluginConfigDraft = { ...aiFastApiDefaults };
         }
+        this.ensureOllamaConfigDraft(this.aiUI.pluginConfigDraft);
         if (pluginId === "ai-fast-api") {
           const backend = (this.aiUI.pluginConfigDraft.LLM_BACKEND || "g4f").toLowerCase();
           if (!["auto", "codex", "qwen", "gemini"].includes(backend)) {
@@ -773,17 +902,46 @@ window.PocketPaw.AiUI = {
               if (modelsRes.ok) {
                 const data = await modelsRes.json();
                 const models = data.models || [];
-                const savedModel =
-                  this.aiUI.pluginConfig?.G4F_MODEL || this.aiUI.pluginConfigDraft.G4F_MODEL;
-                if (savedModel && !models.some((m) => m.id === savedModel)) {
+                const savedModel = backend === "ollama"
+                  ? this.getOllamaDraftModel(this.aiUI.pluginConfigDraft)
+                  : (
+                      this.aiUI.pluginConfig?.G4F_MODEL || this.aiUI.pluginConfigDraft.G4F_MODEL
+                    );
+                if (backend === "ollama") {
+                  const ollamaDraft = this.aiUI.pluginConfigDraft || {};
+                  const candidateModels = [
+                    ollamaDraft.OLLAMA_LOCAL_MODEL,
+                    ollamaDraft.OLLAMA_CLOUD_MODEL,
+                    ollamaDraft.OLLAMA_MODEL,
+                    this.aiUI.pluginConfig?.OLLAMA_LOCAL_MODEL,
+                    this.aiUI.pluginConfig?.OLLAMA_CLOUD_MODEL,
+                    this.aiUI.pluginConfig?.OLLAMA_MODEL,
+                  ].filter(Boolean);
+                  for (const modelId of candidateModels) {
+                    if (!models.some((m) => m.id === modelId)) {
+                      models.unshift({ id: modelId });
+                    }
+                  }
+                } else if (savedModel && !models.some((m) => m.id === savedModel)) {
                   models.unshift({ id: savedModel });
                 }
                 this.aiUI.configModels = models;
                 if (savedModel) {
-                  this.aiUI.pluginConfigDraft.G4F_MODEL = savedModel;
+                  if (backend === "ollama") {
+                    this.setOllamaDraftModel(this.aiUI.pluginConfigDraft, savedModel);
+                    this.syncOllamaModelCompat(this.aiUI.pluginConfigDraft);
+                  } else {
+                    this.aiUI.pluginConfigDraft.G4F_MODEL = savedModel;
+                  }
                 }
                 this.$nextTick(() => {
-                  if (savedModel) this.aiUI.pluginConfigDraft.G4F_MODEL = savedModel;
+                  if (!savedModel) return;
+                  if (backend === "ollama") {
+                    this.setOllamaDraftModel(this.aiUI.pluginConfigDraft, savedModel);
+                    this.syncOllamaModelCompat(this.aiUI.pluginConfigDraft);
+                  } else {
+                    this.aiUI.pluginConfigDraft.G4F_MODEL = savedModel;
+                  }
                 });
               }
               if (backend === "g4f") {
@@ -850,16 +1008,57 @@ window.PocketPaw.AiUI = {
         this.aiUI.geminiVerificationUri = "";
         this.aiUI.geminiUserCode = "";
         this.aiUI.geminiAuthPolling = false;
+        this.aiUI.localOllamaSetupInProgress = false;
       },
 
       getAiUiPluginModel(plugin) {
         const env = plugin?.env || {};
         const backend = (env.LLM_BACKEND || "g4f").toLowerCase();
         if (backend === "auto") return env.AUTO_G4F_MODEL || env.G4F_MODEL || "gpt-4o-mini";
+        if (backend === "ollama") return this.getOllamaDraftModel(env);
         if (backend === "codex") return env.CODEX_MODEL || "gpt-5";
         if (backend === "qwen") return env.QWEN_MODEL || "qwen3-coder-plus";
         if (backend === "gemini") return env.GEMINI_MODEL || "gemini-2.5-flash";
         return env.G4F_MODEL || "gpt-4o-mini";
+      },
+
+      getAiUiPluginProvider(plugin, backendOverride = "") {
+        const env = plugin?.env || {};
+        const backend = (backendOverride || env.LLM_BACKEND || "g4f").toLowerCase();
+        if (backend === "codex") return "CodexOAuth";
+        if (backend === "qwen") return "QwenOAuth";
+        if (backend === "gemini") return "GeminiOAuth";
+        if (backend === "ollama") {
+          const deployment = (env.OLLAMA_DEPLOYMENT || this.inferOllamaDeployment(env.OLLAMA_BASE_URL))
+            .toLowerCase();
+          return deployment === "cloud" ? "Cloud Ollama" : "Local Ollama";
+        }
+        if (backend === "g4f") return env.G4F_PROVIDER || "auto";
+        return "AutoRotate";
+      },
+
+      getAiUiPluginRouteLabel(plugin) {
+        const env = plugin?.env || {};
+        const configuredBackend = (env.LLM_BACKEND || "g4f").toLowerCase();
+        const fallbackModel = this.getAiUiPluginModel(plugin);
+        if (configuredBackend !== "auto") {
+          const provider = this.getAiUiPluginProvider(plugin, configuredBackend);
+          return `${configuredBackend} · ${provider} · ${fallbackModel}`;
+        }
+
+        const route = this.aiUI?.detailTestResult;
+        if (
+          route &&
+          route.ok &&
+          (route.requested_backend || "").toLowerCase() === "auto" &&
+          route.selected_model
+        ) {
+          const backend = (route.selected_backend || "auto").toLowerCase();
+          const provider = route.selected_provider || this.getAiUiPluginProvider(plugin, backend);
+          return `${backend} · ${provider} · ${route.selected_model}`;
+        }
+
+        return `auto · AutoRotate · ${fallbackModel}`;
       },
 
       async fetchCodexAuthStatus(pluginId) {
@@ -1202,6 +1401,7 @@ window.PocketPaw.AiUI = {
         if (!pluginId) return;
         this.aiUI.savingConfig = true;
         try {
+          this.ensureOllamaConfigDraft(this.aiUI.pluginConfigDraft);
           const res = await fetch(`/api/ai-ui/plugins/${pluginId}/config`, {
             method: "PUT",
             headers: { "Content-Type": "application/json" },

@@ -381,6 +381,53 @@ def test_resolve_chat_model_from_env_auto():
     assert plugins._resolve_chat_model_from_env(env) == "gpt-4.1"
 
 
+def test_resolve_chat_model_from_env_ollama_prefers_local_model_for_local_deployment():
+    env = {
+        "LLM_BACKEND": "ollama",
+        "OLLAMA_DEPLOYMENT": "local",
+        "OLLAMA_LOCAL_MODEL": "llama3.2:3b",
+        "OLLAMA_CLOUD_MODEL": "llama3.3:70b",
+        "OLLAMA_MODEL": "llama3.1",
+    }
+    assert plugins._resolve_chat_model_from_env(env) == "llama3.2:3b"
+
+
+def test_resolve_chat_model_from_env_ollama_prefers_cloud_model_for_cloud_deployment():
+    env = {
+        "LLM_BACKEND": "ollama",
+        "OLLAMA_DEPLOYMENT": "cloud",
+        "OLLAMA_LOCAL_MODEL": "llama3.2:3b",
+        "OLLAMA_CLOUD_MODEL": "llama3.3:70b",
+        "OLLAMA_MODEL": "llama3.1",
+    }
+    assert plugins._resolve_chat_model_from_env(env) == "llama3.3:70b"
+
+
+def test_resolve_chat_model_from_env_ollama_cloud_inferred_from_base_url():
+    env = {
+        "LLM_BACKEND": "ollama",
+        "OLLAMA_BASE_URL": "https://ollama.com/v1",
+        "OLLAMA_LOCAL_MODEL": "llama3.2:3b",
+        "OLLAMA_CLOUD_MODEL": "llama3.3:70b",
+    }
+    assert plugins._resolve_chat_model_from_env(env) == "llama3.3:70b"
+
+
+def test_resolve_chat_model_from_env_ollama_falls_back_to_legacy_model():
+    env = {"LLM_BACKEND": "ollama", "OLLAMA_MODEL": "llama3.3:70b"}
+    assert plugins._resolve_chat_model_from_env(env) == "llama3.3:70b"
+
+
+def test_provider_label_for_backend_ollama_cloud_from_env():
+    env = {"OLLAMA_DEPLOYMENT": "cloud", "OLLAMA_BASE_URL": "https://ollama.com/v1"}
+    assert plugins._provider_label_for_backend(env, "ollama") == "Cloud Ollama"
+
+
+def test_provider_label_for_backend_ollama_local_from_base_url():
+    env = {"OLLAMA_BASE_URL": "http://127.0.0.1:11434/v1"}
+    assert plugins._provider_label_for_backend(env, "ollama") == "Local Ollama"
+
+
 def test_test_plugin_connection_uses_codex_model(tmp_path):
     plugin_id = "ai-fast-api"
     plugin_dir = tmp_path / plugin_id
@@ -407,7 +454,7 @@ def test_test_plugin_connection_uses_codex_model(tmp_path):
 
         @staticmethod
         def json():
-            return {"choices": [{"message": {"content": "pong"}}]}
+            return {"model": "gpt-5.2", "choices": [{"message": {"content": "pong"}}]}
 
     class DummyClient:
         def __init__(self, *args, **kwargs):
@@ -431,6 +478,10 @@ def test_test_plugin_connection_uses_codex_model(tmp_path):
         result = plugins.test_plugin_connection(plugin_id)
 
     assert result["ok"] is True
+    assert result["requested_backend"] == "codex"
+    assert result["selected_backend"] == "codex"
+    assert result["selected_provider"] == "CodexOAuth"
+    assert result["selected_model"] == "gpt-5.2"
     assert captured["model"] == "gpt-5.2"
     assert captured["url"].startswith("http://127.0.0.1:8000")
 
@@ -461,7 +512,7 @@ def test_test_plugin_connection_uses_qwen_model(tmp_path):
 
         @staticmethod
         def json():
-            return {"choices": [{"message": {"content": "pong"}}]}
+            return {"model": "qwen3-coder-plus", "choices": [{"message": {"content": "pong"}}]}
 
     class DummyClient:
         def __init__(self, *args, **kwargs):
@@ -485,6 +536,10 @@ def test_test_plugin_connection_uses_qwen_model(tmp_path):
         result = plugins.test_plugin_connection(plugin_id)
 
     assert result["ok"] is True
+    assert result["requested_backend"] == "qwen"
+    assert result["selected_backend"] == "qwen"
+    assert result["selected_provider"] == "QwenOAuth"
+    assert result["selected_model"] == "qwen3-coder-plus"
     assert captured["model"] == "qwen3-coder-plus"
     assert captured["url"].startswith("http://127.0.0.1:8000")
 
@@ -515,7 +570,7 @@ def test_test_plugin_connection_uses_gemini_model(tmp_path):
 
         @staticmethod
         def json():
-            return {"choices": [{"message": {"content": "pong"}}]}
+            return {"model": "gemini-2.5-flash", "choices": [{"message": {"content": "pong"}}]}
 
     class DummyClient:
         def __init__(self, *args, **kwargs):
@@ -539,6 +594,10 @@ def test_test_plugin_connection_uses_gemini_model(tmp_path):
         result = plugins.test_plugin_connection(plugin_id)
 
     assert result["ok"] is True
+    assert result["requested_backend"] == "gemini"
+    assert result["selected_backend"] == "gemini"
+    assert result["selected_provider"] == "GeminiOAuth"
+    assert result["selected_model"] == "gemini-2.5-flash"
     assert captured["model"] == "gemini-2.5-flash"
     assert captured["url"].startswith("http://127.0.0.1:8000")
 
@@ -565,11 +624,12 @@ def test_test_plugin_connection_uses_auto_model(tmp_path):
     captured: dict[str, str] = {}
 
     class DummyResponse:
-        status_code = 200
+        def __init__(self, status_code=200, payload=None):
+            self.status_code = status_code
+            self._payload = payload or {}
 
-        @staticmethod
-        def json():
-            return {"choices": [{"message": {"content": "pong"}}]}
+        def json(self):
+            return self._payload
 
     class DummyClient:
         def __init__(self, *args, **kwargs):
@@ -584,7 +644,26 @@ def test_test_plugin_connection_uses_auto_model(tmp_path):
         def post(self, url, json):
             captured["url"] = url
             captured["model"] = json.get("model")
-            return DummyResponse()
+            return DummyResponse(
+                payload={"model": "gpt-5", "choices": [{"message": {"content": "pong"}}]}
+            )
+
+        def get(self, url):
+            captured["providers_url"] = url
+            return DummyResponse(
+                payload={
+                    "data": [
+                        {
+                            "id": "AutoRotate",
+                            "params": {"active_backends": ["g4f", "codex", "qwen"]},
+                        },
+                        {
+                            "id": "CodexOAuth",
+                            "models": ["gpt-5", "o3"],
+                        },
+                    ]
+                }
+            )
 
     with (
         patch("pocketpaw.ai_ui.plugins.get_plugins_dir", return_value=tmp_path),
@@ -593,8 +672,13 @@ def test_test_plugin_connection_uses_auto_model(tmp_path):
         result = plugins.test_plugin_connection(plugin_id)
 
     assert result["ok"] is True
+    assert result["requested_backend"] == "auto"
+    assert result["selected_backend"] == "codex"
+    assert result["selected_provider"] == "CodexOAuth"
+    assert result["selected_model"] == "gpt-5"
     assert captured["model"] == "gpt-4.1"
     assert captured["url"].startswith("http://127.0.0.1:8000")
+    assert captured["providers_url"] == "http://127.0.0.1:8000/v1/providers"
 
 
 def test_chat_completion_proxy_uses_codex_model(tmp_path):
@@ -763,3 +847,43 @@ def test_get_gemini_device_auth_status_not_found():
     result = plugins.get_gemini_device_auth_status("missing-session")
     assert result["ok"] is False
     assert result["status"] == "not_found"
+
+
+@pytest.mark.asyncio
+async def test_setup_local_ollama_for_ai_fast_api_installs_and_starts():
+    with (
+        patch("pocketpaw.ai_ui.plugins.get_plugin", side_effect=[None, {"status": "stopped"}]),
+        patch(
+            "pocketpaw.ai_ui.plugins.install_plugin",
+            side_effect=[{"status": "ok", "plugin_id": "ollama"}],
+        ) as install_mock,
+        patch(
+            "pocketpaw.ai_ui.plugins.launch_plugin",
+            side_effect=[{"status": "ok", "plugin_id": "ollama"}],
+        ) as launch_mock,
+    ):
+        result = await plugins.setup_local_ollama_for_ai_fast_api()
+
+    assert result["ok"] is True
+    assert result["plugin_id"] == "ollama"
+    assert result["installed"] is True
+    assert result["started"] is True
+    assert result["base_url"] == "http://127.0.0.1:11434/v1"
+    install_mock.assert_awaited_once_with("builtin:ollama")
+    launch_mock.assert_awaited_once_with("ollama")
+
+
+@pytest.mark.asyncio
+async def test_setup_local_ollama_for_ai_fast_api_noop_when_running():
+    with (
+        patch("pocketpaw.ai_ui.plugins.get_plugin", return_value={"status": "running"}),
+        patch("pocketpaw.ai_ui.plugins.install_plugin") as install_mock,
+        patch("pocketpaw.ai_ui.plugins.launch_plugin") as launch_mock,
+    ):
+        result = await plugins.setup_local_ollama_for_ai_fast_api()
+
+    assert result["ok"] is True
+    assert result["installed"] is False
+    assert result["started"] is False
+    install_mock.assert_not_called()
+    launch_mock.assert_not_called()

@@ -1,9 +1,27 @@
 import os
-from typing import Dict, List
 
 from dotenv import load_dotenv
 
 load_dotenv()
+
+
+def _infer_ollama_deployment(raw_deployment: str, raw_base_url: str) -> str:
+    deployment = (raw_deployment or "").strip().lower()
+    if deployment in {"local", "cloud"}:
+        return deployment
+    return "cloud" if "ollama.com" in (raw_base_url or "").strip().lower() else "local"
+
+
+def _resolve_ollama_model(
+    deployment: str,
+    local_model: str,
+    cloud_model: str,
+    legacy_model: str,
+) -> str:
+    fallback = legacy_model or "llama3.1"
+    if deployment == "cloud":
+        return cloud_model or fallback
+    return local_model or fallback
 
 
 class Settings:
@@ -25,6 +43,33 @@ class Settings:
 
         self.g4f_provider: str = os.getenv("G4F_PROVIDER", "auto")
         self.g4f_model: str = os.getenv("G4F_MODEL", "gpt-4o-mini")
+        raw_ollama_deployment = os.getenv("OLLAMA_DEPLOYMENT", "local")
+        raw_ollama_base_url = os.getenv("OLLAMA_BASE_URL", "").strip()
+        self.ollama_deployment: str = _infer_ollama_deployment(
+            raw_ollama_deployment,
+            raw_ollama_base_url,
+        )
+        default_ollama_base_url = (
+            "https://ollama.com/v1"
+            if self.ollama_deployment == "cloud"
+            else "http://127.0.0.1:11434/v1"
+        )
+        self.ollama_base_url: str = raw_ollama_base_url or default_ollama_base_url
+        legacy_ollama_model = os.getenv("OLLAMA_MODEL", "").strip()
+        self.ollama_local_model: str = (
+            os.getenv("OLLAMA_LOCAL_MODEL", "").strip() or legacy_ollama_model or "llama3.1"
+        )
+        self.ollama_cloud_model: str = (
+            os.getenv("OLLAMA_CLOUD_MODEL", "").strip() or legacy_ollama_model or "llama3.1"
+        )
+        # Backward-compatible effective model used by existing call sites.
+        self.ollama_model: str = _resolve_ollama_model(
+            self.ollama_deployment,
+            self.ollama_local_model,
+            self.ollama_cloud_model,
+            legacy_ollama_model,
+        )
+        self.ollama_api_key: str = os.getenv("OLLAMA_API_KEY", "")
         self.g4f_timeout: int = int(os.getenv("G4F_TIMEOUT", "60"))
         self.g4f_retries: int = int(os.getenv("G4F_RETRIES", "3"))
         self.codex_model: str = os.getenv("CODEX_MODEL", "gpt-5")
@@ -51,7 +96,7 @@ class Settings:
 
         self.cors_enabled: bool = os.getenv("CORS_ENABLED", "true").lower() == "true"
         cors_origins_str = os.getenv("CORS_ORIGINS", "*")
-        self.cors_origins: List[str] = [origin.strip() for origin in cors_origins_str.split(",")]
+        self.cors_origins: list[str] = [origin.strip() for origin in cors_origins_str.split(",")]
 
         self.openai_api_base: str = os.getenv("OPENAI_API_BASE", "/v1")
 

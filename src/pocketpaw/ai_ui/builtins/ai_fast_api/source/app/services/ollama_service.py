@@ -1,12 +1,13 @@
-"""Ollama backend \u2014 implements BaseLLMService using OpenAI client pointing to local Ollama."""
+"""Ollama backend - implements BaseLLMService via Ollama's local HTTP API."""
 
 import json
 import os
 import time
 import uuid
-from typing import AsyncGenerator, List, Optional
+from collections.abc import AsyncGenerator
+from typing import Any
+from urllib.parse import urlparse
 
-from openai import AsyncOpenAI
 import httpx
 
 from ..models import (
@@ -17,7 +18,6 @@ from ..models import (
     ChatCompletionStreamResponse,
     ChatCompletionUsage,
     ChatMessage,
-    ImageData,
     ImageGenerationRequest,
     ImageGenerationResponse,
     MessageRole,
@@ -29,24 +29,46 @@ from . import BaseLLMService
 
 
 class OllamaService(BaseLLMService):
-    """LLM service backed by local Ollama via OpenAI compatibility layer."""
+    """LLM service backed by Ollama endpoints (local or cloud)."""
 
     def __init__(self):
-        self._models_cache: Optional[List[ModelInfo]] = None
+        self._models_cache: list[ModelInfo] | None = None
         self._cache_timestamp = 0
         self._cache_ttl = 300
         self._initialized = False
 
-        # Connect to Ollama's OpenAI-compatible endpoint
-        base_url = os.environ.get("OLLAMA_BASE_URL", "http://127.0.0.1:11434/v1")
-        # Ensure it has trailing slash for httpx
-        if not base_url.endswith("/"):
-            base_url += "/"
+        deployment = os.environ.get("OLLAMA_DEPLOYMENT", "local").strip().lower()
+        if deployment not in {"local", "cloud"}:
+            deployment = "local"
+        self._deployment = deployment
+        self._api_key = os.environ.get("OLLAMA_API_KEY", "").strip()
 
-        self.base_url = base_url
-        self._client = AsyncOpenAI(
-            base_url=self.base_url,
-            api_key="ollama",  # Required but ignored by ollama
+        default_base_url = (
+            "https://ollama.com/v1" if self._deployment == "cloud" else "http://127.0.0.1:11434/v1"
+        )
+        # Accept OLLAMA_BASE_URL as either root (http://host:11434) or /v1 URL.
+        raw_base_url = os.environ.get("OLLAMA_BASE_URL", default_base_url).strip()
+        if not raw_base_url:
+            raw_base_url = default_base_url
+        raw_base_url = raw_base_url.rstrip("/")
+
+        if raw_base_url.endswith("/v1"):
+            self._ollama_root = raw_base_url[:-3]
+            self.base_url = f"{raw_base_url}/"
+        else:
+            self._ollama_root = raw_base_url
+            self.base_url = f"{raw_base_url}/v1/"
+
+        parsed_root = urlparse(self._ollama_root)
+        self._is_cloud = "ollama.com" in parsed_root.netloc.lower()
+        headers: dict[str, str] = {}
+        if self._api_key:
+            headers["Authorization"] = f"Bearer {self._api_key}"
+
+        self._client = httpx.AsyncClient(
+            base_url=self._ollama_root,
+            timeout=httpx.Timeout(60.0),
+            headers=headers,
         )
 
     async def initialize(self):
@@ -64,8 +86,7 @@ class OllamaService(BaseLLMService):
             logger.info("Cleaning up Ollama service...")
             self._models_cache = None
             self._initialized = False
-            if hasattr(self._client, "close"):
-                await self._client.close()
+            await self._client.aclose()
             logger.info("Ollama service cleanup completed")
         except Exception as e:
             logger.error(f"Error during Ollama service cleanup: {e}")
@@ -75,46 +96,68 @@ class OllamaService(BaseLLMService):
             return False
         return time.time() - self._cache_timestamp < self._cache_ttl
 
+    @staticmethod
+    def _safe_int(value: Any) -> int:
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return 0
+
+    @staticmethod
+    def _build_messages_payload(request: ChatCompletionRequest) -> list[dict[str, str]]:
+        return [{"role": msg.role.value, "content": msg.content} for msg in request.messages]
+
+    def _build_chat_payload(
+        self, request: ChatCompletionRequest, *, stream: bool
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "model": request.model,
+            "messages": self._build_messages_payload(request),
+            "stream": stream,
+        }
+        if request.max_tokens:
+            # Ollama option equivalent of OpenAI max_tokens.
+            payload["options"] = {"num_predict": request.max_tokens}
+        return payload
+
     async def create_chat_completion(
         self, request: ChatCompletionRequest
     ) -> ChatCompletionResponse:
         try:
             logger.info(f"Ollama chat completion with model: {request.model}")
-            messages = [
-                {"role": msg.role.value, "content": msg.content} for msg in request.messages
-            ]
+            payload = self._build_chat_payload(request, stream=False)
+            response = await self._client.post("/api/chat", json=payload)
+            response.raise_for_status()
+            data = response.json()
 
-            kwargs = {
-                "model": request.model,
-                "messages": messages,
-                "stream": False,
-            }
-            if request.max_tokens:
-                kwargs["max_tokens"] = request.max_tokens
+            message_data = data.get("message") or {}
+            role_value = str(message_data.get("role") or MessageRole.ASSISTANT.value)
+            try:
+                role = MessageRole(role_value)
+            except ValueError:
+                role = MessageRole.ASSISTANT
 
-            response = await self._client.chat.completions.create(**kwargs)
-
-            completion_id = response.id if response.id else f"chatcmpl-{uuid.uuid4().hex[:29]}"
+            prompt_tokens = self._safe_int(data.get("prompt_eval_count"))
+            completion_tokens = self._safe_int(data.get("eval_count"))
 
             return ChatCompletionResponse(
-                id=completion_id,
+                id=f"chatcmpl-{uuid.uuid4().hex[:29]}",
                 object="chat.completion",
-                created=response.created or int(time.time()),
-                model=response.model or request.model,
+                created=int(time.time()),
+                model=str(data.get("model") or request.model),
                 choices=[
                     ChatCompletionChoice(
-                        index=c.index,
+                        index=0,
                         message=ChatMessage(
-                            role=MessageRole(c.message.role), content=c.message.content or ""
+                            role=role, content=str(message_data.get("content") or "")
                         ),
-                        finish_reason=c.finish_reason,
+                        finish_reason=str(data.get("done_reason") or "stop"),
                     )
-                    for c in response.choices
                 ],
                 usage=ChatCompletionUsage(
-                    prompt_tokens=response.usage.prompt_tokens if response.usage else 0,
-                    completion_tokens=response.usage.completion_tokens if response.usage else 0,
-                    total_tokens=response.usage.total_tokens if response.usage else 0,
+                    prompt_tokens=prompt_tokens,
+                    completion_tokens=completion_tokens,
+                    total_tokens=prompt_tokens + completion_tokens,
                 ),
             )
         except Exception as e:
@@ -126,36 +169,72 @@ class OllamaService(BaseLLMService):
     ) -> AsyncGenerator[str, None]:
         try:
             logger.info(f"Ollama streaming chat completion with model: {request.model}")
-            messages = [
-                {"role": msg.role.value, "content": msg.content} for msg in request.messages
-            ]
+            payload = self._build_chat_payload(request, stream=True)
+            stream_id = f"chatcmpl-{uuid.uuid4().hex[:29]}"
+            final_sent = False
 
-            kwargs = {
-                "model": request.model,
-                "messages": messages,
-                "stream": True,
-            }
-            if request.max_tokens:
-                kwargs["max_tokens"] = request.max_tokens
+            async with self._client.stream("POST", "/api/chat", json=payload) as response:
+                response.raise_for_status()
+                async for line in response.aiter_lines():
+                    if not line:
+                        continue
+                    try:
+                        data = json.loads(line)
+                    except json.JSONDecodeError:
+                        logger.debug("Skipping non-JSON Ollama stream line: %s", line)
+                        continue
 
-            stream = await self._client.chat.completions.create(**kwargs)
+                    message_data = data.get("message") or {}
+                    content = message_data.get("content")
+                    if content:
+                        stream_response = ChatCompletionStreamResponse(
+                            id=stream_id,
+                            object="chat.completion.chunk",
+                            created=int(time.time()),
+                            model=str(data.get("model") or request.model),
+                            choices=[
+                                ChatCompletionStreamChoice(
+                                    index=0,
+                                    delta={
+                                        "role": MessageRole.ASSISTANT.value,
+                                        "content": str(content),
+                                    },
+                                    finish_reason=None,
+                                )
+                            ],
+                        )
+                        yield f"data: {stream_response.model_dump_json(exclude_none=True)}\n\n"
 
-            async for chunk in stream:
-                # Need to convert openai's chunk to our model
+                    if data.get("done"):
+                        stream_response = ChatCompletionStreamResponse(
+                            id=stream_id,
+                            object="chat.completion.chunk",
+                            created=int(time.time()),
+                            model=str(data.get("model") or request.model),
+                            choices=[
+                                ChatCompletionStreamChoice(
+                                    index=0,
+                                    delta={},
+                                    finish_reason=str(data.get("done_reason") or "stop"),
+                                )
+                            ],
+                        )
+                        yield f"data: {stream_response.model_dump_json(exclude_none=True)}\n\n"
+                        final_sent = True
+                        break
+
+            if not final_sent:
                 stream_response = ChatCompletionStreamResponse(
-                    id=chunk.id or f"chatcmpl-{uuid.uuid4().hex[:29]}",
+                    id=stream_id,
                     object="chat.completion.chunk",
-                    created=chunk.created or int(time.time()),
-                    model=chunk.model or request.model,
+                    created=int(time.time()),
+                    model=request.model,
                     choices=[
                         ChatCompletionStreamChoice(
-                            index=c.index,
-                            delta={"role": c.delta.role, "content": c.delta.content}
-                            if getattr(c.delta, "content", None) is not None
-                            else {},
-                            finish_reason=c.finish_reason,
+                            index=0,
+                            delta={},
+                            finish_reason="stop",
                         )
-                        for c in chunk.choices
                     ],
                 )
                 yield f"data: {stream_response.model_dump_json(exclude_none=True)}\n\n"
@@ -175,26 +254,30 @@ class OllamaService(BaseLLMService):
     async def create_image_generation(
         self, request: ImageGenerationRequest
     ) -> ImageGenerationResponse:
-        # Ollama does not directly support image generation natively inside the OpenAI chat completions layer
-        # However, it might in the future. We can throw an informative error or simply try
+        # Ollama does not directly support image generation in this backend.
         raise NotImplementedError(
             "Ollama does not natively support image generation. Use G4F for images."
         )
 
-    async def get_models(self) -> List[ModelInfo]:
+    async def get_models(self) -> list[ModelInfo]:
         if self._is_cache_valid() and self._models_cache:
             return self._models_cache
         try:
             logger.info("Fetching models from local Ollama")
-            models = await self._client.models.list()
+            response = await self._client.get("/api/tags")
+            response.raise_for_status()
+            payload = response.json()
 
             result = []
-            for m in models.data:
+            for model in payload.get("models", []):
+                model_id = str(model.get("name") or "").strip()
+                if not model_id:
+                    continue
                 result.append(
                     ModelInfo(
-                        id=m.id,
-                        created=m.created or int(time.time()),
-                        owned_by=m.owned_by or "ollama",
+                        id=model_id,
+                        created=int(time.time()),
+                        owned_by="ollama",
                     )
                 )
 
@@ -207,13 +290,19 @@ class OllamaService(BaseLLMService):
                 ModelInfo(id="No Ollama models found", created=int(time.time()), owned_by="ollama")
             ]
 
-    async def get_providers(self) -> List[ProviderInfo]:
-        # Ollama manages its own models locally
+    async def get_providers(self) -> list[ProviderInfo]:
+        provider_id = "Cloud Ollama" if self._is_cloud else "Local Ollama"
+        no_auth = (not self._is_cloud) or bool(self._api_key)
         return [
             ProviderInfo(
-                id="Local Ollama",
+                id=provider_id,
                 url=self.base_url,
                 models=[m.id for m in (self._models_cache or [])],
-                params={"supports_stream": True, "no_auth": True},
+                params={
+                    "supports_stream": True,
+                    "no_auth": no_auth,
+                    "requires_api_key": self._is_cloud,
+                    "logged_in": bool(self._api_key) if self._is_cloud else True,
+                },
             )
         ]
