@@ -3,11 +3,12 @@ name: PR Quality Gate
 
 on:
   pull_request:
-    types: [opened, edited, synchronize]
+    types: [opened, edited, synchronize, reopened]
 
 permissions:
   pull-requests: write
   issues: write
+  members: read
 
 jobs:
   check-quality:
@@ -26,8 +27,96 @@ jobs:
             const body = pr.body || '';
             const title = pr.title || '';
 
+            const base = pr.base.ref;
             const issues = [];
             const MARKER = '<!-- pr-quality-gate -->';
+
+            // ── Hard block: non-maintainer PRs targeting main ─────────
+            if (base === 'main') {
+              const { data: permData } = await github.rest.repos.getCollaboratorPermissionLevel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                username: pr.user.login
+              });
+              const perm = permData.permission;
+              const isMaintainer = perm === 'admin' || perm === 'maintain';
+
+              if (!isMaintainer) {
+                const message = `${MARKER}\n` +
+                  `## PR targets \`main\` — closing automatically\n\n` +
+                  `Only maintainers can open PRs against \`main\`. All other PRs must target the \`dev\` branch.\n\n` +
+                  `Please retarget your PR to \`dev\`:\n` +
+                  `\`\`\`bash\n` +
+                  `gh pr edit ${pr.number} --base dev\n` +
+                  `\`\`\`\n\n` +
+                  `See [CONTRIBUTING.md](../blob/dev/CONTRIBUTING.md#branch-strategy) for details.`;
+
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: pr.number,
+                  body: message
+                });
+
+                await github.rest.pulls.update({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: pr.number,
+                  state: 'closed'
+                });
+
+                return;
+              }
+            }
+
+            // ── Reopen guard: block reopening of previously closed PRs ──
+            if (context.payload.action === 'reopened') {
+              const { data: prComments } = await github.rest.issues.listComments({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pr.number,
+              });
+
+              const wasBotClosed = prComments.some(
+                c => c.user.type === 'Bot' && c.body.includes(MARKER) && c.body.includes('closing')
+              );
+
+              const { data: events } = await github.rest.issues.listEventsForTimeline({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pr.number,
+                per_page: 100
+              });
+
+              const maintainerClosed = events.some(e =>
+                e.event === 'closed' &&
+                e.actor &&
+                e.actor.login !== pr.user.login &&
+                e.actor.type !== 'Bot'
+              );
+
+              if (wasBotClosed || maintainerClosed) {
+                const reason = wasBotClosed
+                  ? 'This PR was previously closed by the quality gate bot.'
+                  : 'This PR was previously closed by a maintainer.';
+
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: pr.number,
+                  body: `${MARKER}\n## Reopened PR closed automatically\n\n${reason} Please don't reopen closed PRs — if you've addressed the feedback, open a new PR instead.\n\nSee [CONTRIBUTING.md](../blob/dev/CONTRIBUTING.md) for guidelines.`
+                });
+
+                await github.rest.pulls.update({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: pr.number,
+                  state: 'closed'
+                });
+
+                return;
+              }
+            }
 
             // Check for conventional commit title (feat:, fix:, docs:, etc.)
             const conventionalRe = /^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\(.+\))?!?:\s.+/;
