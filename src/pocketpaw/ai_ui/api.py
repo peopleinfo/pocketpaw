@@ -374,9 +374,10 @@ async def install_plugin_endpoint(request: Request):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except RuntimeError as e:
+        logger.exception("Plugin install RuntimeError for source=%s", source)
         raise HTTPException(status_code=500, detail=str(e))
     except Exception as e:
-        logger.exception("Plugin install failed")
+        logger.exception("Plugin install failed for source=%s", source)
         raise HTTPException(status_code=500, detail=str(e))
 
 

@@ -10,28 +10,36 @@ _MANIFEST = {
     ),
     "icon": "brain",
     "version": "1.0.0",
-    "start": "bash start.sh",
-    "install": "uv run python install.py",
+    "start": "python start.py",
+    "install": "python install.py",
     "requires": ["uv"],
     "port": 11434,
     "openapi": "openapi.json",
 }
 
-_START_SH = """\
-#!/bin/bash
-export OLLAMA_ORIGINS="*"
+_START_PY = """\
+import os
+import platform
+import subprocess
+import sys
+import time
 
-# Start Ollama's local server in the background
-./ollama serve &
-SERVER_PID=$!
+def main():
+    os.environ["OLLAMA_ORIGINS"] = "*"
+    ollama = "ollama.exe" if platform.system() == "Windows" else "./ollama"
 
-sleep 2
+    # Start Ollama server in the background
+    server = subprocess.Popen([ollama, "serve"])
+    time.sleep(2)
 
-# Pull a tiny demo model in the background
-./ollama pull qwen2.5:0.5b &
+    # Pull a tiny demo model in the background
+    subprocess.Popen([ollama, "pull", "qwen2.5:0.5b"])
 
-echo "Ollama is running on port 11434 (demo model is fetching in background)"
-wait $SERVER_PID
+    print("Ollama is running on port 11434 (demo model is fetching in background)")
+    server.wait()
+
+if __name__ == "__main__":
+    main()
 """
 
 _INSTALL_PY = """\
@@ -173,7 +181,7 @@ DEFINITION: BuiltinDefinition = {
     "id": "ollama",
     "manifest": _MANIFEST,
     "files": {
-        "start.sh": _START_SH,
+        "start.py": _START_PY,
         "install.py": _INSTALL_PY,
         "openapi.json": _OPENAPI_JSON,
     },

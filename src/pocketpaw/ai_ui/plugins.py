@@ -7,9 +7,12 @@ point inside it.  No host environment variables leak through.
     plugins/
       my-app/
         pocketpaw.json      <- Required manifest
-        install.sh           <- Install script (optional)
-        start.sh             <- Launch script (optional)
-        stop.sh              <- Stop script (optional)
+        install.py           <- Install script (optional, cross-platform)
+        start.py             <- Launch script (optional, cross-platform)
+        stop.py              <- Stop script (optional, cross-platform)
+        install.sh           <- Install script (legacy, needs bash)
+        start.sh             <- Launch script (legacy, needs bash)
+        stop.sh              <- Stop script (legacy, needs bash)
         .venv/               <- Python venv (created by install)
         .tmp/                <- Sandboxed TMPDIR
         .cache/              <- Sandboxed cache
@@ -22,9 +25,9 @@ pocketpaw.json manifest:
   "description": "An AI app",
   "icon": "brain",
   "version": "1.0.0",
-  "start": "start.sh",
-  "install": "install.sh",
-  "stop": "stop.sh",
+  "start": "python start.py",
+  "install": "python install.py",
+  "stop": "python stop.py",
   "port": 7860,
   "env": {},
   "requires": ["python", "git"],
@@ -59,13 +62,53 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
+
+async def _async_subprocess_shell(
+    cmd: str, *, timeout: float = 300, **kwargs: Any
+) -> subprocess.CompletedProcess[bytes]:
+    """Run a shell command async, works on all platforms including Windows.
+
+    On Windows, ``asyncio.create_subprocess_shell`` raises ``NotImplementedError``
+    inside uvicorn's reloader because the event loop policy doesn't support
+    subprocesses.  This helper runs ``subprocess.run`` in a thread executor
+    as a reliable cross-platform alternative.
+    """
+    loop = asyncio.get_running_loop()
+
+    def _run() -> subprocess.CompletedProcess[bytes]:
+        return subprocess.run(
+            cmd,
+            shell=True,
+            timeout=timeout,
+            **kwargs,
+        )
+
+    return await loop.run_in_executor(None, _run)
+
+
+async def _async_subprocess_exec(
+    *args: str, timeout: float = 300, **kwargs: Any
+) -> subprocess.CompletedProcess[bytes]:
+    """Run an exec command async, works on all platforms including Windows."""
+    loop = asyncio.get_running_loop()
+
+    def _run() -> subprocess.CompletedProcess[bytes]:
+        return subprocess.run(
+            list(args),
+            timeout=timeout,
+            **kwargs,
+        )
+
+    return await loop.run_in_executor(None, _run)
+
+
 _PID_FILENAME = ".pocketpaw.pid"
 _LOG_FILENAME = ".pocketpaw.log"
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[3]
 PLUGINS_DIR = _PROJECT_ROOT / "plugins"
 
-_running_processes: dict[str, asyncio.subprocess.Process] = {}
+_running_processes: dict[str, subprocess.Popen | asyncio.subprocess.Process] = {}
 _codex_auth_sessions: dict[str, dict[str, Any]] = {}
 _codex_auth_lock = threading.Lock()
 _qwen_auth_sessions: dict[str, dict[str, Any]] = {}
@@ -206,6 +249,14 @@ def _sandbox_env(plugin_dir: Path, manifest: dict) -> dict[str, str]:
         "LC_ALL": "en_US.UTF-8",
     }
 
+    # On Windows, Python's asyncio and networking need SystemRoot for
+    # Winsock initialization (_overlapped, SSL, DNS resolution).
+    if platform.system() == "Windows":
+        for key in ("SystemRoot", "SYSTEMROOT", "COMSPEC"):
+            val = os.environ.get(key)
+            if val and key not in env:
+                env[key] = val
+
     host_home = os.environ.get("HOME", "").strip()
     if host_home:
         # Allow selected backends (e.g. Codex OAuth) to access host-level auth stores
@@ -245,6 +296,13 @@ def _sandbox_install_env(plugin_dir: Path, manifest: dict) -> dict[str, str]:
         val = os.environ.get(key)
         if val:
             env[key] = val
+
+    # On Windows, networking/SSL/DNS need these system variables
+    if platform.system() == "Windows":
+        for key in ("SystemRoot", "SYSTEMROOT", "APPDATA", "USERPROFILE", "COMSPEC"):
+            val = os.environ.get(key)
+            if val and key not in env:
+                env[key] = val
 
     return env
 
@@ -1335,17 +1393,24 @@ def _resolve_phase_command(plugin_dir: Path, manifest: dict | None, phase: str) 
 
     Priority:
     1) `pocketpaw_<phase>.py` wrapper (universal)
-    2) manifest command
-    3) `<phase>.sh` script
+    2) manifest command (if not a shell command, or on non-Windows)
+    3) `<phase>.py` script (universal, cross-platform)
+    4) `<phase>.sh` script (with bash fallback on Windows)
     """
+    is_windows = platform.system() == "Windows"
+
     wrapper = plugin_dir / f"pocketpaw_{phase}.py"
     if wrapper.exists():
         return f"python {wrapper.name}"
 
     cmd = str((manifest or {}).get(phase) or "").strip()
     if cmd:
-        # On Windows, allow shell scripts when Git Bash exists.
-        if platform.system() == "Windows" and _is_shell_command(cmd):
+        # On Windows, if the manifest command is a shell command,
+        # prefer a .py fallback first for universal support.
+        if is_windows and _is_shell_command(cmd):
+            py_script = plugin_dir / f"{phase}.py"
+            if py_script.exists():
+                return f"python {py_script.name}"
             bash = shutil.which("bash")
             if bash:
                 script = plugin_dir / f"{phase}.sh"
@@ -1359,9 +1424,14 @@ def _resolve_phase_command(plugin_dir: Path, manifest: dict | None, phase: str) 
             return ""
         return cmd
 
+    # No manifest command — try convention-based scripts
+    py_script = plugin_dir / f"{phase}.py"
+    if py_script.exists():
+        return f"python {py_script.name}"
+
     script = plugin_dir / f"{phase}.sh"
     if script.exists():
-        if platform.system() == "Windows":
+        if is_windows:
             bash = shutil.which("bash")
             if bash:
                 return f'"{bash}" {script.name}'
@@ -1377,6 +1447,21 @@ def _resolve_phase_command(plugin_dir: Path, manifest: dict | None, phase: str) 
 def _clear_pid(plugin_dir: Path) -> None:
     pid_path = plugin_dir / _PID_FILENAME
     pid_path.unlink(missing_ok=True)
+
+
+def _force_kill_pid(pid: int) -> None:
+    """Force-kill a process by PID, cross-platform."""
+    force_sig = getattr(signal, "SIGKILL", signal.SIGTERM)
+    try:
+        if hasattr(os, "killpg") and hasattr(os, "getpgid"):
+            os.killpg(os.getpgid(pid), force_sig)
+        else:
+            os.kill(pid, force_sig)
+    except (ProcessLookupError, PermissionError, OSError, AttributeError):
+        try:
+            os.kill(pid, force_sig)
+        except (ProcessLookupError, PermissionError, OSError):
+            pass
 
 
 def _is_pid_alive(pid: int) -> bool:
@@ -1574,7 +1659,11 @@ def list_plugins() -> list[dict[str, Any]]:
                 "status": "running" if running else "stopped",
                 "path": str(item),
                 "start_cmd": manifest.get("start", ""),
-                "has_install": ((item / "install.sh").exists() or bool(manifest.get("install"))),
+                "has_install": (
+                    (item / "install.sh").exists()
+                    or (item / "install.py").exists()
+                    or bool(manifest.get("install"))
+                ),
                 "requires": manifest.get("requires", []),
                 "env": manifest.get("env", {}),
                 "openapi": openapi_file if has_openapi else None,
@@ -1613,7 +1702,11 @@ def get_plugin(plugin_id: str) -> dict | None:
         "status": "running" if running else "stopped",
         "path": str(plugin_dir),
         "start_cmd": manifest.get("start", ""),
-        "has_install": ((plugin_dir / "install.sh").exists() or bool(manifest.get("install"))),
+        "has_install": (
+            (plugin_dir / "install.sh").exists()
+            or (plugin_dir / "install.py").exists()
+            or bool(manifest.get("install"))
+        ),
         "requires": manifest.get("requires", []),
         "env": manifest.get("env", {}),
         "openapi": openapi_file if has_openapi else None,
@@ -1949,18 +2042,13 @@ async def install_plugin(source: str) -> dict:
     import tempfile
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        proc = await asyncio.create_subprocess_exec(
-            "git",
-            "clone",
-            "--depth=1",
-            git_url,
-            tmpdir,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
+        proc = await _async_subprocess_exec(
+            "git", "clone", "--depth=1", git_url, tmpdir,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
         )
-        _, stderr_out = await asyncio.wait_for(proc.communicate(), timeout=300)
         if proc.returncode != 0:
-            err = stderr_out.decode(errors="replace").strip()
+            err = proc.stderr.decode(errors="replace").strip()
             if "not found" in err.lower() or "404" in err:
                 raise RuntimeError("Couldn't find that app. Double-check the URL and try again.")
             raise RuntimeError(
@@ -1993,14 +2081,13 @@ async def install_plugin(source: str) -> dict:
 
     if install_cmd:
         logger.info("Running install command for '%s': %s", plugin_id, install_cmd)
-        proc = await asyncio.create_subprocess_shell(
+        await _async_subprocess_shell(
             install_cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             cwd=str(dest),
             env=sandbox_env,
         )
-        await asyncio.wait_for(proc.communicate(), timeout=300)
 
     return {
         "status": "ok",
@@ -2071,14 +2158,13 @@ async def install_plugin_from_zip(zip_bytes: bytes) -> dict:
 
     if install_cmd:
         logger.info("Running install command for '%s': %s", plugin_id, install_cmd)
-        proc = await asyncio.create_subprocess_shell(
+        await _async_subprocess_shell(
             install_cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             cwd=str(dest),
             env=sandbox_env,
         )
-        await asyncio.wait_for(proc.communicate(), timeout=300)
 
     return {
         "status": "ok",
@@ -2129,10 +2215,11 @@ async def launch_plugin(plugin_id: str) -> dict:
         "stderr": log_file,
         "cwd": str(plugin_dir),
         "env": env,
+        "shell": True,
     }
     if platform.system() != "Windows":
         spawn_kwargs["preexec_fn"] = os.setsid
-    proc = await asyncio.create_subprocess_shell(start_cmd, **spawn_kwargs)
+    proc = subprocess.Popen(start_cmd, **spawn_kwargs)
 
     log_file.close()
 
@@ -2142,7 +2229,7 @@ async def launch_plugin(plugin_id: str) -> dict:
     # Catch immediate failures (bad command, missing deps, crash on startup)
     # so UI doesn't report "launched" for a dead process.
     await asyncio.sleep(0.35)
-    if proc.returncode is not None:
+    if proc.poll() is not None:
         _running_processes.pop(plugin_id, None)
         _clear_pid(plugin_dir)
         tail = _tail_file(log_path, lines=25)
@@ -2214,14 +2301,14 @@ async def stop_plugin(plugin_id: str) -> dict:
     if stop_cmd:
         try:
             env = _sandbox_env(plugin_dir, manifest or {})
-            stop_proc = await asyncio.create_subprocess_shell(
+            await _async_subprocess_shell(
                 stop_cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
                 cwd=str(plugin_dir),
                 env=env,
+                timeout=10,
             )
-            await asyncio.wait_for(stop_proc.communicate(), timeout=10)
         except Exception:
             pass
 
@@ -2239,21 +2326,18 @@ async def stop_plugin(plugin_id: str) -> dict:
 
     if proc is not None and proc.returncode is None:
         try:
-            await asyncio.wait_for(proc.wait(), timeout=5)
-        except TimeoutError:
+            if isinstance(proc, subprocess.Popen):
+                loop = asyncio.get_running_loop()
+                await asyncio.wait_for(
+                    loop.run_in_executor(None, proc.wait, 5), timeout=6
+                )
+            else:
+                await asyncio.wait_for(proc.wait(), timeout=5)
+        except (TimeoutError, subprocess.TimeoutExpired):
             pass
 
     if _is_pid_alive(pid):
-        try:
-            if hasattr(os, "killpg") and hasattr(os, "getpgid"):
-                os.killpg(os.getpgid(pid), signal.SIGKILL)
-            else:
-                os.kill(pid, signal.SIGKILL)
-        except (ProcessLookupError, PermissionError, OSError, AttributeError):
-            try:
-                os.kill(pid, signal.SIGKILL)
-            except (ProcessLookupError, PermissionError):
-                pass
+        _force_kill_pid(pid)
 
     _running_processes.pop(plugin_id, None)
     _clear_pid(plugin_dir)
@@ -2274,20 +2358,11 @@ def remove_plugin(plugin_id: str) -> dict:
 
     proc = _running_processes.pop(plugin_id, None)
     if proc is not None and proc.returncode is None:
-        try:
-            os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
-        except (ProcessLookupError, PermissionError):
-            pass
+        _force_kill_pid(proc.pid)
 
     pid = _read_pid(plugin_dir)
     if pid is not None and _is_pid_alive(pid):
-        try:
-            os.killpg(os.getpgid(pid), signal.SIGKILL)
-        except (ProcessLookupError, PermissionError):
-            try:
-                os.kill(pid, signal.SIGKILL)
-            except (ProcessLookupError, PermissionError):
-                pass
+        _force_kill_pid(pid)
 
     shutil.rmtree(plugin_dir)
     return {"status": "ok", "message": f"Plugin '{plugin_id}' removed"}
@@ -2317,22 +2392,22 @@ async def run_shell(command: str, cwd: str | None = None) -> dict:
     }
 
     try:
-        proc = await asyncio.create_subprocess_shell(
+        proc = await _async_subprocess_shell(
             command,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             cwd=work_dir,
             env=clean_env,
+            timeout=120,
         )
-        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=120)
-        output = (stdout or b"").decode(errors="replace")
-        if stderr:
-            output += "\n" + stderr.decode(errors="replace")
+        output = (proc.stdout or b"").decode(errors="replace")
+        if proc.stderr:
+            output += "\n" + proc.stderr.decode(errors="replace")
         return {
             "output": output.strip()[-4000:],
             "exit_code": proc.returncode,
         }
-    except TimeoutError:
+    except subprocess.TimeoutExpired:
         return {"output": "Command timed out (120s limit)", "exit_code": -1}
     except Exception as e:
         return {"output": f"Error: {e}", "exit_code": -1}

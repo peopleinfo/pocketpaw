@@ -5,13 +5,13 @@ Every Python module in this package (except ``_base``) that exposes a
 new ``.py`` file here — no other wiring needed.
 """
 
-import asyncio
 import importlib
 import json
 import logging
 import pkgutil
 import platform
 import shutil
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -103,29 +103,29 @@ async def install_builtin(app_id: str, plugins_dir: Path) -> dict:
         json.dumps(defn["manifest"], indent=2), encoding="utf-8"
     )
 
-    # Write overlay files (install.sh, start.sh, openapi.json, etc.)
+    # Write overlay files (install.py, start.py, openapi.json, etc.)
     for filename, content in defn.get("files", {}).items():
         (dest / filename).write_text(content, encoding="utf-8")
 
-    # Run install command in sandboxed env
-    install_cmd = defn["manifest"].get("install")
-    if install_cmd:
-        from pocketpaw.ai_ui.plugins import _sandbox_install_env
+    # Run install command in sandboxed env (resolved cross-platform)
+    from pocketpaw.ai_ui.plugins import (
+        _async_subprocess_shell,
+        _resolve_phase_command,
+        _sandbox_install_env,
+    )
 
+    install_cmd = _resolve_phase_command(dest, defn["manifest"], "install")
+    if install_cmd:
         sandbox_env = _sandbox_install_env(dest, defn["manifest"])
-        proc = await asyncio.create_subprocess_shell(
+        proc = await _async_subprocess_shell(
             install_cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             cwd=str(dest),
             env=sandbox_env,
         )
-        _, stderr_out = await asyncio.wait_for(
-            proc.communicate(), timeout=300
-        )
-
         if proc.returncode != 0:
-            err = stderr_out.decode(errors="replace").strip()
+            err = proc.stderr.decode(errors="replace").strip()
             raise RuntimeError(
                 f"Failed to setup built-in '{app_id}': {err}"
             )
@@ -146,14 +146,15 @@ async def _clone_source(git_url: str, dest: Path) -> None:
     if dest.exists():
         shutil.rmtree(dest)
 
-    proc = await asyncio.create_subprocess_exec(
+    from pocketpaw.ai_ui.plugins import _async_subprocess_exec
+
+    proc = await _async_subprocess_exec(
         "git", "clone", "--depth=1", git_url, str(dest),
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
     )
-    _, stderr_out = await asyncio.wait_for(proc.communicate(), timeout=300)
     if proc.returncode != 0:
-        err = stderr_out.decode(errors="replace").strip()
+        err = proc.stderr.decode(errors="replace").strip()
         raise RuntimeError(
             f"Couldn't clone {git_url}. Check your internet connection.\n{err}"
         )
