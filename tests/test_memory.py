@@ -83,7 +83,7 @@ class TestFileMemoryStore:
 
         # Check file was created
         assert memory_store.long_term_file.exists()
-        content = memory_store.long_term_file.read_text()
+        content = memory_store.long_term_file.read_text(encoding="utf-8")
         assert "User prefers dark mode" in content
 
     @pytest.mark.asyncio

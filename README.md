@@ -123,6 +123,9 @@ pocketpaw
 ```
 ---
 
+> [!TIP]
+> **First Run:** After opening the dashboard, the system health may show **UNHEALTHY** — this is expected if no API key is configured. The app itself is running correctly; only AI features are disabled. Go to **Settings > API Keys** to add your key, or [use Ollama for free local inference](#features).
+
     
 > **Note:** Some features (browser automation, shell tools) work best under WSL2. Native Windows support covers the web dashboard and all LLM chat features.
 
@@ -304,6 +307,18 @@ powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | ie
 # Or via pip
 pip install uv
 ```
+
+> **Windows Note:** After installing `uv` via the PowerShell script, you may need to **restart your terminal** for the `uv` command to be recognized. The installer adds `uv` to `C:\Users\<your-username>\.local\bin` and updates your PATH, but the current session won't reflect this change until you open a new terminal window.
+>
+> If you want to use `uv` immediately without restarting, run:
+> ```powershell
+> $env:Path = "$env:USERPROFILE\.local\bin;$env:Path"
+> ```
+>
+> Verify the installation:
+> ```powershell
+> uv --version
+> ```
 
 **Setup and run:**
 

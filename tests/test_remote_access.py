@@ -49,7 +49,7 @@ def test_token_generation(mock_config):
     assert token is not None
     assert len(token) > 20  # UUID length
     assert token_path.exists()
-    assert token_path.read_text() == token
+    assert token_path.read_text(encoding="utf-8") == token
 
 
 def test_auth_middleware_deny():

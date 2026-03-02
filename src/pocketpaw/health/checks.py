@@ -10,7 +10,6 @@ from __future__ import annotations
 import importlib.util
 import json
 import logging
-import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
@@ -302,12 +301,6 @@ def check_api_key_primary() -> HealthCheckResult:
     )
 
 
-# API key format patterns
-_KEY_PATTERNS = {
-    "anthropic_api_key": re.compile(r"^sk-ant-"),
-    "openai_api_key": re.compile(r"^sk-"),
-}
-
 # Backends that do not require API key format validation here because
 # credentials are handled by external CLIs or provider-specific flows.
 _SKIP_OPENAI_FORMAT_BACKENDS = {"codex_cli", "opencode", "copilot_sdk"}
@@ -316,20 +309,20 @@ _SKIP_OPENAI_FORMAT_BACKENDS = {"codex_cli", "opencode", "copilot_sdk"}
 _DISK_WARN_MB = 2048
 _DISK_CRITICAL_MB = 5120
 
-
 def check_api_key_format() -> HealthCheckResult:
     """Validate that configured API keys match expected prefix patterns."""
-    from pocketpaw.config import get_settings
+    from pocketpaw.config import _API_KEY_PATTERNS, get_settings
 
     settings = get_settings()
     backend = str(getattr(settings, "agent_backend", "") or "")
     warnings = []
 
-    for field_name, pattern in _KEY_PATTERNS.items():
+    for field_name, validator in _API_KEY_PATTERNS.items():
         if field_name == "openai_api_key" and backend in _SKIP_OPENAI_FORMAT_BACKENDS:
             continue
         value = getattr(settings, field_name, None)
-        if value and not pattern.match(value):
+        pattern = validator["pattern"]
+        if value and isinstance(value, str) and not pattern.match(value):
             warnings.append(f"{field_name} doesn't match expected format ({pattern.pattern})")
 
     if warnings:
@@ -784,6 +777,15 @@ async def check_llm_reachable() -> HealthCheckResult:
                     status="critical",
                     message=f"OpenAI API reachable but key is invalid (HTTP {resp.status_code})",
                     fix_hint="Check your OpenAI API key in Settings > API Keys.",
+                )
+            else:
+                return HealthCheckResult(
+                    check_id="llm_reachable",
+                    name="LLM Reachable",
+                    category="connectivity",
+                    status="warning",
+                    message=f"OpenAI API returned unexpected HTTP {resp.status_code}",
+                    fix_hint="Check https://status.openai.com for outages.",
                 )
         except Exception as e:
             return HealthCheckResult(

@@ -178,6 +178,6 @@ def test_round_trip_save_load(tmp_path):
     config_path.write_text(json.dumps(save_dict))
 
     # Load back
-    data = json.loads(config_path.read_text())
+    data = json.loads(config_path.read_text(encoding="utf-8"))
     loaded = Settings(**data)
     assert loaded.channel_autostart == {"discord": False, "teams": True}

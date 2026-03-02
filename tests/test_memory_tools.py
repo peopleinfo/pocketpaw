@@ -285,7 +285,7 @@ class TestSessionListAPI:
         for session_file in sorted(
             sessions_path.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True
         ):
-            data = json.loads(session_file.read_text())
+            data = json.loads(session_file.read_text(encoding="utf-8"))
             if data:
                 first_msg = data[0]
                 last_msg = data[-1]
@@ -341,7 +341,7 @@ class TestSessionListAPI:
         sessions = []
         for session_file in sessions_dir.glob("*.json"):
             try:
-                data = json.loads(session_file.read_text())
+                data = json.loads(session_file.read_text(encoding="utf-8"))
                 if data:
                     sessions.append({"id": session_file.stem})
             except json.JSONDecodeError:

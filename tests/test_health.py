@@ -116,7 +116,7 @@ class TestErrorStore:
     def test_record_appends_valid_jsonl(self, store):
         store.record(message="error one")
         store.record(message="error two")
-        lines = store.path.read_text().strip().splitlines()
+        lines = store.path.read_text(encoding="utf-8").strip().splitlines()
         assert len(lines) == 2
         entry = json.loads(lines[0])
         assert entry["message"] == "error one"
@@ -159,7 +159,7 @@ class TestErrorStore:
             traceback="Traceback...",
             context={"project_id": "abc"},
         )
-        entry = json.loads(store.path.read_text().strip())
+        entry = json.loads(store.path.read_text(encoding="utf-8").strip())
         assert entry["source"] == "test.module"
         assert entry["severity"] == "warning"
         assert entry["traceback"] == "Traceback..."
