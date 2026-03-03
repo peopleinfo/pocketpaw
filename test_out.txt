@@ -1,0 +1,107 @@
+============================= test session starts =============================
+platform win32 -- Python 3.12.12, pytest-9.0.2, pluggy-1.6.0
+rootdir: C:\Users\MT-Staff\Documents\GitHub\pocketpaw-extra
+configfile: pyproject.toml
+plugins: anyio-4.12.1, asyncio-1.3.0
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 1 item
+
+tests\e2e\test_plugins_wan2gp.py F                                       [100%]
+
+================================== FAILURES ===================================
+__________ TestAiUIGalleryWan2GP.test_wan2gp_install_error_reporting __________
+
+self = <test_plugins_wan2gp.TestAiUIGalleryWan2GP object at 0x0000019A11FDD2E0>
+page = <Page url='http://127.0.0.1:50171/#/ai-ui/discover'>
+dashboard_url = 'http://127.0.0.1:50171'
+
+    def test_wan2gp_install_error_reporting(self, page: Page, dashboard_url: str):
+        """Test that Wan2GP install failures display the full error message to the user."""
+        state = {"install_calls": 0}
+    
+        def handle_install(route):
+            if route.request.method == "POST":
+                state["install_calls"] += 1
+                route.fulfill(
+                    status=500,
+                    content_type="application/json",
+                    body=json.dumps({
+                        "detail": "Failed to setup built-in 'wan2gp': Wan2GP requires an NVIDIA GPU for this preset flow.\\nSet WAN2GP_ALLOW_NO_NVIDIA=1 to force install anyway."
+                    }),
+                )
+                return
+            route.continue_()
+    
+        def handle_plugins(route):
+            route.fulfill(
+                status=200,
+                content_type="application/json",
+                body=json.dumps({"plugins": []}),
+            )
+    
+        # We override just the necessary routes to control the test context for Wan2GP
+        page.route(re.compile(r".*/api/ai-ui/plugins/install(?:\?.*)?$"), handle_install)
+        page.route(re.compile(r".*/api/ai-ui/plugins(?:\?.*)?$"), handle_plugins)
+    
+        page.goto(dashboard_url)
+        # Navigate to Discover view
+        page.locator("button:has-text('AI UI Local Cloud')").click()
+        page.locator("button:has-text('Discover'):visible").first.click()
+    
+        expect(page.get_by_text("Discover AI Apps")).to_be_visible()
+    
+        # Open Wan2GP's install button. Wait for gallery items to render.
+        # Check carefully for the exact match to the Wan2GP card
+        wan2gp_card = page.locator("div:has-text('builtin:wan2gp')").first
+        expect(wan2gp_card).to_be_visible(timeout=10000)
+    
+        # Click Install
+>       wan2gp_card.locator("button:has-text('Install')").click()
+
+tests\e2e\test_plugins_wan2gp.py:50: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+.venv\Lib\site-packages\playwright\sync_api\_generated.py:15631: in click
+    self._sync(
+.venv\Lib\site-packages\playwright\_impl\_locator.py:162: in click
+    return await self._frame._click(self._selector, strict=True, **params)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\playwright\_impl\_frame.py:566: in _click
+    await self._channel.send("click", self._timeout, locals_to_params(locals()))
+.venv\Lib\site-packages\playwright\_impl\_connection.py:69: in send
+    return await self._connection.wrap_api_call(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <playwright._impl._connection.Connection object at 0x0000019A12075640>
+cb = <function Channel.send.<locals>.<lambda> at 0x0000019A120877E0>
+is_internal = False, title = None
+
+    async def wrap_api_call(
+        self, cb: Callable[[], Any], is_internal: bool = False, title: str = None
+    ) -> Any:
+        if self._api_zone.get():
+            return await cb()
+        task = asyncio.current_task(self._loop)
+        st: List[inspect.FrameInfo] = getattr(
+            task, "__pw_stack__", None
+        ) or inspect.stack(0)
+    
+        parsed_st = _extract_stack_trace_information_from_stack(st, is_internal, title)
+        self._api_zone.set(parsed_st)
+        try:
+            return await cb()
+        except Exception as error:
+>           raise rewrite_error(error, f"{parsed_st['apiName']}: {error}") from None
+E           playwright._impl._errors.Error: Locator.click: Error: strict mode violation: locator("div:has-text('builtin:wan2gp')").first.locator("button:has-text('Install')") resolved to 5 elements:
+E               1) <button title="" @click.stop="installAiUIGalleryApp(app)" :title="isGalleryInstallDisabled(app) ? galleryInstallDisabledReason(app) : ''" :disabled="aiUI.installingGalleryApp === app.id || isGalleryInstallDisabled(app)" class="px-3 py-1.5 bg-accent/10 text-accent hover:bg-accent/20 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-[11px] font-medium transition-all border border-accent/20 hover:scale-105 disabled:hover:scale-100 flex items-center gap-1.5">…</button> aka get_by_role("button", name="Install").first
+E               2) <button title="" @click.stop="installAiUIGalleryApp(app)" :title="isGalleryInstallDisabled(app) ? galleryInstallDisabledReason(app) : ''" :disabled="aiUI.installingGalleryApp === app.id || isGalleryInstallDisabled(app)" class="px-3 py-1.5 bg-accent/10 text-accent hover:bg-accent/20 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-[11px] font-medium transition-all border border-accent/20 hover:scale-105 disabled:hover:scale-100 flex items-center gap-1.5">…</button> aka get_by_role("button", name="Install").nth(1)
+E               3) <button title="" @click.stop="installAiUIGalleryApp(app)" :title="isGalleryInstallDisabled(app) ? galleryInstallDisabledReason(app) : ''" :disabled="aiUI.installingGalleryApp === app.id || isGalleryInstallDisabled(app)" class="px-3 py-1.5 bg-accent/10 text-accent hover:bg-accent/20 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-[11px] font-medium transition-all border border-accent/20 hover:scale-105 disabled:hover:scale-100 flex items-center gap-1.5">…</button> aka get_by_role("button", name="Install").nth(2)
+E               4) <button title="" @click.stop="installAiUIGalleryApp(app)" :title="isGalleryInstallDisabled(app) ? galleryInstallDisabledReason(app) : ''" :disabled="aiUI.installingGalleryApp === app.id || isGalleryInstallDisabled(app)" class="px-3 py-1.5 bg-accent/10 text-accent hover:bg-accent/20 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-[11px] font-medium transition-all border border-accent/20 hover:scale-105 disabled:hover:scale-100 flex items-center gap-1.5">…</button> aka get_by_role("button", name="Install").nth(3)
+E               5) <button title="" @click.stop="installAiUIGalleryApp(app)" :title="isGalleryInstallDisabled(app) ? galleryInstallDisabledReason(app) : ''" :disabled="aiUI.installingGalleryApp === app.id || isGalleryInstallDisabled(app)" class="px-3 py-1.5 bg-accent/10 text-accent hover:bg-accent/20 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-[11px] font-medium transition-all border border-accent/20 hover:scale-105 disabled:hover:scale-100 flex items-center gap-1.5">…</button> aka get_by_role("button", name="Install").nth(4)
+E           
+E           Call log:
+E             - waiting for locator("div:has-text('builtin:wan2gp')").first.locator("button:has-text('Install')")
+
+.venv\Lib\site-packages\playwright\_impl\_connection.py:559: Error
+=========================== short test summary info ===========================
+FAILED tests/e2e/test_plugins_wan2gp.py::TestAiUIGalleryWan2GP::test_wan2gp_install_error_reporting
+============================= 1 failed in 14.12s ==============================

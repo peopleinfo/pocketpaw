@@ -99,7 +99,15 @@ def _ensure_venv() -> Path:
     py = _venv_python()
     if py.exists():
         return py
-    _run([sys.executable, "-m", "venv", str(VENV_DIR)])
+    
+    if _has_uv():
+        print("Using uv to create isolated Python 3.10 environment (like Pinokio)...")
+        # Ask uv to fetch python 3.10 if we don't have it, and create the venv
+        _run(["uv", "venv", "--python", "3.10", str(VENV_DIR)])
+    else:
+        print("uv not found. Falling back to system python venv...")
+        _run([sys.executable, "-m", "venv", str(VENV_DIR)])
+        
     return _venv_python()
 
 

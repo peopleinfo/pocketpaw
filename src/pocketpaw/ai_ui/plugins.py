@@ -49,6 +49,7 @@ import queue
 import re
 import shutil
 import signal
+import stat
 import socket
 import subprocess
 import sys
@@ -61,6 +62,26 @@ from pathlib import Path
 from typing import Any
 
 logger = logging.getLogger(__name__)
+
+
+def _safe_rmtree(path: Path) -> None:
+    """Remove a directory tree, handling read-only files on Windows.
+
+    Git marks pack/object files as read-only, which causes ``shutil.rmtree``
+    to raise ``[WinError 5] Access is denied`` on Windows.  This helper
+    clears the read-only flag before retrying the removal.
+    """
+    def _on_error(func, fpath, exc_info):
+        try:
+            os.chmod(fpath, stat.S_IWRITE)
+            func(fpath)
+        except Exception as e:
+            # Check if this is the root path failing because of leftover files
+            if str(fpath) == str(path):
+                raise RuntimeError(f"Failed to clear plugin directory (files are locked). Is the plugin still running? ({e})") from e
+            raise RuntimeError(f"Failed to remove {fpath}: {e}") from e
+
+    shutil.rmtree(path, onerror=_on_error)
 
 
 async def _async_subprocess_shell(
@@ -303,6 +324,11 @@ def _sandbox_install_env(plugin_dir: Path, manifest: dict) -> dict[str, str]:
             val = os.environ.get(key)
             if val and key not in env:
                 env[key] = val
+
+    # Forward plugin and system specific flags
+    for key in os.environ:
+        if key.startswith("WAN2GP_") or key.startswith("POCKETPAW_") or key.startswith("PINOKIO_"):
+            env[key] = os.environ[key]
 
     return env
 
@@ -2019,7 +2045,7 @@ async def install_plugin(source: str) -> dict:
         plugin_id = src_path.name
         dest = plugins_dir / plugin_id
         if dest.exists():
-            shutil.rmtree(dest)
+            _safe_rmtree(dest)
         shutil.copytree(src_path, dest)
         return {
             "status": "ok",
@@ -2068,12 +2094,12 @@ async def install_plugin(source: str) -> dict:
         plugin_id = repo_name
         dest = plugins_dir / plugin_id
         if dest.exists():
-            shutil.rmtree(dest)
+            _safe_rmtree(dest)
 
         shutil.copytree(tmp, dest, dirs_exist_ok=True)
         git_dir = dest / ".git"
         if git_dir.exists():
-            shutil.rmtree(git_dir)
+            _safe_rmtree(git_dir)
 
     # Run install in sandboxed env (with network access for deps)
     install_cmd = _resolve_phase_command(dest, manifest, "install")
@@ -2148,7 +2174,7 @@ async def install_plugin_from_zip(zip_bytes: bytes) -> dict:
 
         dest = plugins_dir / plugin_id
         if dest.exists():
-            shutil.rmtree(dest)
+            _safe_rmtree(dest)
         shutil.copytree(plugin_root, dest)
         # Copy done while temp dir still exists
 
@@ -2364,7 +2390,7 @@ def remove_plugin(plugin_id: str) -> dict:
     if pid is not None and _is_pid_alive(pid):
         _force_kill_pid(pid)
 
-    shutil.rmtree(plugin_dir)
+    _safe_rmtree(plugin_dir)
     return {"status": "ok", "message": f"Plugin '{plugin_id}' removed"}
 
 

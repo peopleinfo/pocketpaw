@@ -8,9 +8,11 @@ new ``.py`` file here — no other wiring needed.
 import importlib
 import json
 import logging
+import os
 import pkgutil
 import platform
 import shutil
+import stat
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -67,6 +69,25 @@ def get_install_block_reason(app_id: str) -> str | None:
     return None
 
 
+def _safe_rmtree(path: Path) -> None:
+    """Remove a directory tree, handling read-only files on Windows.
+
+    Git marks pack/object files as read-only, which causes ``shutil.rmtree``
+    to raise ``[WinError 5] Access is denied`` on Windows.  This helper
+    clears the read-only flag before retrying the removal.
+    """
+    def _on_error(func, fpath, exc_info):
+        try:
+            os.chmod(fpath, stat.S_IWRITE)
+            func(fpath)
+        except Exception as e:
+            if str(fpath) == str(path):
+                raise RuntimeError(f"Failed to clear directory (files are locked). Is the plugin still running? ({e})") from e
+            raise RuntimeError(f"Failed to remove {fpath}: {e}") from e
+
+    shutil.rmtree(path, onerror=_on_error)
+
+
 # ─── Install logic ───────────────────────────────────────────────────────
 
 async def install_builtin(app_id: str, plugins_dir: Path) -> dict:
@@ -95,7 +116,7 @@ async def install_builtin(app_id: str, plugins_dir: Path) -> dict:
         await _clone_source(git_source, dest)
     else:
         if dest.exists():
-            shutil.rmtree(dest)
+            _safe_rmtree(dest)
         dest.mkdir(parents=True, exist_ok=True)
 
     # Write manifest
@@ -116,7 +137,12 @@ async def install_builtin(app_id: str, plugins_dir: Path) -> dict:
 
     install_cmd = _resolve_phase_command(dest, defn["manifest"], "install")
     if install_cmd:
+        import os
         sandbox_env = _sandbox_install_env(dest, defn["manifest"])
+        # Ensure python doesn't buffer stdout so an aborted process still gives us partial logs
+        sandbox_env["PYTHONUNBUFFERED"] = "1"
+        sandbox_env["PYTHONIOENCODING"] = "utf-8"
+        
         proc = await _async_subprocess_shell(
             install_cmd,
             stdout=subprocess.PIPE,
@@ -126,6 +152,16 @@ async def install_builtin(app_id: str, plugins_dir: Path) -> dict:
         )
         if proc.returncode != 0:
             err = proc.stderr.decode(errors="replace").strip()
+            if not err:
+                err = proc.stdout.decode(errors="replace").strip()
+            
+            if not err:
+                err = f"[No output] Command '{install_cmd}' exited with code {proc.returncode}."
+            
+            # Extract only the last few lines if stdout is very long
+            if err and len(err.splitlines()) > 50:
+                err = "...\n" + "\n".join(err.splitlines()[-50:])
+                
             raise RuntimeError(
                 f"Failed to setup built-in '{app_id}': {err}"
             )
@@ -137,14 +173,14 @@ async def install_builtin(app_id: str, plugins_dir: Path) -> dict:
 def _copy_source(source: Path, dest: Path) -> None:
     """Copy a local source directory into *dest*, replacing any existing content."""
     if dest.exists():
-        shutil.rmtree(dest)
+        _safe_rmtree(dest)
     shutil.copytree(source, dest)
 
 
 async def _clone_source(git_url: str, dest: Path) -> None:
     """Clone a git repo into *dest*, removing any existing directory first."""
     if dest.exists():
-        shutil.rmtree(dest)
+        _safe_rmtree(dest)
 
     from pocketpaw.ai_ui.plugins import _async_subprocess_exec
 
@@ -162,4 +198,4 @@ async def _clone_source(git_url: str, dest: Path) -> None:
     # Remove .git directory — the plugin is a snapshot, not a live repo
     git_dir = dest / ".git"
     if git_dir.exists():
-        shutil.rmtree(git_dir)
+        _safe_rmtree(git_dir)

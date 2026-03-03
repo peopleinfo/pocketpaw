@@ -5,7 +5,7 @@ version = "0.4.5"
 description = "The AI agent that runs on your laptop, not a datacenter. OpenClaw alternative with one-command install."
 readme = "README.md"
 license = "MIT"
-requires-python = ">=3.11"
+requires-python = ">=3.11,<3.14"
 keywords = [
     "ai", "agent", "telegram", "assistant", "automation",
     "browser", "llm", "ollama", "openai", "anthropic",
@@ -138,7 +138,7 @@ mcp = [
     "mcp>=1.0.0",
 ]
 soul = [
-    "soul-protocol>=0.2.0",
+    # "soul-protocol>=0.2.0",  # Not yet published to PyPI — uncomment when available
 ]
 
 # --- Composite extras ---
