@@ -389,6 +389,23 @@ def _bool_env(name: str, default: bool) -> bool:
     return raw.strip().lower() in {{"1", "true", "yes", "on"}}
 
 
+def _str_env(name: str, default: str) -> str:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    value = raw.strip()
+    return value or default
+
+
+def _parse_python_version(value: str) -> tuple[int, int] | None:
+    match = re.match(r"^(\\d+)(?:\\.(\\d+))?", value.strip())
+    if not match:
+        return None
+    major = int(match.group(1))
+    minor = int(match.group(2) or 0)
+    return (major, minor)
+
+
 def _has_nvidia_gpu() -> bool:
     try:
         proc = subprocess.run(
@@ -416,9 +433,36 @@ def _venv_python(venv_dir: Path) -> Path:
 def _ensure_venv(app_dir: Path) -> Path:
     venv_dir = app_dir / ".venv"
     py = _venv_python(venv_dir)
+    requested_python = _str_env(
+        "PINOKIO_PYTHON_VERSION",
+        "3.10" if bool(CONFIG.get("torch_default", False)) else "",
+    )
+    expected = _parse_python_version(requested_python) if requested_python else None
+    if requested_python and expected is None:
+        print(f"Ignoring invalid PINOKIO_PYTHON_VERSION={{requested_python!r}}")
+        requested_python = ""
     if py.exists():
-        return py
-    subprocess.run([sys.executable, "-m", "venv", str(venv_dir)], check=True, cwd=str(app_dir))
+        if not requested_python:
+            return py
+        current = _python_mm(py)
+        if current == expected:
+            return py
+        print(
+            f"Existing venv uses Python {{current[0]}}.{{current[1]}}; "
+            f"recreating with Python {{requested_python}}."
+        )
+        shutil.rmtree(venv_dir, ignore_errors=True)
+
+    if _has_cmd("uv"):
+        cmd = ["uv", "venv"]
+        if requested_python:
+            cmd.extend(["--python", requested_python])
+        cmd.extend(["--seed", str(venv_dir)])
+        print("+", " ".join(cmd))
+        subprocess.run(cmd, check=True, cwd=str(app_dir))
+    else:
+        print("uv not found; falling back to system python venv.")
+        subprocess.run([sys.executable, "-m", "venv", str(venv_dir)], check=True, cwd=str(app_dir))
     return _venv_python(venv_dir)
 
 
@@ -426,7 +470,13 @@ def _pip(py: Path, *args: str) -> None:
     # Prefer `uv pip install --python ...` when available for faster, more
     # reliable wheel resolution on heavy CUDA stacks; fall back to pip.
     if args and args[0] == "install" and _has_cmd("uv"):
-        subprocess.run(["uv", "pip", "install", "--python", str(py), *args[1:]], check=True)
+        cmd = ["uv", "pip", "install", "--python", str(py)]
+        index_strategy = _str_env("PINOKIO_UV_INDEX_STRATEGY", "unsafe-best-match")
+        if index_strategy:
+            cmd.extend(["--index-strategy", index_strategy])
+        cmd.extend(args[1:])
+        print("+", " ".join(cmd))
+        subprocess.run(cmd, check=True)
         return
     subprocess.run([str(py), "-m", "pip", *args], check=True)
 
@@ -504,7 +554,10 @@ def _install_pinokio_torch_profile(py: Path, *, with_xformers: bool) -> None:
 
 def _install_python(app_dir: Path, *, torch_enabled: bool) -> None:
     py = _ensure_venv(app_dir)
-    _pip(py, "install", "--upgrade", "pip")
+    if not _has_cmd("uv"):
+        _pip(py, "install", "--upgrade", "pip")
+    else:
+        print("Using uv pip; skipping pip self-upgrade.")
 
     if torch_enabled:
         with_xformers = _bool_env("PINOKIO_TORCH_XFORMERS", True)
@@ -545,14 +598,18 @@ def main() -> int:
 
     app_dir = ROOT / CONFIG["app_subdir"]
     source_repo = CONFIG.get("source_repo")
+    print("== [install] Ensuring source checkout ==")
     _ensure_checkout(app_dir, source_repo)
 
     if CONFIG["app_kind"] == "python":
         torch_default = bool(CONFIG.get("torch_default", False))
         torch_enabled = _bool_env("PINOKIO_TORCH_ENABLE", torch_default)
+        print("== [install] Resolving Python dependencies ==")
         _install_python(app_dir, torch_enabled=torch_enabled)
     else:
+        print("== [install] Resolving Node.js dependencies ==")
         _install_node(app_dir)
+    print("== [install] Done ==")
     return 0
 
 
@@ -607,19 +664,58 @@ def _venv_python(app_dir: Path) -> Path | None:
     return py if py.exists() else None
 
 
+def _bootstrap_install_if_needed(app_dir: Path, *, env: dict[str, str]) -> bool:
+    if CONFIG["app_kind"] != "python":
+        return True
+
+    py = _venv_python(app_dir)
+    if py is not None:
+        return True
+
+    install_script = ROOT / "pocketpaw_install.py"
+    if not install_script.exists():
+        print("Python venv not found and pocketpaw_install.py is missing.")
+        return False
+
+    print("== [start] Missing .venv; bootstrapping dependencies with pocketpaw_install.py ==")
+    proc = subprocess.run(
+        [sys.executable, str(install_script)],
+        cwd=str(ROOT),
+        env=env,
+        check=False,
+    )
+    if proc.returncode != 0:
+        print(f"Install bootstrap failed (exit={{proc.returncode}}).")
+        return False
+
+    return _venv_python(app_dir) is not None
+
+
 def main() -> int:
     app_dir = ROOT / CONFIG["app_subdir"]
+    print("== [start] Ensuring source checkout ==")
     _ensure_checkout(app_dir, CONFIG.get("source_repo"))
 
     port = str(os.getenv("PORT") or os.getenv("SERVER_PORT") or CONFIG["port"])
     env = dict(os.environ)
     env["PORT"] = port
     env.setdefault("SERVER_PORT", port)
+    env.setdefault("HOME", str(app_dir))
+    env.setdefault("MPLCONFIGDIR", str(app_dir / ".matplotlib"))
+    if os.name == "nt":
+        env.setdefault("USERPROFILE", str(app_dir))
+        env.setdefault("APPDATA", str(app_dir / ".appdata"))
+        env.setdefault("LOCALAPPDATA", str(app_dir / ".localappdata"))
+
+    if not _bootstrap_install_if_needed(app_dir, env=env):
+        print("== [start] Startup aborted due to failed dependency bootstrap ==")
+        return 1
 
     cmd = str(CONFIG["start_cmd"]).replace("{{PORT}}", port)
     if CONFIG["app_kind"] == "python":
         py = _venv_python(app_dir) or Path(sys.executable)
         cmd = re.sub(r"^python3?\\b", f'"{{py}}"', cmd)
+    print("== [start] Launching app process ==")
     return _run(cmd, cwd=app_dir, env=env)
 
 
@@ -654,7 +750,10 @@ exec python pocketpaw_start.py
         "SERVER_PORT": str(detection.port),
         "PINOKIO_TORCH_ENABLE": "1" if detection.pinokio_torch else "0",
         "PINOKIO_TORCH_XFORMERS": "1",
+        "PINOKIO_UV_INDEX_STRATEGY": "unsafe-best-match",
     }
+    if detection.pinokio_torch:
+        env["PINOKIO_PYTHON_VERSION"] = "3.10"
     if detection.source_repo:
         env["PINOKIO_SOURCE_REPO"] = detection.source_repo
     if detection.requires_nvidia:
@@ -669,8 +768,7 @@ exec python pocketpaw_start.py
     manifest = {
         "name": plugin_id.replace("-", " ").title(),
         "description": (
-            "Auto-generated PocketPaw AI UI plugin scaffold "
-            "(Python/Node/Pinokio compatible)."
+            "Auto-generated PocketPaw AI UI plugin scaffold (Python/Node/Pinokio compatible)."
         ),
         "icon": "box",
         "version": "0.2.0",

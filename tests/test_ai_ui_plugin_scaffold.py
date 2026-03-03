@@ -23,6 +23,9 @@ def test_scaffold_python_repo_creates_manifest_and_scripts(tmp_path: Path):
     assert (plugin_dir / "pocketpaw_start.py").exists()
     assert (plugin_dir / "install.sh").exists()
     assert (plugin_dir / "start.sh").exists()
+    manifest = json.loads((plugin_dir / "pocketpaw.json").read_text(encoding="utf-8"))
+    assert manifest["env"]["PINOKIO_UV_INDEX_STRATEGY"] == "unsafe-best-match"
+    assert "PINOKIO_PYTHON_VERSION" not in manifest["env"]
 
 
 def test_scaffold_keeps_existing_manifest(tmp_path: Path):
@@ -94,8 +97,15 @@ module.exports = {
     assert manifest["env"]["PINOKIO_TORCH_ENABLE"] == "1"
     assert manifest["env"]["PINOKIO_SOURCE_REPO"] == "https://github.com/acme/demo"
     assert manifest["env"]["PINOKIO_ALLOW_NO_NVIDIA"] == "0"
+    assert manifest["env"]["PINOKIO_UV_INDEX_STRATEGY"] == "unsafe-best-match"
+    assert manifest["env"]["PINOKIO_PYTHON_VERSION"] == "3.10"
     install_py = (plugin_dir / "pocketpaw_install.py").read_text(encoding="utf-8")
     assert "git clone" in install_py
+    assert "PINOKIO_UV_INDEX_STRATEGY" in install_py
+    assert "--index-strategy" in install_py
+    start_py = (plugin_dir / "pocketpaw_start.py").read_text(encoding="utf-8")
+    assert "_bootstrap_install_if_needed" in start_py
+    assert "MPLCONFIGDIR" in start_py
 
 
 def test_generated_pinokio_install_wrapper_runs_without_nameerror(tmp_path: Path):

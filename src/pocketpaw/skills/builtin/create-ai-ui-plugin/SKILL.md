@@ -26,9 +26,12 @@ When user provides `$ARGUMENTS`, do this in order:
    - plugin id
    - generated files (`pocketpaw.json`, `pocketpaw_install.py`, `pocketpaw_start.py`, `install.sh`, `start.sh`)
    - recommended next command to launch from AI UI
+   - exact runtime log path: `plugins/<plugin_id>/.pocketpaw.log`
+   - one troubleshooting hint for "Working... stuck" states: open `.pocketpaw.log` and check latest traceback/exit line
 5. Keep output concise and actionable.
 
 Rules:
 - Prefer safe defaults (Python: 8000, Node: 3000, Pinokio UI: 7860 if unknown).
 - Never delete unrelated plugin directories.
 - If source already has `pocketpaw.json`, keep existing behavior and just report that it's already a plugin.
+- Mention that generated wrappers auto-bootstrap `.venv` on first start for Python apps.
