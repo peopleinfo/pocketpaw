@@ -334,12 +334,40 @@ async def update_plugin_config_endpoint(plugin_id: str, request: Request):
         raise HTTPException(status_code=400, detail=str(e))
 
 
+@router.get("/plugins/install-steps/{app_id}")
+async def get_install_steps_endpoint(app_id: str):
+    """Get Pinokio-style install step definitions for a built-in app."""
+    from pocketpaw.ai_ui.builtins import get_install_steps
+
+    steps = get_install_steps(app_id)
+    return {"steps": steps}
+
+
+def _make_stream_logger_cb(q):
+    """Create a log callback that emits step:* messages as structured events."""
+
+    async def logger_cb(msg: str):
+        if msg.startswith("step:"):
+            step_id = msg[5:]
+            await q.put({"type": "step", "step": step_id})
+        else:
+            await q.put({"type": "log", "text": msg})
+
+    return logger_cb
+
+
 @router.post("/plugins/install")
 async def install_plugin_endpoint(request: Request):
     """Install a plugin from a Git URL, local path, or uploaded .zip file."""
+    import asyncio
+    import json
+
+    from fastapi.responses import StreamingResponse
+
     from pocketpaw.ai_ui.plugins import install_plugin, install_plugin_from_zip
 
     content_type = request.headers.get("content-type", "")
+    wants_stream = request.query_params.get("stream", "").lower() in ("1", "true", "yes")
 
     if "multipart/form-data" in content_type:
         form = await request.form()
@@ -354,6 +382,34 @@ async def install_plugin_endpoint(request: Request):
         zip_bytes = await file.read()
         if len(zip_bytes) > 100 * 1024 * 1024:
             raise HTTPException(status_code=400, detail="Zip file too large (max 100MB).")
+
+        if wants_stream:
+
+            async def upload_generator():
+                q = asyncio.Queue()
+                logger_cb = _make_stream_logger_cb(q)
+
+                async def worker():
+                    try:
+                        res = await install_plugin_from_zip(zip_bytes, log_handler=logger_cb)
+                        await q.put(res)
+                    except ValueError as e:
+                        await q.put({"status": "error", "detail": str(e)})
+                    except Exception as e:
+                        logger.exception("Plugin install from zip failed")
+                        await q.put({"status": "error", "detail": str(e)})
+                    finally:
+                        await q.put(None)
+
+                asyncio.create_task(worker())
+                while True:
+                    m = await q.get()
+                    if m is None:
+                        break
+                    yield json.dumps(m) + "\\n"
+
+            return StreamingResponse(upload_generator(), media_type="application/x-ndjson")
+
         try:
             result = await install_plugin_from_zip(zip_bytes)
             return result
@@ -367,6 +423,35 @@ async def install_plugin_endpoint(request: Request):
     source = data.get("source", "").strip()
     if not source:
         raise HTTPException(status_code=400, detail="Missing 'source' field")
+
+    wants_stream = wants_stream or data.get("stream") is True
+
+    if wants_stream:
+
+        async def install_generator():
+            q = asyncio.Queue()
+            logger_cb = _make_stream_logger_cb(q)
+
+            async def worker():
+                try:
+                    res = await install_plugin(source, log_handler=logger_cb)
+                    await q.put(res)
+                except ValueError as e:
+                    await q.put({"status": "error", "detail": str(e)})
+                except Exception as e:
+                    logger.exception("Plugin install failed for source=%s", source)
+                    await q.put({"status": "error", "detail": str(e)})
+                finally:
+                    await q.put(None)
+
+            asyncio.create_task(worker())
+            while True:
+                m = await q.get()
+                if m is None:
+                    break
+                yield json.dumps(m) + "\\n"
+
+        return StreamingResponse(install_generator(), media_type="application/x-ndjson")
 
     try:
         result = await install_plugin(source)
@@ -382,18 +467,95 @@ async def install_plugin_endpoint(request: Request):
 
 
 @router.post("/plugins/{plugin_id}/launch")
-async def launch_plugin_endpoint(plugin_id: str):
-    """Launch a plugin."""
-    from pocketpaw.ai_ui.plugins import launch_plugin
+async def launch_plugin_endpoint(plugin_id: str, request: Request):
+    """Launch a plugin. Add ?stream=1 to tail logs until port is ready."""
+    import asyncio
+    import json
 
-    try:
-        result = await launch_plugin(plugin_id)
-        return result
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        logger.exception("Plugin launch failed: %s", plugin_id)
-        raise HTTPException(status_code=500, detail=str(e))
+    from fastapi.responses import StreamingResponse
+
+    from pocketpaw.ai_ui.plugins import _is_port_listening, get_plugins_dir, launch_plugin
+
+    wants_stream = request.query_params.get("stream", "").lower() in ("1", "true", "yes")
+
+    if not wants_stream:
+        try:
+            result = await launch_plugin(plugin_id)
+            return result
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        except Exception as e:
+            logger.exception("Plugin launch failed: %s", plugin_id)
+            raise HTTPException(status_code=500, detail=str(e))
+
+    # Streaming launch: start the plugin then tail logs until port is listening
+    async def launch_stream():
+        try:
+            result = await launch_plugin(plugin_id)
+            yield json.dumps({"type": "log", "text": result.get("message", "Launched")}) + "\n"
+        except (ValueError, RuntimeError) as e:
+            yield json.dumps({"status": "error", "detail": str(e)}) + "\n"
+            return
+        except Exception as e:
+            logger.exception("Plugin launch failed: %s", plugin_id)
+            yield json.dumps({"status": "error", "detail": str(e)}) + "\n"
+            return
+
+        port = result.get("port")
+        log_path = get_plugins_dir() / plugin_id / ".pocketpaw.log"
+        last_pos = 0
+        max_wait = 120  # seconds
+        elapsed = 0
+
+        # Tail the log file until port is listening or timeout
+        while elapsed < max_wait:
+            await asyncio.sleep(1)
+            elapsed += 1
+            emitted = False
+
+            # Read new log lines
+            if log_path.exists():
+                try:
+                    with open(log_path, encoding="utf-8", errors="replace") as f:
+                        f.seek(last_pos)
+                        new_text = f.read()
+                        last_pos = f.tell()
+                    if new_text:
+                        for line in new_text.splitlines():
+                            if line.strip():
+                                emitted = True
+                                yield json.dumps({"type": "log", "text": line}) + "\n"
+                except OSError:
+                    pass
+
+            # Check if port is ready
+            if port:
+                try:
+                    if _is_port_listening(int(port)):
+                        yield (
+                            json.dumps({"type": "log", "text": f"App is ready on port {port}!"})
+                            + "\n"
+                        )
+                        yield json.dumps(result) + "\n"
+                        return
+                except (TypeError, ValueError):
+                    pass
+
+            if not emitted and elapsed % 5 == 0:
+                yield (
+                    json.dumps(
+                        {
+                            "type": "log",
+                            "text": f"Waiting for app to be ready... ({elapsed}s)",
+                        }
+                    )
+                    + "\n"
+                )
+
+        # Timeout - still return success since process is running
+        yield json.dumps(result) + "\n"
+
+    return StreamingResponse(launch_stream(), media_type="application/x-ndjson")
 
 
 @router.post("/plugins/{plugin_id}/stop")

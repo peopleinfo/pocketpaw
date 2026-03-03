@@ -533,17 +533,49 @@
                       class="font-semibold text-[14px] text-white/90 truncate"
                       x-text="plugin.name"
                     ></div>
-                    <div class="text-[11px] text-white/40 flex items-center gap-2">
+                    <div
+                      class="text-[11px] text-white/40 flex items-center gap-2"
+                    >
                       <span x-text="'v' + plugin.version"></span>
-                      <span class="font-mono text-white/30" x-text="'id:' + plugin.id"></span>
+                      <span
+                        class="font-mono text-white/30"
+                        x-text="'id:' + plugin.id"
+                      ></span>
                     </div>
                   </div>
                 </div>
 
                 <p
-                  class="text-[12px] text-white/40 leading-relaxed mb-4 line-clamp-2"
+                  class="text-[12px] text-white/40 leading-relaxed mb-3 line-clamp-2"
                   x-text="plugin.description || 'No description'"
                 ></p>
+
+                <!-- Isolation badges (Pinokio-style) -->
+                <template x-if="plugin.python_version || plugin.cuda_version">
+                  <div class="flex items-center gap-1.5 mb-3 flex-wrap">
+                    <template x-if="plugin.python_version">
+                      <span
+                        class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-500/10 border border-blue-500/20 text-[10px] font-medium text-blue-400"
+                        data-testid="python-version-badge"
+                      >
+                        🐍 Python <span x-text="plugin.python_version"></span>
+                      </span>
+                    </template>
+                    <template x-if="plugin.cuda_version">
+                      <span
+                        class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-green-500/10 border border-green-500/20 text-[10px] font-medium text-green-400"
+                        data-testid="cuda-version-badge"
+                      >
+                        🎮 CUDA <span x-text="plugin.cuda_version"></span>
+                      </span>
+                    </template>
+                    <span
+                      class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-purple-500/10 border border-purple-500/20 text-[10px] font-medium text-purple-400"
+                    >
+                      🔒 Isolated
+                    </span>
+                  </div>
+                </template>
 
                 <div class="flex items-center justify-between">
                   <template x-if="plugin.port">
@@ -804,6 +836,55 @@
                 ></span>
               </div>
             </div>
+
+            <!-- Isolation Environment (Pinokio-style) -->
+            <template
+              x-if="aiUI.selectedPlugin.python_version || aiUI.selectedPlugin.cuda_version"
+            >
+              <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+                <template x-if="aiUI.selectedPlugin.python_version">
+                  <div
+                    class="p-4 rounded-xl bg-blue-500/5 border border-blue-500/10"
+                  >
+                    <span
+                      class="text-[10px] uppercase tracking-wide text-blue-400/50 block mb-1"
+                      >🐍 Python (Isolated)</span
+                    >
+                    <span
+                      class="text-[14px] font-mono text-blue-400"
+                      x-text="aiUI.selectedPlugin.python_version"
+                      data-testid="detail-python-version"
+                    ></span>
+                  </div>
+                </template>
+                <template x-if="aiUI.selectedPlugin.cuda_version">
+                  <div
+                    class="p-4 rounded-xl bg-green-500/5 border border-green-500/10"
+                  >
+                    <span
+                      class="text-[10px] uppercase tracking-wide text-green-400/50 block mb-1"
+                      >🎮 CUDA</span
+                    >
+                    <span
+                      class="text-[14px] font-mono text-green-400"
+                      x-text="aiUI.selectedPlugin.cuda_version"
+                      data-testid="detail-cuda-version"
+                    ></span>
+                  </div>
+                </template>
+                <div
+                  class="p-4 rounded-xl bg-purple-500/5 border border-purple-500/10"
+                >
+                  <span
+                    class="text-[10px] uppercase tracking-wide text-purple-400/50 block mb-1"
+                    >Environment</span
+                  >
+                  <span class="text-[14px] text-purple-400 font-medium"
+                    >🔒 Fully Isolated</span
+                  >
+                </div>
+              </div>
+            </template>
 
             <!-- Description -->
             <div class="p-5 rounded-2xl bg-black/20 border border-white/5 mb-6">
@@ -1287,26 +1368,47 @@
                   x-text="app.description"
                 ></p>
                 <template x-if="isGalleryInstallDisabled(app)">
-                  <div class="mb-3 text-[11px] text-amber-300/90" x-text="galleryInstallDisabledReason(app)"></div>
+                  <div
+                    class="mb-3 text-[11px] text-amber-300/90"
+                    x-text="galleryInstallDisabledReason(app)"
+                  ></div>
                 </template>
                 <div class="flex items-center justify-between">
                   <code
                     class="text-[11px] font-mono text-white/30"
                     x-text="app.source"
                   ></code>
-                  <button
-                    class="px-3 py-1.5 bg-accent/10 text-accent hover:bg-accent/20 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-[11px] font-medium transition-all border border-accent/20 hover:scale-105 disabled:hover:scale-100 flex items-center gap-1.5"
-                    :disabled="aiUI.installingGalleryApp === app.id || isGalleryInstallDisabled(app)"
-                    :title="isGalleryInstallDisabled(app) ? galleryInstallDisabledReason(app) : ''"
-                    @click.stop="installAiUIGalleryApp(app)"
-                  >
-                    <i
-                      :data-lucide="galleryActionIcon(app)"
-                      :class="aiUI.installingGalleryApp === app.id ? 'animate-spin' : ''"
-                      class="w-3 h-3"
-                    ></i>
-                    <span x-text="galleryInstallLabel(app)"></span>
-                  </button>
+                  <div class="flex items-center gap-2">
+                    <button
+                      class="px-3 py-1.5 bg-accent/10 text-accent hover:bg-accent/20 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-[11px] font-medium transition-all border border-accent/20 hover:scale-105 disabled:hover:scale-100 flex items-center gap-1.5"
+                      :disabled="aiUI.installingGalleryApp === app.id || isGalleryInstallDisabled(app)"
+                      :title="isGalleryInstallDisabled(app) ? galleryInstallDisabledReason(app) : ''"
+                      @click.stop="installAiUIGalleryApp(app)"
+                    >
+                      <i
+                        :data-lucide="galleryActionIcon(app)"
+                        :class="aiUI.installingGalleryApp === app.id ? 'animate-spin' : ''"
+                        class="w-3 h-3"
+                      ></i>
+                      <span x-text="galleryInstallLabel(app)"></span>
+                    </button>
+                    <template
+                      x-if="aiUI.plugins.some(p => p.id === app.id || p.source === app.source || 'builtin:' + p.id === app.source)"
+                    >
+                      <button
+                        title="Reinstall"
+                        class="p-1.5 bg-white/5 text-white/70 hover:bg-white/10 hover:text-white rounded-lg transition-all border border-white/10 flex items-center justify-center disabled:opacity-50"
+                        :disabled="aiUI.installingGalleryApp === app.id"
+                        @click.stop="installAiUIGalleryApp(app)"
+                      >
+                        <i
+                          data-lucide="refresh-cw"
+                          :class="aiUI.installingGalleryApp === app.id ? 'animate-spin' : ''"
+                          class="w-3.5 h-3.5"
+                        ></i>
+                      </button>
+                    </template>
+                  </div>
                 </div>
               </div>
             </template>
@@ -1490,7 +1592,9 @@
                 <option value="gemini">gemini (OAuth)</option>
               </select>
             </div>
-            <div x-show="(aiUI.pluginConfigDraft.LLM_BACKEND || 'g4f').toLowerCase() === 'g4f'">
+            <div
+              x-show="(aiUI.pluginConfigDraft.LLM_BACKEND || 'g4f').toLowerCase() === 'g4f'"
+            >
               <label
                 class="block text-[12px] font-semibold text-white/70 mb-1.5"
                 >G4F Provider</label
@@ -1594,7 +1698,8 @@
                 </select>
               </div>
               <div>
-                <label class="block text-[12px] font-semibold text-white/70 mb-1.5"
+                <label
+                  class="block text-[12px] font-semibold text-white/70 mb-1.5"
                   x-text="(aiUI.pluginConfigDraft.OLLAMA_DEPLOYMENT || 'local') === 'cloud' ? 'Ollama Cloud Model' : 'Ollama Local Model'"
                   >Ollama Model</label
                 >
@@ -1645,7 +1750,8 @@
                 </div>
               </div>
               <div>
-                <label class="block text-[12px] font-semibold text-white/70 mb-1.5"
+                <label
+                  class="block text-[12px] font-semibold text-white/70 mb-1.5"
                   >Ollama Base URL</label
                 >
                 <input
@@ -1655,11 +1761,15 @@
                   class="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/30 text-[14px] focus:border-accent focus:outline-none"
                 />
                 <p class="text-[11px] text-white/40 mt-1">
-                  Local default: http://127.0.0.1:11434/v1 • Cloud default: https://ollama.com/v1
+                  Local default: http://127.0.0.1:11434/v1 • Cloud default:
+                  https://ollama.com/v1
                 </p>
               </div>
-              <div x-show="(aiUI.pluginConfigDraft.OLLAMA_DEPLOYMENT || 'local') === 'cloud'">
-                <label class="block text-[12px] font-semibold text-white/70 mb-1.5"
+              <div
+                x-show="(aiUI.pluginConfigDraft.OLLAMA_DEPLOYMENT || 'local') === 'cloud'"
+              >
+                <label
+                  class="block text-[12px] font-semibold text-white/70 mb-1.5"
                   >Ollama API Key</label
                 >
                 <input
@@ -1673,10 +1783,12 @@
                 x-show="(aiUI.pluginConfigDraft.OLLAMA_DEPLOYMENT || 'local') === 'local'"
                 class="rounded-xl border border-white/10 bg-white/5 p-3 space-y-2"
               >
-                <div class="text-[12px] text-white/70 font-semibold">Local Ollama Runtime</div>
+                <div class="text-[12px] text-white/70 font-semibold">
+                  Local Ollama Runtime
+                </div>
                 <p class="text-[11px] text-white/50">
-                  Installs and starts the built-in local Ollama service (plugin `ollama`) on
-                  port 11434.
+                  Installs and starts the built-in local Ollama service (plugin
+                  `ollama`) on port 11434.
                 </p>
                 <button
                   type="button"
@@ -1684,12 +1796,18 @@
                   :disabled="aiUI.localOllamaSetupInProgress"
                   @click="setupLocalOllamaForAiFastApi()"
                 >
-                  <span x-show="!aiUI.localOllamaSetupInProgress">Setup / Start Local Ollama</span>
-                  <span x-show="aiUI.localOllamaSetupInProgress">Setting up...</span>
+                  <span x-show="!aiUI.localOllamaSetupInProgress"
+                    >Setup / Start Local Ollama</span
+                  >
+                  <span x-show="aiUI.localOllamaSetupInProgress"
+                    >Setting up...</span
+                  >
                 </button>
               </div>
             </div>
-            <div x-show="(aiUI.pluginConfigDraft.LLM_BACKEND || 'g4f').toLowerCase() === 'codex'">
+            <div
+              x-show="(aiUI.pluginConfigDraft.LLM_BACKEND || 'g4f').toLowerCase() === 'codex'"
+            >
               <label
                 class="block text-[12px] font-semibold text-white/70 mb-1.5"
                 >Codex Model</label
@@ -1711,7 +1829,9 @@
                 </button>
               </div>
             </div>
-            <div x-show="(aiUI.pluginConfigDraft.LLM_BACKEND || 'g4f').toLowerCase() === 'qwen'">
+            <div
+              x-show="(aiUI.pluginConfigDraft.LLM_BACKEND || 'g4f').toLowerCase() === 'qwen'"
+            >
               <label
                 class="block text-[12px] font-semibold text-white/70 mb-1.5"
                 >Qwen Model</label
@@ -1733,7 +1853,9 @@
                 </button>
               </div>
             </div>
-            <div x-show="(aiUI.pluginConfigDraft.LLM_BACKEND || 'g4f').toLowerCase() === 'gemini'">
+            <div
+              x-show="(aiUI.pluginConfigDraft.LLM_BACKEND || 'g4f').toLowerCase() === 'gemini'"
+            >
               <label
                 class="block text-[12px] font-semibold text-white/70 mb-1.5"
                 >Gemini Model</label
@@ -1759,8 +1881,13 @@
               x-show="(aiUI.pluginConfigDraft.LLM_BACKEND || 'g4f').toLowerCase() === 'codex'"
               class="rounded-xl border border-white/10 bg-white/5 p-3 space-y-2"
             >
-              <div class="text-[12px] text-white/70 font-semibold">Codex OAuth</div>
-              <div class="text-[11px] text-white/50" x-show="!aiUI.codexAuthStatus">
+              <div class="text-[12px] text-white/70 font-semibold">
+                Codex OAuth
+              </div>
+              <div
+                class="text-[11px] text-white/50"
+                x-show="!aiUI.codexAuthStatus"
+              >
                 Click Start OAuth Login, then complete browser sign-in.
               </div>
               <div class="text-[11px]" x-show="aiUI.codexAuthStatus">
@@ -1769,7 +1896,10 @@
                   x-text="aiUI.codexAuthStatus?.logged_in ? 'Connected' : 'Not connected'"
                 ></span>
                 <span class="text-white/40"> · </span>
-                <span class="text-white/60" x-text="aiUI.codexAuthStatus?.message || ''"></span>
+                <span
+                  class="text-white/60"
+                  x-text="aiUI.codexAuthStatus?.message || ''"
+                ></span>
               </div>
               <div class="flex gap-2 items-center">
                 <button
@@ -1789,7 +1919,10 @@
                   Refresh
                 </button>
               </div>
-              <div class="text-[11px] text-white/60 break-all" x-show="aiUI.codexVerificationUri">
+              <div
+                class="text-[11px] text-white/60 break-all"
+                x-show="aiUI.codexVerificationUri"
+              >
                 URL:
                 <a
                   :href="aiUI.codexVerificationUri"
@@ -1797,16 +1930,28 @@
                   x-text="aiUI.codexVerificationUri"
                 ></a>
               </div>
-              <div class="text-[11px] text-white/60" x-show="aiUI.codexUserCode">
-                Code: <span class="font-mono text-white" x-text="aiUI.codexUserCode"></span>
+              <div
+                class="text-[11px] text-white/60"
+                x-show="aiUI.codexUserCode"
+              >
+                Code:
+                <span
+                  class="font-mono text-white"
+                  x-text="aiUI.codexUserCode"
+                ></span>
               </div>
             </div>
             <div
               x-show="(aiUI.pluginConfigDraft.LLM_BACKEND || 'g4f').toLowerCase() === 'qwen'"
               class="rounded-xl border border-white/10 bg-white/5 p-3 space-y-2"
             >
-              <div class="text-[12px] text-white/70 font-semibold">Qwen OAuth</div>
-              <div class="text-[11px] text-white/50" x-show="!aiUI.qwenAuthStatus">
+              <div class="text-[12px] text-white/70 font-semibold">
+                Qwen OAuth
+              </div>
+              <div
+                class="text-[11px] text-white/50"
+                x-show="!aiUI.qwenAuthStatus"
+              >
                 Click Start OAuth Login, then complete browser sign-in.
               </div>
               <div class="text-[11px]" x-show="aiUI.qwenAuthStatus">
@@ -1815,7 +1960,10 @@
                   x-text="aiUI.qwenAuthStatus?.logged_in ? 'Connected' : 'Not connected'"
                 ></span>
                 <span class="text-white/40"> · </span>
-                <span class="text-white/60" x-text="aiUI.qwenAuthStatus?.message || ''"></span>
+                <span
+                  class="text-white/60"
+                  x-text="aiUI.qwenAuthStatus?.message || ''"
+                ></span>
               </div>
               <div class="flex gap-2 items-center">
                 <button
@@ -1835,7 +1983,10 @@
                   Refresh
                 </button>
               </div>
-              <div class="text-[11px] text-white/60 break-all" x-show="aiUI.qwenVerificationUri">
+              <div
+                class="text-[11px] text-white/60 break-all"
+                x-show="aiUI.qwenVerificationUri"
+              >
                 URL:
                 <a
                   :href="aiUI.qwenVerificationUri"
@@ -1844,15 +1995,24 @@
                 ></a>
               </div>
               <div class="text-[11px] text-white/60" x-show="aiUI.qwenUserCode">
-                Code: <span class="font-mono text-white" x-text="aiUI.qwenUserCode"></span>
+                Code:
+                <span
+                  class="font-mono text-white"
+                  x-text="aiUI.qwenUserCode"
+                ></span>
               </div>
             </div>
             <div
               x-show="(aiUI.pluginConfigDraft.LLM_BACKEND || 'g4f').toLowerCase() === 'gemini'"
               class="rounded-xl border border-white/10 bg-white/5 p-3 space-y-2"
             >
-              <div class="text-[12px] text-white/70 font-semibold">Gemini OAuth</div>
-              <div class="text-[11px] text-white/50" x-show="!aiUI.geminiAuthStatus">
+              <div class="text-[12px] text-white/70 font-semibold">
+                Gemini OAuth
+              </div>
+              <div
+                class="text-[11px] text-white/50"
+                x-show="!aiUI.geminiAuthStatus"
+              >
                 Click Start OAuth Login, then complete browser sign-in.
               </div>
               <div class="text-[11px]" x-show="aiUI.geminiAuthStatus">
@@ -1861,7 +2021,10 @@
                   x-text="aiUI.geminiAuthStatus?.logged_in ? 'Connected' : 'Not connected'"
                 ></span>
                 <span class="text-white/40"> · </span>
-                <span class="text-white/60" x-text="aiUI.geminiAuthStatus?.message || ''"></span>
+                <span
+                  class="text-white/60"
+                  x-text="aiUI.geminiAuthStatus?.message || ''"
+                ></span>
               </div>
               <div class="flex gap-2 items-center">
                 <button
@@ -1870,7 +2033,9 @@
                   :disabled="aiUI.geminiAuthPolling"
                   @click="startGeminiOAuth()"
                 >
-                  <span x-show="!aiUI.geminiAuthPolling">Start OAuth Login</span>
+                  <span x-show="!aiUI.geminiAuthPolling"
+                    >Start OAuth Login</span
+                  >
                   <span x-show="aiUI.geminiAuthPolling">Waiting...</span>
                 </button>
                 <button
@@ -1881,7 +2046,10 @@
                   Refresh
                 </button>
               </div>
-              <div class="text-[11px] text-white/60 break-all" x-show="aiUI.geminiVerificationUri">
+              <div
+                class="text-[11px] text-white/60 break-all"
+                x-show="aiUI.geminiVerificationUri"
+              >
                 URL:
                 <a
                   :href="aiUI.geminiVerificationUri"
@@ -1889,11 +2057,20 @@
                   x-text="aiUI.geminiVerificationUri"
                 ></a>
               </div>
-              <div class="text-[11px] text-white/60" x-show="aiUI.geminiUserCode">
-                Code: <span class="font-mono text-white" x-text="aiUI.geminiUserCode"></span>
+              <div
+                class="text-[11px] text-white/60"
+                x-show="aiUI.geminiUserCode"
+              >
+                Code:
+                <span
+                  class="font-mono text-white"
+                  x-text="aiUI.geminiUserCode"
+                ></span>
               </div>
             </div>
-            <div x-show="(aiUI.pluginConfigDraft.LLM_BACKEND || 'g4f').toLowerCase() === 'auto'">
+            <div
+              x-show="(aiUI.pluginConfigDraft.LLM_BACKEND || 'g4f').toLowerCase() === 'auto'"
+            >
               <label
                 class="block text-[12px] font-semibold text-white/70 mb-1.5"
                 >Auto Max Rotate Retry</label
@@ -1910,7 +2087,9 @@
                 Failed request rotates to the next active backend only.
               </p>
             </div>
-            <div x-show="(aiUI.pluginConfigDraft.LLM_BACKEND || 'g4f').toLowerCase() === 'auto'">
+            <div
+              x-show="(aiUI.pluginConfigDraft.LLM_BACKEND || 'g4f').toLowerCase() === 'auto'"
+            >
               <label
                 class="block text-[12px] font-semibold text-white/70 mb-1.5"
                 >Auto Rotate Backends</label
@@ -1925,8 +2104,11 @@
                 Comma-separated order, for example: g4f,ollama,codex,qwen,gemini
               </p>
             </div>
-            <div x-show="(aiUI.pluginConfigDraft.LLM_BACKEND || 'g4f').toLowerCase() === 'auto'">
-              <label class="block text-[12px] font-semibold text-white/70 mb-1.5"
+            <div
+              x-show="(aiUI.pluginConfigDraft.LLM_BACKEND || 'g4f').toLowerCase() === 'auto'"
+            >
+              <label
+                class="block text-[12px] font-semibold text-white/70 mb-1.5"
                 >Auto G4F Model</label
               >
               <input
@@ -1936,8 +2118,11 @@
                 class="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/30 text-[14px] focus:border-accent focus:outline-none"
               />
             </div>
-            <div x-show="(aiUI.pluginConfigDraft.LLM_BACKEND || 'g4f').toLowerCase() === 'auto'">
-              <label class="block text-[12px] font-semibold text-white/70 mb-1.5"
+            <div
+              x-show="(aiUI.pluginConfigDraft.LLM_BACKEND || 'g4f').toLowerCase() === 'auto'"
+            >
+              <label
+                class="block text-[12px] font-semibold text-white/70 mb-1.5"
                 >Auto Ollama Model</label
               >
               <input
@@ -1947,8 +2132,11 @@
                 class="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/30 text-[14px] focus:border-accent focus:outline-none"
               />
             </div>
-            <div x-show="(aiUI.pluginConfigDraft.LLM_BACKEND || 'g4f').toLowerCase() === 'auto'">
-              <label class="block text-[12px] font-semibold text-white/70 mb-1.5"
+            <div
+              x-show="(aiUI.pluginConfigDraft.LLM_BACKEND || 'g4f').toLowerCase() === 'auto'"
+            >
+              <label
+                class="block text-[12px] font-semibold text-white/70 mb-1.5"
                 >Auto Codex Model</label
               >
               <input
@@ -1958,8 +2146,11 @@
                 class="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/30 text-[14px] focus:border-accent focus:outline-none"
               />
             </div>
-            <div x-show="(aiUI.pluginConfigDraft.LLM_BACKEND || 'g4f').toLowerCase() === 'auto'">
-              <label class="block text-[12px] font-semibold text-white/70 mb-1.5"
+            <div
+              x-show="(aiUI.pluginConfigDraft.LLM_BACKEND || 'g4f').toLowerCase() === 'auto'"
+            >
+              <label
+                class="block text-[12px] font-semibold text-white/70 mb-1.5"
                 >Auto Qwen Model</label
               >
               <input
@@ -1969,8 +2160,11 @@
                 class="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/30 text-[14px] focus:border-accent focus:outline-none"
               />
             </div>
-            <div x-show="(aiUI.pluginConfigDraft.LLM_BACKEND || 'g4f').toLowerCase() === 'auto'">
-              <label class="block text-[12px] font-semibold text-white/70 mb-1.5"
+            <div
+              x-show="(aiUI.pluginConfigDraft.LLM_BACKEND || 'g4f').toLowerCase() === 'auto'"
+            >
+              <label
+                class="block text-[12px] font-semibold text-white/70 mb-1.5"
                 >Auto Gemini Model</label
               >
               <input
@@ -2129,6 +2323,186 @@
             class="w-full h-full border-0 bg-white"
             sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
           ></iframe>
+        </div>
+      </div>
+    </template>
+
+    <!-- ═══════════════════ INSTALL PROGRESS MODAL ═══════════════════ -->
+    <template x-if="aiUI.installProgress.open">
+      <div
+        class="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm"
+        @click.self="aiUI.installProgress.status !== 'running' && _closeInstallProgress()"
+      >
+        <div
+          class="w-full max-w-2xl mx-4 rounded-2xl bg-[#0d1117] border border-white/10 shadow-2xl overflow-hidden flex flex-col"
+          style="max-height: 85vh"
+        >
+          <!-- Header -->
+          <div class="flex items-center justify-between px-6 py-4 border-b border-white/10 shrink-0">
+            <div class="flex items-center gap-3">
+              <div
+                class="w-10 h-10 rounded-xl flex items-center justify-center"
+                :class="aiUI.installProgress.status === 'error' ? 'bg-red-500/20' : aiUI.installProgress.status === 'done' ? 'bg-green-500/20' : 'bg-accent/20'"
+              >
+                <i
+                  :data-lucide="aiUI.installProgress.status === 'error' ? 'x-circle' : aiUI.installProgress.status === 'done' ? 'check-circle-2' : 'download'"
+                  :class="aiUI.installProgress.status === 'error' ? 'text-red-400' : aiUI.installProgress.status === 'done' ? 'text-green-400' : 'text-accent'"
+                  class="w-5 h-5"
+                ></i>
+              </div>
+              <div>
+                <h3 class="text-[15px] font-bold text-white" x-text="aiUI.installProgress.status === 'done' ? aiUI.installProgress.appName + ' is ready!' : aiUI.installProgress.status === 'error' ? 'Installation failed' : 'Installing ' + aiUI.installProgress.appName"></h3>
+                <p class="text-[11px] text-white/40" x-text="aiUI.installProgress.status === 'running' ? 'This may take a few minutes...' : aiUI.installProgress.status === 'done' ? 'You can now launch the app' : ''"></p>
+              </div>
+            </div>
+            <button
+              class="p-1.5 rounded-lg text-white/40 hover:text-white hover:bg-white/10 transition-colors"
+              :class="aiUI.installProgress.status === 'running' ? 'opacity-30 cursor-not-allowed' : ''"
+              :disabled="aiUI.installProgress.status === 'running'"
+              @click="_closeInstallProgress()"
+            >
+              <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
+          </div>
+
+          <!-- Percent progress -->
+          <div class="px-6 py-3 border-b border-white/5 shrink-0">
+            <div class="flex items-center justify-between text-[11px] mb-1.5">
+              <span class="text-white/40">Overall progress</span>
+              <span
+                class="font-semibold text-white/70"
+                x-text="Math.max(0, Math.min(100, aiUI.installProgress.progressPct || 0)) + '%'"
+              ></span>
+            </div>
+            <div class="h-1.5 rounded-full bg-white/10 overflow-hidden">
+              <div
+                class="h-full transition-all duration-300 ease-out"
+                :class="aiUI.installProgress.status === 'error' ? 'bg-red-400/80' : aiUI.installProgress.status === 'done' ? 'bg-green-400/80' : 'bg-accent'"
+                :style="'width: ' + Math.max(0, Math.min(100, aiUI.installProgress.progressPct || 0)) + '%'"
+              ></div>
+            </div>
+          </div>
+
+          <!-- Steps -->
+          <template x-if="aiUI.installProgress.steps.length > 0">
+            <div class="px-6 py-3 border-b border-white/5 shrink-0">
+              <div class="flex items-center gap-2 flex-wrap">
+                <template x-for="(step, i) in aiUI.installProgress.steps" :key="step.id">
+                  <div class="flex items-center gap-2">
+                    <div class="flex items-center gap-1.5">
+                      <!-- Step icon -->
+                      <div
+                        class="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 transition-all duration-300"
+                        :class="{
+                          'bg-green-500/20 text-green-400': step.status === 'done',
+                          'bg-accent/20 text-accent animate-pulse': step.status === 'active',
+                          'bg-red-500/20 text-red-400': step.status === 'error',
+                          'bg-white/5 text-white/30': step.status === 'pending',
+                        }"
+                      >
+                        <template x-if="step.status === 'done'">
+                          <i data-lucide="check" class="w-3 h-3"></i>
+                        </template>
+                        <template x-if="step.status === 'active'">
+                          <div class="w-2.5 h-2.5 border border-accent border-t-transparent rounded-full animate-spin"></div>
+                        </template>
+                        <template x-if="step.status === 'error'">
+                          <i data-lucide="x" class="w-3 h-3"></i>
+                        </template>
+                        <template x-if="step.status === 'pending'">
+                          <span x-text="i + 1"></span>
+                        </template>
+                      </div>
+                      <!-- Step label -->
+                      <span
+                        class="text-[11px] font-medium whitespace-nowrap transition-colors"
+                        :class="{
+                          'text-green-400/80': step.status === 'done',
+                          'text-accent': step.status === 'active',
+                          'text-red-400': step.status === 'error',
+                          'text-white/30': step.status === 'pending',
+                        }"
+                        x-text="step.label"
+                      ></span>
+                    </div>
+                    <!-- Connector line (not after last step) -->
+                    <template x-if="i < aiUI.installProgress.steps.length - 1">
+                      <div
+                        class="w-6 h-[1px] transition-colors"
+                        :class="step.status === 'done' ? 'bg-green-500/30' : 'bg-white/10'"
+                      ></div>
+                    </template>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </template>
+
+          <!-- Terminal output -->
+          <div
+            id="install-progress-log"
+            class="flex-1 overflow-y-auto px-4 py-3 font-mono text-[11px] leading-[1.6] bg-black/50 min-h-[200px]"
+            style="scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.1) transparent;"
+          >
+            <template x-if="aiUI.installProgress.logs.length === 0 && aiUI.installProgress.status === 'running'">
+              <div class="flex items-center gap-2 text-white/30 py-8 justify-center">
+                <div class="w-4 h-4 border-2 border-accent/30 border-t-accent rounded-full animate-spin"></div>
+                <span>Waiting for output...</span>
+              </div>
+            </template>
+            <template x-for="(line, i) in aiUI.installProgress.logs" :key="i">
+              <div
+                class="whitespace-pre-wrap break-all"
+                :class="line.startsWith('+') ? 'text-accent/70' : line.toLowerCase().includes('error') ? 'text-red-400/80' : line.toLowerCase().includes('success') || line.toLowerCase().includes('done') || line.toLowerCase().includes('ready') ? 'text-green-400/70' : 'text-white/50'"
+                x-text="line"
+              ></div>
+            </template>
+          </div>
+
+          <!-- Error message -->
+          <template x-if="aiUI.installProgress.error">
+            <div class="px-6 py-3 border-t border-red-500/20 bg-red-500/5 shrink-0">
+              <div class="flex items-start gap-2">
+                <i data-lucide="alert-triangle" class="w-4 h-4 text-red-400 shrink-0 mt-0.5"></i>
+                <p class="text-[12px] text-red-300/90" x-text="aiUI.installProgress.error"></p>
+              </div>
+            </div>
+          </template>
+
+          <!-- Footer -->
+          <div class="flex items-center justify-end gap-2 px-6 py-3 border-t border-white/10 shrink-0">
+            <template x-if="aiUI.installProgress.status === 'done'">
+              <div class="flex items-center gap-2">
+                <button
+                  class="px-4 py-2 text-[12px] font-medium text-white/60 hover:text-white bg-white/5 hover:bg-white/10 rounded-lg transition-colors"
+                  @click="_closeInstallProgress()"
+                >
+                  Close
+                </button>
+                <button
+                  class="px-4 py-2 text-[12px] font-bold text-white bg-accent hover:bg-accent/90 rounded-lg transition-colors flex items-center gap-1.5 shadow-lg shadow-accent/20"
+                  @click="_closeInstallProgress(); openAiUIPlugin(aiUI.installProgress.appId)"
+                >
+                  <i data-lucide="play" class="w-3.5 h-3.5"></i>
+                  Launch App
+                </button>
+              </div>
+            </template>
+            <template x-if="aiUI.installProgress.status === 'error'">
+              <button
+                class="px-4 py-2 text-[12px] font-medium text-white/60 hover:text-white bg-white/5 hover:bg-white/10 rounded-lg transition-colors"
+                @click="_closeInstallProgress()"
+              >
+                Close
+              </button>
+            </template>
+            <template x-if="aiUI.installProgress.status === 'running'">
+              <div class="flex items-center gap-2 text-[11px] text-white/30">
+                <div class="w-3 h-3 border-2 border-accent/30 border-t-accent rounded-full animate-spin"></div>
+                <span x-text="'Working... ' + Math.max(0, Math.min(100, aiUI.installProgress.progressPct || 0)) + '%'"></span>
+              </div>
+            </template>
+          </div>
         </div>
       </div>
     </template>

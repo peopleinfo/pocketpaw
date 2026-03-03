@@ -93,6 +93,19 @@ window.PocketPaw.AiUI = {
         geminiUserCode: "",
         geminiAuthPolling: false,
         localOllamaSetupInProgress: false,
+
+        // Install progress modal (Pinokio-style)
+        installProgress: {
+          open: false,
+          appName: "",
+          appId: "",
+          steps: [],
+          currentStep: null,
+          progressPct: 0,
+          logs: [],
+          status: "idle", // 'idle' | 'running' | 'done' | 'error'
+          error: null,
+        },
       },
     };
   },
@@ -106,9 +119,11 @@ window.PocketPaw.AiUI = {
         const self = this;
         window._aiUiChatBridge = {
           getPluginId: () => self.aiUI?.selectedPlugin?.id,
-          getPluginName: () => self.aiUI?.selectedPlugin?.name || 'Plugin',
-          send: (id, msgs) => self.sendAiUIChatMessage(id || self.aiUI?.selectedPlugin?.id, msgs),
-          load: (id) => self.loadAiUIChatHistory(id || self.aiUI?.selectedPlugin?.id),
+          getPluginName: () => self.aiUI?.selectedPlugin?.name || "Plugin",
+          send: (id, msgs) =>
+            self.sendAiUIChatMessage(id || self.aiUI?.selectedPlugin?.id, msgs),
+          load: (id) =>
+            self.loadAiUIChatHistory(id || self.aiUI?.selectedPlugin?.id),
           save: (id, msgs) =>
             self.saveAiUIChatHistory(id || self.aiUI?.selectedPlugin?.id, msgs),
         };
@@ -217,7 +232,7 @@ window.PocketPaw.AiUI = {
         if (!text) return;
         navigator.clipboard?.writeText(text).then(
           () => this.showToast?.(`${label} copied`, "success"),
-          () => {}
+          () => {},
         );
       },
 
@@ -225,7 +240,11 @@ window.PocketPaw.AiUI = {
         if (!["overview", "web", "api"].includes(tab)) return;
         this.aiUI.pluginDetailTab = tab;
         if (this.updateAiUIHash && this.aiUI.selectedPlugin?.id) {
-          this.updateAiUIHash("plugin-detail", this.aiUI.selectedPlugin.id, tab);
+          this.updateAiUIHash(
+            "plugin-detail",
+            this.aiUI.selectedPlugin.id,
+            tab,
+          );
         }
       },
 
@@ -260,14 +279,22 @@ window.PocketPaw.AiUI = {
 
         this.aiUI.installForm.installing = true;
         this.log?.(`[AI UI] Install requested: ${url}`, "info");
+
+        // Open progress modal (generic steps for URL installs)
+        this._openInstallProgress(url, url, [
+          { id: "clone", label: "Downloading repository" },
+          { id: "install", label: "Installing dependencies" },
+          { id: "done", label: "Ready to launch" },
+        ]);
+
         try {
-          const res = await fetch("/api/ai-ui/plugins/install", {
+          const res = await fetch("/api/ai-ui/plugins/install?stream=1", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ source: url }),
           });
-          if (res.ok) {
-            const data = await res.json();
+          const data = await this._handleInstallStream(res, url);
+          if (data) {
             this.showToast(
               data.message || "Plugin installed successfully!",
               "success",
@@ -277,22 +304,27 @@ window.PocketPaw.AiUI = {
               "success",
             );
             this.aiUI.installForm.url = "";
-            await this.fetchPlugins();
+            // Update appId so "Launch App" button works
             if (data.plugin_id) {
-              await this.openAiUIPlugin(data.plugin_id);
+              this.aiUI.installProgress.appId = data.plugin_id;
+              this.aiUI.installProgress.appName =
+                data.message?.replace(" has been added!", "") ||
+                data.plugin_id;
             }
-          } else {
-            const err = await res.json();
-            this.showToast(err.detail || "Installation failed", "error");
-            this.log?.(
-              `[AI UI] Install failed: ${url} - ${err.detail || "Installation failed"}`,
-              "error",
-            );
+            await this.fetchPlugins();
           }
         } catch (e) {
           console.error("Plugin install error:", e);
           this.showToast("Installation failed", "error");
-          this.log?.(`[AI UI] Install error: ${url} - ${e.message || e}`, "error");
+          this.log?.(
+            `[AI UI] Install error: ${url} - ${e.message || e}`,
+            "error",
+          );
+          const ip = this.aiUI.installProgress;
+          if (ip.open) {
+            ip.status = "error";
+            ip.error = e.message || "Installation failed";
+          }
         } finally {
           this.aiUI.installForm.installing = false;
         }
@@ -321,6 +353,8 @@ window.PocketPaw.AiUI = {
           plugin = this.getAiUIPluginById(pluginId) || plugin;
         }
 
+        // Auto-close progress modal before navigating to plugin detail
+        this._closeInstallProgress();
         await this.selectAiUIPlugin(plugin);
         this.setPluginDetailTab("web");
       },
@@ -337,14 +371,18 @@ window.PocketPaw.AiUI = {
 
       galleryInstallDisabledReason(app) {
         if (!this.isGalleryInstallDisabled(app)) return "";
-        return app?.install_disabled_reason || "This app is not supported on your OS.";
+        return (
+          app?.install_disabled_reason ||
+          "This app is not supported on your OS."
+        );
       },
 
       galleryInstallLabel(app) {
         if (this.aiUI.installingGalleryApp === app?.id) return "Installing...";
         if (this.isGalleryInstallDisabled(app)) return "Unsupported";
         const plugin = this.getAiUIPluginById(app?.id);
-        if (plugin) return plugin.status === "running" ? "Open" : "Start & Open";
+        if (plugin)
+          return plugin.status === "running" ? "Open" : "Start & Open";
         return "Install";
       },
 
@@ -360,7 +398,10 @@ window.PocketPaw.AiUI = {
         if (this.isGalleryInstallDisabled(app)) {
           const reason = this.galleryInstallDisabledReason(app);
           this.showToast(reason, "error");
-          this.log?.(`[AI UI] Gallery install blocked: ${app?.id} - ${reason}`, "warning");
+          this.log?.(
+            `[AI UI] Gallery install blocked: ${app?.id} - ${reason}`,
+            "warning",
+          );
           return;
         }
 
@@ -378,14 +419,35 @@ window.PocketPaw.AiUI = {
 
         this.aiUI.installingGalleryApp = app.id;
         this.log?.(`[AI UI] Gallery install requested: ${app.id}`, "info");
+
+        // Fetch install steps for progress UI (non-blocking on failure)
+        let steps = [];
+        if (source.startsWith("builtin:")) {
+          const builtinId = source.split(":")[1];
+          try {
+            const stepsRes = await fetch(
+              `/api/ai-ui/plugins/install-steps/${builtinId}`,
+            );
+            if (stepsRes.ok) {
+              const stepsData = await stepsRes.json();
+              steps = stepsData.steps || [];
+            }
+          } catch (e) {
+            /* steps are optional enhancement */
+          }
+        }
+
+        // Open progress modal
+        this._openInstallProgress(app.name || app.id, app.id, steps);
+
         try {
-          const res = await fetch("/api/ai-ui/plugins/install", {
+          const res = await fetch("/api/ai-ui/plugins/install?stream=1", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ source }),
           });
-          if (res.ok) {
-            const data = await res.json();
+          const data = await this._handleInstallStream(res, app.id);
+          if (data) {
             this.showToast(
               data.message || "Plugin installed successfully!",
               "success",
@@ -396,19 +458,19 @@ window.PocketPaw.AiUI = {
             );
             await this.fetchPlugins();
             await this.fetchGallery();
-            await this.openAiUIPlugin(data.plugin_id || app.id);
-          } else {
-            const err = await res.json();
-            this.showToast(err.detail || "Installation failed", "error");
-            this.log?.(
-              `[AI UI] Gallery install failed: ${app.id} - ${err.detail || "Installation failed"}`,
-              "error",
-            );
           }
         } catch (e) {
           console.error("Gallery install error:", e);
           this.showToast("Installation failed", "error");
-          this.log?.(`[AI UI] Gallery install error: ${app.id} - ${e.message || e}`, "error");
+          this.log?.(
+            `[AI UI] Gallery install error: ${app.id} - ${e.message || e}`,
+            "error",
+          );
+          const ip = this.aiUI.installProgress;
+          if (ip.open) {
+            ip.status = "error";
+            ip.error = e.message || "Installation failed";
+          }
         } finally {
           this.aiUI.installingGalleryApp = null;
           this.$nextTick(() => {
@@ -430,12 +492,12 @@ window.PocketPaw.AiUI = {
         try {
           const formData = new FormData();
           formData.append("file", file);
-          const res = await fetch("/api/ai-ui/plugins/install", {
+          const res = await fetch("/api/ai-ui/plugins/install?stream=1", {
             method: "POST",
             body: formData,
           });
-          if (res.ok) {
-            const data = await res.json();
+          const data = await this._handleInstallStream(res, file.name);
+          if (data) {
             this.showToast(
               data.message || "Plugin installed successfully!",
               "success",
@@ -448,74 +510,461 @@ window.PocketPaw.AiUI = {
             if (data.plugin_id) {
               await this.openAiUIPlugin(data.plugin_id);
             } else if (this.aiUI.selectedPlugin?.id) {
-              const plugin = this.aiUI.plugins.find((p) => p.id === this.aiUI.selectedPlugin.id);
+              const plugin = this.aiUI.plugins.find(
+                (p) => p.id === this.aiUI.selectedPlugin.id,
+              );
               if (plugin) this.aiUI.selectedPlugin = plugin;
             }
             this.$nextTick(() => {
               if (window.refreshIcons) window.refreshIcons();
             });
-          } else {
-            const err = await res.json();
-            this.showToast(err.detail || "Installation failed", "error");
-            this.log?.(
-              `[AI UI] Zip install failed: ${file.name} - ${err.detail || "Installation failed"}`,
-              "error",
-            );
           }
         } catch (e) {
           console.error("Plugin install from zip error:", e);
           this.showToast("Installation failed", "error");
-          this.log?.(`[AI UI] Zip install error: ${file.name} - ${e.message || e}`, "error");
+          this.log?.(
+            `[AI UI] Zip install error: ${file.name} - ${e.message || e}`,
+            "error",
+          );
         } finally {
           this.aiUI.installForm.installing = false;
           event.target.value = "";
         }
       },
 
+      _syncInstallProgressPct() {
+        const ip = this.aiUI.installProgress;
+        if (!ip) return;
+
+        if (ip.status === "done") {
+          ip.progressPct = 100;
+          return;
+        }
+
+        const steps = Array.isArray(ip.steps) ? ip.steps : [];
+        if (steps.length === 0) {
+          if (ip.status === "running" && (ip.progressPct || 0) < 5) {
+            ip.progressPct = 5;
+          }
+          return;
+        }
+
+        let doneCount = 0;
+        let activeIndex = -1;
+        for (let i = 0; i < steps.length; i++) {
+          const status = steps[i]?.status;
+          if (status === "done") {
+            doneCount += 1;
+            continue;
+          }
+          if ((status === "active" || status === "error") && activeIndex === -1) {
+            activeIndex = i;
+          }
+        }
+
+        let pct = (doneCount / steps.length) * 100;
+        if (activeIndex !== -1) {
+          pct = ((doneCount + 0.5) / steps.length) * 100;
+        } else if (ip.status === "running" && doneCount < steps.length) {
+          pct = ((doneCount + 0.1) / steps.length) * 100;
+        }
+
+        pct = Math.round(pct);
+        if (ip.status === "running") {
+          pct = Math.min(99, pct);
+        }
+        ip.progressPct = Math.max(ip.progressPct || 0, pct);
+      },
+
+      _maybeSetInstallProgressPctFromLog(text) {
+        const ip = this.aiUI.installProgress;
+        if (!ip || ip.status !== "running" || !text) return;
+
+        const matches = text.match(/\b(\d{1,3})%\b/g);
+        if (!matches || matches.length === 0) return;
+
+        const last = matches[matches.length - 1];
+        const numeric = Number(last.replace("%", ""));
+        if (!Number.isFinite(numeric) || numeric < 0 || numeric > 100) return;
+
+        const steps = Array.isArray(ip.steps) ? ip.steps : [];
+        if (steps.length === 0) {
+          ip.progressPct = Math.max(ip.progressPct || 0, Math.min(99, numeric));
+          return;
+        }
+
+        let activeIndex = steps.findIndex(
+          (step) => step.status === "active" || step.status === "error",
+        );
+        if (activeIndex < 0) {
+          activeIndex = steps.findIndex((step) => step.status === "pending");
+        }
+        if (activeIndex < 0) {
+          activeIndex = steps.length - 1;
+        }
+
+        const perStep = 100 / steps.length;
+        const base = activeIndex * perStep;
+        const pct = Math.round(base + (numeric / 100) * perStep);
+        ip.progressPct = Math.max(ip.progressPct || 0, Math.min(99, pct));
+      },
+
+      _openInstallProgress(appName, appId, steps) {
+        const ip = this.aiUI.installProgress;
+        ip.open = true;
+        ip.appName = appName || appId || "App";
+        ip.appId = appId || "";
+        ip.steps = (steps || []).map((s) => ({ ...s, status: "pending" }));
+        ip.currentStep = null;
+        ip.progressPct = 0;
+        ip.logs = [];
+        ip.status = "running";
+        ip.error = null;
+        this._syncInstallProgressPct();
+        this.$nextTick(() => {
+          if (window.refreshIcons) window.refreshIcons();
+        });
+      },
+
+      _closeInstallProgress() {
+        this.aiUI.installProgress.open = false;
+      },
+
+      async _handleInstallStream(res, nameOrSource) {
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          this.showToast(err.detail || "Installation failed", "error");
+          this.log?.(
+            `[AI UI] Install failed: ${nameOrSource} - ${err.detail || "Installation failed"}`,
+            "error",
+          );
+          // Update progress modal if open
+          const ip = this.aiUI.installProgress;
+          if (ip.open) {
+            ip.status = "error";
+            ip.error = err.detail || "Installation failed";
+            this._syncInstallProgressPct();
+          }
+          return null;
+        }
+
+        // Also push to shell tab for reference
+        this.aiUI.shell.output.push({
+          type: "command",
+          text: `$ install ${nameOrSource}`,
+          ts: new Date().toISOString(),
+        });
+
+        const ip = this.aiUI.installProgress;
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        let finalData = null;
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split(/\r?\n/);
+          buffer = lines.pop() || "";
+
+          for (const line of lines) {
+            if (!line.trim()) continue;
+            try {
+              const data = JSON.parse(line);
+              if (data.type === "step") {
+                // Mark previous step as done, mark this step as active
+                if (ip.open) {
+                  for (const s of ip.steps) {
+                    if (s.status === "active") s.status = "done";
+                  }
+                  const step = ip.steps.find((s) => s.id === data.step);
+                  if (step) {
+                    step.status = "active";
+                    ip.currentStep = data.step;
+                  }
+                  this._syncInstallProgressPct();
+                  this.$nextTick(() => {
+                    if (window.refreshIcons) window.refreshIcons();
+                  });
+                }
+              } else if (data.type === "log") {
+                const text = data.text || "";
+                // Add to progress modal logs
+                if (ip.open) {
+                  ip.logs.push(text);
+                  this._maybeSetInstallProgressPctFromLog(text);
+                  // Keep last 500 lines to avoid memory bloat
+                  if (ip.logs.length > 500) ip.logs.splice(0, ip.logs.length - 500);
+                  this.$nextTick(() => {
+                    const el = document.getElementById("install-progress-log");
+                    if (el) el.scrollTop = el.scrollHeight;
+                  });
+                }
+                // Also push to shell tab
+                this.aiUI.shell.output.push({
+                  type: "stdout",
+                  text,
+                  ts: new Date().toISOString(),
+                });
+              } else if (data.status === "ok") {
+                finalData = data;
+                if (ip.open) {
+                  for (const s of ip.steps) {
+                    if (s.status === "active" || s.status === "pending")
+                      s.status = "done";
+                  }
+                  ip.status = "done";
+                  ip.progressPct = 100;
+                  this.$nextTick(() => {
+                    if (window.refreshIcons) window.refreshIcons();
+                  });
+                }
+              } else if (data.status === "error") {
+                this.showToast(data.detail || "Installation failed", "error");
+                this.log?.(
+                  `[AI UI] Install error: ${data.detail || "Unknown error"}`,
+                  "error",
+                );
+                if (ip.open) {
+                  for (const s of ip.steps) {
+                    if (s.status === "active") s.status = "error";
+                  }
+                  ip.status = "error";
+                  ip.error = data.detail || "Unknown error";
+                  this._syncInstallProgressPct();
+                }
+                this.aiUI.shell.output.push({
+                  type: "stderr",
+                  text: `Error: ${data.detail || "Unknown error"}`,
+                  ts: new Date().toISOString(),
+                });
+              }
+            } catch (e) {
+              /* ignore parse error on bad chunk */
+            }
+          }
+        }
+        // Flush decoder and parse any trailing JSON line without newline terminator.
+        buffer += decoder.decode();
+        if (buffer.trim()) {
+          for (const line of buffer.split(/\r?\n/)) {
+            if (!line.trim()) continue;
+            try {
+              const data = JSON.parse(line);
+              if (data.type === "step") {
+                if (ip.open) {
+                  for (const s of ip.steps) {
+                    if (s.status === "active") s.status = "done";
+                  }
+                  const step = ip.steps.find((s) => s.id === data.step);
+                  if (step) {
+                    step.status = "active";
+                    ip.currentStep = data.step;
+                  }
+                  this._syncInstallProgressPct();
+                }
+              } else if (data.type === "log") {
+                const text = data.text || "";
+                if (ip.open) {
+                  ip.logs.push(text);
+                  this._maybeSetInstallProgressPctFromLog(text);
+                  if (ip.logs.length > 500) ip.logs.splice(0, ip.logs.length - 500);
+                }
+              } else if (data.status === "ok") {
+                finalData = data;
+                if (ip.open) {
+                  for (const s of ip.steps) {
+                    if (s.status === "active" || s.status === "pending")
+                      s.status = "done";
+                  }
+                  ip.status = "done";
+                  ip.progressPct = 100;
+                }
+              } else if (data.status === "error") {
+                if (ip.open) {
+                  for (const s of ip.steps) {
+                    if (s.status === "active") s.status = "error";
+                  }
+                  ip.status = "error";
+                  ip.error = data.detail || "Unknown error";
+                  this._syncInstallProgressPct();
+                }
+              }
+            } catch (e) {
+              /* ignore parse error on trailing chunk */
+            }
+          }
+        }
+
+        return finalData;
+      },
+
       async launchAiUIPlugin(pluginId) {
         this.aiUI.launchingPlugin = pluginId;
         this.log?.(`[AI UI] Launch requested: ${pluginId}`, "info");
+
+        // Open progress modal for launch with log tailing
+        const plugin = this.getAiUIPluginById(pluginId);
+        const appName = plugin?.name || pluginId;
+        this._openInstallProgress(appName, pluginId, [
+          { id: "launch", label: "Starting app" },
+          { id: "ready", label: "Waiting for app to be ready" },
+        ]);
+        const ip = this.aiUI.installProgress;
+        ip.steps[0].status = "active";
+        ip.currentStep = "launch";
+        this._syncInstallProgressPct();
+
         try {
-          const res = await fetch(`/api/ai-ui/plugins/${pluginId}/launch`, {
-            method: "POST",
-          });
-          if (res.ok) {
-            const data = await res.json();
-            this.showToast(data.message || "App launched!", "success");
-            this.log?.(
-              `[AI UI] Launch success: ${pluginId} - ${data.message || "App launched"}`,
-              "success",
-            );
-            await this.fetchPlugins();
-            await this.fetchAiUIPluginLogs(pluginId);
-            const lines = this.aiUI.logs?.[pluginId] || [];
-            if (lines.length > 0) {
-              this.log?.(`[AI UI:${pluginId}] ${lines[lines.length - 1]}`, "info");
-            }
-            // Update selected plugin if viewing detail
-            if (this.aiUI.selectedPlugin?.id === pluginId) {
-              const plugin = this.aiUI.plugins.find((p) => p.id === pluginId);
-              if (plugin) this.aiUI.selectedPlugin = plugin;
-            }
-          } else {
-            const err = await res.json();
+          const res = await fetch(
+            `/api/ai-ui/plugins/${pluginId}/launch?stream=1`,
+            { method: "POST" },
+          );
+          if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
             this.showToast(err.detail || "Launch failed", "error");
             this.log?.(
               `[AI UI] Launch failed: ${pluginId} - ${err.detail || "Launch failed"}`,
               "error",
             );
+            ip.status = "error";
+            ip.error = err.detail || "Launch failed";
+            this._syncInstallProgressPct();
             await this.fetchAiUIPluginLogs(pluginId);
-            const lines = this.aiUI.logs?.[pluginId] || [];
-            if (lines.length > 0) {
-              this.log?.(`[AI UI:${pluginId}] ${lines[lines.length - 1]}`, "error");
+            return;
+          }
+
+          // Stream launch logs
+          const reader = res.body.getReader();
+          const decoder = new TextDecoder();
+          let buffer = "";
+          let launchResult = null;
+
+          // Mark "ready" step as active once launch emits first log
+          let readyStarted = false;
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split(/\r?\n/);
+            buffer = lines.pop() || "";
+            for (const line of lines) {
+              if (!line.trim()) continue;
+              try {
+                const data = JSON.parse(line);
+                if (data.type === "log") {
+                  if (!readyStarted) {
+                    ip.steps[0].status = "done";
+                    ip.steps[1].status = "active";
+                    ip.currentStep = "ready";
+                    readyStarted = true;
+                    this._syncInstallProgressPct();
+                  }
+                  ip.logs.push(data.text || "");
+                  this._maybeSetInstallProgressPctFromLog(data.text || "");
+                  if (ip.logs.length > 500)
+                    ip.logs.splice(0, ip.logs.length - 500);
+                  this.$nextTick(() => {
+                    const el = document.getElementById("install-progress-log");
+                    if (el) el.scrollTop = el.scrollHeight;
+                  });
+                } else if (data.status === "ok" || data.pid) {
+                  launchResult = data;
+                } else if (data.status === "error") {
+                  ip.status = "error";
+                  ip.error = data.detail || "Launch failed";
+                  this._syncInstallProgressPct();
+                  this.showToast(data.detail || "Launch failed", "error");
+                }
+              } catch (e) {
+                /* ignore */
+              }
             }
+          }
+          // Flush decoder and parse any trailing JSON line without newline terminator.
+          buffer += decoder.decode();
+          if (buffer.trim()) {
+            for (const line of buffer.split(/\r?\n/)) {
+              if (!line.trim()) continue;
+              try {
+                const data = JSON.parse(line);
+                if (data.type === "log") {
+                  if (!readyStarted) {
+                    ip.steps[0].status = "done";
+                    ip.steps[1].status = "active";
+                    ip.currentStep = "ready";
+                    readyStarted = true;
+                    this._syncInstallProgressPct();
+                  }
+                  ip.logs.push(data.text || "");
+                  this._maybeSetInstallProgressPctFromLog(data.text || "");
+                  if (ip.logs.length > 500)
+                    ip.logs.splice(0, ip.logs.length - 500);
+                } else if (data.status === "ok" || data.pid) {
+                  launchResult = data;
+                } else if (data.status === "error") {
+                  ip.status = "error";
+                  ip.error = data.detail || "Launch failed";
+                  this._syncInstallProgressPct();
+                }
+              } catch (e) {
+                /* ignore parse error on trailing chunk */
+              }
+            }
+          }
+
+          // Fallback: if stream closed without final "ok" payload but plugin is running,
+          // treat launch as successful to avoid leaving modal stuck on "Working...".
+          if (!launchResult && ip.status === "running") {
+            await this.fetchPlugins();
+            const current = this.getAiUIPluginById(pluginId);
+            if (current?.status === "running") {
+              launchResult = {
+                status: "ok",
+                message: current.port
+                  ? `Plugin '${pluginId}' launched on port ${current.port}`
+                  : "App launched!",
+                port: current.port,
+              };
+            }
+          }
+
+          if (launchResult) {
+            for (const s of ip.steps) s.status = "done";
+            ip.status = "done";
+            ip.progressPct = 100;
+            this.showToast(
+              launchResult.message || "App launched!",
+              "success",
+            );
+            this.log?.(
+              `[AI UI] Launch success: ${pluginId}`,
+              "success",
+            );
+          }
+
+          await this.fetchPlugins();
+          if (this.aiUI.selectedPlugin?.id === pluginId) {
+            const p = this.aiUI.plugins.find((x) => x.id === pluginId);
+            if (p) this.aiUI.selectedPlugin = p;
           }
         } catch (e) {
           console.error("Launch error:", e);
           this.showToast("Launch failed", "error");
-          this.log?.(`[AI UI] Launch error: ${pluginId} - ${e.message || e}`, "error");
+          this.log?.(
+            `[AI UI] Launch error: ${pluginId} - ${e.message || e}`,
+            "error",
+          );
+          ip.status = "error";
+          ip.error = e.message || "Launch failed";
+          this._syncInstallProgressPct();
         } finally {
           this.aiUI.launchingPlugin = null;
+          this.$nextTick(() => {
+            if (window.refreshIcons) window.refreshIcons();
+          });
         }
       },
 
@@ -543,7 +992,10 @@ window.PocketPaw.AiUI = {
           }
         } catch (e) {
           this.showToast("Failed to stop app", "error");
-          this.log?.(`[AI UI] Stop error: ${pluginId} - ${e.message || e}`, "error");
+          this.log?.(
+            `[AI UI] Stop error: ${pluginId} - ${e.message || e}`,
+            "error",
+          );
         }
       },
 
@@ -576,7 +1028,10 @@ window.PocketPaw.AiUI = {
           }
         } catch (e) {
           this.showToast("Failed to remove plugin", "error");
-          this.log?.(`[AI UI] Remove error: ${pluginId} - ${e.message || e}`, "error");
+          this.log?.(
+            `[AI UI] Remove error: ${pluginId} - ${e.message || e}`,
+            "error",
+          );
         }
       },
 
@@ -720,7 +1175,9 @@ window.PocketPaw.AiUI = {
       // ==================== Plugin Config ====================
 
       getOllamaBaseUrlDefault(deployment) {
-        return deployment === "cloud" ? "https://ollama.com/v1" : "http://127.0.0.1:11434/v1";
+        return deployment === "cloud"
+          ? "https://ollama.com/v1"
+          : "http://127.0.0.1:11434/v1";
       },
 
       inferOllamaDeployment(baseUrl) {
@@ -737,7 +1194,9 @@ window.PocketPaw.AiUI = {
 
       getOllamaDraftModel(draft, deploymentOverride = "") {
         if (!draft || typeof draft !== "object") return "llama3.1";
-        const deployment = (deploymentOverride || this.normalizeOllamaDeployment(draft)).toLowerCase();
+        const deployment = (
+          deploymentOverride || this.normalizeOllamaDeployment(draft)
+        ).toLowerCase();
         const fallback = draft.OLLAMA_MODEL || draft.G4F_MODEL || "llama3.1";
         if (deployment === "cloud") {
           return draft.OLLAMA_CLOUD_MODEL || draft.OLLAMA_MODEL || fallback;
@@ -747,7 +1206,9 @@ window.PocketPaw.AiUI = {
 
       setOllamaDraftModel(draft, model, deploymentOverride = "") {
         if (!draft || typeof draft !== "object" || !model) return;
-        const deployment = (deploymentOverride || this.normalizeOllamaDeployment(draft)).toLowerCase();
+        const deployment = (
+          deploymentOverride || this.normalizeOllamaDeployment(draft)
+        ).toLowerCase();
         if (deployment === "cloud") {
           draft.OLLAMA_CLOUD_MODEL = model;
         } else {
@@ -763,7 +1224,8 @@ window.PocketPaw.AiUI = {
       ensureOllamaConfigDraft(draft) {
         if (!draft || typeof draft !== "object") return;
 
-        const fallbackModel = draft.OLLAMA_MODEL || draft.G4F_MODEL || "llama3.1";
+        const fallbackModel =
+          draft.OLLAMA_MODEL || draft.G4F_MODEL || "llama3.1";
         if (!draft.OLLAMA_LOCAL_MODEL) {
           draft.OLLAMA_LOCAL_MODEL = fallbackModel;
         }
@@ -775,14 +1237,19 @@ window.PocketPaw.AiUI = {
         if (!draft.OLLAMA_BASE_URL) {
           draft.OLLAMA_BASE_URL = this.getOllamaBaseUrlDefault(deployment);
         }
-        if (draft.OLLAMA_API_KEY === undefined || draft.OLLAMA_API_KEY === null) {
+        if (
+          draft.OLLAMA_API_KEY === undefined ||
+          draft.OLLAMA_API_KEY === null
+        ) {
           draft.OLLAMA_API_KEY = "";
         }
         this.syncOllamaModelCompat(draft);
       },
 
       async onAiFastApiBackendChange() {
-        const backend = (this.aiUI.pluginConfigDraft.LLM_BACKEND || "").toLowerCase();
+        const backend = (
+          this.aiUI.pluginConfigDraft.LLM_BACKEND || ""
+        ).toLowerCase();
         if (backend === "ollama") {
           this.ensureOllamaConfigDraft(this.aiUI.pluginConfigDraft);
           return;
@@ -804,7 +1271,9 @@ window.PocketPaw.AiUI = {
         const draft = this.aiUI.pluginConfigDraft || {};
         const deployment = (draft.OLLAMA_DEPLOYMENT || "local").toLowerCase();
         const current = (draft.OLLAMA_BASE_URL || "").trim();
-        const currentDefault = this.getOllamaBaseUrlDefault(this.inferOllamaDeployment(current));
+        const currentDefault = this.getOllamaBaseUrlDefault(
+          this.inferOllamaDeployment(current),
+        );
         if (!current || current === currentDefault) {
           draft.OLLAMA_BASE_URL = this.getOllamaBaseUrlDefault(deployment);
         }
@@ -817,12 +1286,18 @@ window.PocketPaw.AiUI = {
 
         this.aiUI.localOllamaSetupInProgress = true;
         try {
-          const res = await fetch(`/api/ai-ui/plugins/${pluginId}/ollama/local/setup`, {
-            method: "POST",
-          });
+          const res = await fetch(
+            `/api/ai-ui/plugins/${pluginId}/ollama/local/setup`,
+            {
+              method: "POST",
+            },
+          );
           const data = await res.json();
           if (!res.ok || data.ok === false) {
-            this.showToast(data.detail || data.message || "Local Ollama setup failed", "error");
+            this.showToast(
+              data.detail || data.message || "Local Ollama setup failed",
+              "error",
+            );
             return;
           }
 
@@ -889,7 +1364,9 @@ window.PocketPaw.AiUI = {
         }
         this.ensureOllamaConfigDraft(this.aiUI.pluginConfigDraft);
         if (pluginId === "ai-fast-api") {
-          const backend = (this.aiUI.pluginConfigDraft.LLM_BACKEND || "g4f").toLowerCase();
+          const backend = (
+            this.aiUI.pluginConfigDraft.LLM_BACKEND || "g4f"
+          ).toLowerCase();
           if (!["auto", "codex", "qwen", "gemini"].includes(backend)) {
             const host = this.aiUI.pluginConfigDraft.HOST || "0.0.0.0";
             const port = this.aiUI.pluginConfigDraft.PORT || "8000";
@@ -898,15 +1375,17 @@ window.PocketPaw.AiUI = {
             if (port) params.set("port", String(port));
             const qs = params.toString() ? "?" + params.toString() : "";
             try {
-              const modelsRes = await fetch(`/api/ai-ui/plugins/${pluginId}/models${qs}`);
+              const modelsRes = await fetch(
+                `/api/ai-ui/plugins/${pluginId}/models${qs}`,
+              );
               if (modelsRes.ok) {
                 const data = await modelsRes.json();
                 const models = data.models || [];
-                const savedModel = backend === "ollama"
-                  ? this.getOllamaDraftModel(this.aiUI.pluginConfigDraft)
-                  : (
-                      this.aiUI.pluginConfig?.G4F_MODEL || this.aiUI.pluginConfigDraft.G4F_MODEL
-                    );
+                const savedModel =
+                  backend === "ollama"
+                    ? this.getOllamaDraftModel(this.aiUI.pluginConfigDraft)
+                    : this.aiUI.pluginConfig?.G4F_MODEL ||
+                      this.aiUI.pluginConfigDraft.G4F_MODEL;
                 if (backend === "ollama") {
                   const ollamaDraft = this.aiUI.pluginConfigDraft || {};
                   const candidateModels = [
@@ -922,13 +1401,19 @@ window.PocketPaw.AiUI = {
                       models.unshift({ id: modelId });
                     }
                   }
-                } else if (savedModel && !models.some((m) => m.id === savedModel)) {
+                } else if (
+                  savedModel &&
+                  !models.some((m) => m.id === savedModel)
+                ) {
                   models.unshift({ id: savedModel });
                 }
                 this.aiUI.configModels = models;
                 if (savedModel) {
                   if (backend === "ollama") {
-                    this.setOllamaDraftModel(this.aiUI.pluginConfigDraft, savedModel);
+                    this.setOllamaDraftModel(
+                      this.aiUI.pluginConfigDraft,
+                      savedModel,
+                    );
                     this.syncOllamaModelCompat(this.aiUI.pluginConfigDraft);
                   } else {
                     this.aiUI.pluginConfigDraft.G4F_MODEL = savedModel;
@@ -937,7 +1422,10 @@ window.PocketPaw.AiUI = {
                 this.$nextTick(() => {
                   if (!savedModel) return;
                   if (backend === "ollama") {
-                    this.setOllamaDraftModel(this.aiUI.pluginConfigDraft, savedModel);
+                    this.setOllamaDraftModel(
+                      this.aiUI.pluginConfigDraft,
+                      savedModel,
+                    );
                     this.syncOllamaModelCompat(this.aiUI.pluginConfigDraft);
                   } else {
                     this.aiUI.pluginConfigDraft.G4F_MODEL = savedModel;
@@ -945,12 +1433,15 @@ window.PocketPaw.AiUI = {
                 });
               }
               if (backend === "g4f") {
-                const providersRes = await fetch(`/api/ai-ui/plugins/${pluginId}/providers${qs}`);
+                const providersRes = await fetch(
+                  `/api/ai-ui/plugins/${pluginId}/providers${qs}`,
+                );
                 if (providersRes.ok) {
                   const data = await providersRes.json();
                   const providers = data.providers || [];
                   const savedProvider =
-                    this.aiUI.pluginConfig?.G4F_PROVIDER || this.aiUI.pluginConfigDraft.G4F_PROVIDER;
+                    this.aiUI.pluginConfig?.G4F_PROVIDER ||
+                    this.aiUI.pluginConfigDraft.G4F_PROVIDER;
                   if (
                     savedProvider &&
                     savedProvider !== "auto" &&
@@ -963,7 +1454,8 @@ window.PocketPaw.AiUI = {
                     this.aiUI.pluginConfigDraft.G4F_PROVIDER = savedProvider;
                   }
                   this.$nextTick(() => {
-                    if (savedProvider) this.aiUI.pluginConfigDraft.G4F_PROVIDER = savedProvider;
+                    if (savedProvider)
+                      this.aiUI.pluginConfigDraft.G4F_PROVIDER = savedProvider;
                   });
                 }
               } else {
@@ -1014,7 +1506,8 @@ window.PocketPaw.AiUI = {
       getAiUiPluginModel(plugin) {
         const env = plugin?.env || {};
         const backend = (env.LLM_BACKEND || "g4f").toLowerCase();
-        if (backend === "auto") return env.AUTO_G4F_MODEL || env.G4F_MODEL || "gpt-4o-mini";
+        if (backend === "auto")
+          return env.AUTO_G4F_MODEL || env.G4F_MODEL || "gpt-4o-mini";
         if (backend === "ollama") return this.getOllamaDraftModel(env);
         if (backend === "codex") return env.CODEX_MODEL || "gpt-5";
         if (backend === "qwen") return env.QWEN_MODEL || "qwen3-coder-plus";
@@ -1024,13 +1517,19 @@ window.PocketPaw.AiUI = {
 
       getAiUiPluginProvider(plugin, backendOverride = "") {
         const env = plugin?.env || {};
-        const backend = (backendOverride || env.LLM_BACKEND || "g4f").toLowerCase();
+        const backend = (
+          backendOverride ||
+          env.LLM_BACKEND ||
+          "g4f"
+        ).toLowerCase();
         if (backend === "codex") return "CodexOAuth";
         if (backend === "qwen") return "QwenOAuth";
         if (backend === "gemini") return "GeminiOAuth";
         if (backend === "ollama") {
-          const deployment = (env.OLLAMA_DEPLOYMENT || this.inferOllamaDeployment(env.OLLAMA_BASE_URL))
-            .toLowerCase();
+          const deployment = (
+            env.OLLAMA_DEPLOYMENT ||
+            this.inferOllamaDeployment(env.OLLAMA_BASE_URL)
+          ).toLowerCase();
           return deployment === "cloud" ? "Cloud Ollama" : "Local Ollama";
         }
         if (backend === "g4f") return env.G4F_PROVIDER || "auto";
@@ -1042,7 +1541,10 @@ window.PocketPaw.AiUI = {
         const configuredBackend = (env.LLM_BACKEND || "g4f").toLowerCase();
         const fallbackModel = this.getAiUiPluginModel(plugin);
         if (configuredBackend !== "auto") {
-          const provider = this.getAiUiPluginProvider(plugin, configuredBackend);
+          const provider = this.getAiUiPluginProvider(
+            plugin,
+            configuredBackend,
+          );
           return `${configuredBackend} · ${provider} · ${fallbackModel}`;
         }
 
@@ -1054,7 +1556,9 @@ window.PocketPaw.AiUI = {
           route.selected_model
         ) {
           const backend = (route.selected_backend || "auto").toLowerCase();
-          const provider = route.selected_provider || this.getAiUiPluginProvider(plugin, backend);
+          const provider =
+            route.selected_provider ||
+            this.getAiUiPluginProvider(plugin, backend);
           return `${backend} · ${provider} · ${route.selected_model}`;
         }
 
@@ -1076,11 +1580,18 @@ window.PocketPaw.AiUI = {
       async startCodexOAuth() {
         const pluginId = this.aiUI.configModalPluginId;
         if (!pluginId) return;
-        this.aiUI.codexAuthStatus = { ok: false, logged_in: false, message: "Starting OAuth..." };
+        this.aiUI.codexAuthStatus = {
+          ok: false,
+          logged_in: false,
+          message: "Starting OAuth...",
+        };
         try {
-          const res = await fetch(`/api/ai-ui/plugins/${pluginId}/codex/auth/start`, {
-            method: "POST",
-          });
+          const res = await fetch(
+            `/api/ai-ui/plugins/${pluginId}/codex/auth/start`,
+            {
+              method: "POST",
+            },
+          );
           const data = await res.json();
           if (!res.ok || data.ok === false) {
             this.aiUI.codexAuthStatus = {
@@ -1107,7 +1618,11 @@ window.PocketPaw.AiUI = {
           }
         } catch (e) {
           console.error("Codex OAuth start error:", e);
-          this.aiUI.codexAuthStatus = { ok: false, logged_in: false, message: "Request failed" };
+          this.aiUI.codexAuthStatus = {
+            ok: false,
+            logged_in: false,
+            message: "Request failed",
+          };
           this.showToast("Failed to start Codex OAuth", "error");
         }
       },
@@ -1121,10 +1636,18 @@ window.PocketPaw.AiUI = {
           this.aiUI.codexOauthSessionId === sessionId
         ) {
           try {
-            const qs = new URLSearchParams({ session_id: sessionId }).toString();
-            const res = await fetch(`/api/ai-ui/plugins/${pluginId}/codex/auth/poll?${qs}`);
+            const qs = new URLSearchParams({
+              session_id: sessionId,
+            }).toString();
+            const res = await fetch(
+              `/api/ai-ui/plugins/${pluginId}/codex/auth/poll?${qs}`,
+            );
             const data = await res.json();
-            if (!res.ok || data.status === "error" || data.status === "not_found") {
+            if (
+              !res.ok ||
+              data.status === "error" ||
+              data.status === "not_found"
+            ) {
               this.aiUI.codexAuthStatus = {
                 ok: false,
                 logged_in: false,
@@ -1134,7 +1657,8 @@ window.PocketPaw.AiUI = {
               this.showToast("Codex OAuth failed", "error");
               return;
             }
-            if (data.verification_uri) this.aiUI.codexVerificationUri = data.verification_uri;
+            if (data.verification_uri)
+              this.aiUI.codexVerificationUri = data.verification_uri;
             if (data.user_code) this.aiUI.codexUserCode = data.user_code;
             if (data.status === "completed") {
               this.aiUI.codexAuthPolling = false;
@@ -1166,11 +1690,18 @@ window.PocketPaw.AiUI = {
       async startQwenOAuth() {
         const pluginId = this.aiUI.configModalPluginId;
         if (!pluginId) return;
-        this.aiUI.qwenAuthStatus = { ok: false, logged_in: false, message: "Starting OAuth..." };
+        this.aiUI.qwenAuthStatus = {
+          ok: false,
+          logged_in: false,
+          message: "Starting OAuth...",
+        };
         try {
-          const res = await fetch(`/api/ai-ui/plugins/${pluginId}/qwen/auth/start`, {
-            method: "POST",
-          });
+          const res = await fetch(
+            `/api/ai-ui/plugins/${pluginId}/qwen/auth/start`,
+            {
+              method: "POST",
+            },
+          );
           const data = await res.json();
           if (!res.ok || data.ok === false) {
             this.aiUI.qwenAuthStatus = {
@@ -1197,7 +1728,11 @@ window.PocketPaw.AiUI = {
           }
         } catch (e) {
           console.error("Qwen OAuth start error:", e);
-          this.aiUI.qwenAuthStatus = { ok: false, logged_in: false, message: "Request failed" };
+          this.aiUI.qwenAuthStatus = {
+            ok: false,
+            logged_in: false,
+            message: "Request failed",
+          };
           this.showToast("Failed to start Qwen OAuth", "error");
         }
       },
@@ -1211,10 +1746,18 @@ window.PocketPaw.AiUI = {
           this.aiUI.qwenOauthSessionId === sessionId
         ) {
           try {
-            const qs = new URLSearchParams({ session_id: sessionId }).toString();
-            const res = await fetch(`/api/ai-ui/plugins/${pluginId}/qwen/auth/poll?${qs}`);
+            const qs = new URLSearchParams({
+              session_id: sessionId,
+            }).toString();
+            const res = await fetch(
+              `/api/ai-ui/plugins/${pluginId}/qwen/auth/poll?${qs}`,
+            );
             const data = await res.json();
-            if (!res.ok || data.status === "error" || data.status === "not_found") {
+            if (
+              !res.ok ||
+              data.status === "error" ||
+              data.status === "not_found"
+            ) {
               this.aiUI.qwenAuthStatus = {
                 ok: false,
                 logged_in: false,
@@ -1224,7 +1767,8 @@ window.PocketPaw.AiUI = {
               this.showToast("Qwen OAuth failed", "error");
               return;
             }
-            if (data.verification_uri) this.aiUI.qwenVerificationUri = data.verification_uri;
+            if (data.verification_uri)
+              this.aiUI.qwenVerificationUri = data.verification_uri;
             if (data.user_code) this.aiUI.qwenUserCode = data.user_code;
             if (data.status === "completed") {
               this.aiUI.qwenAuthPolling = false;
@@ -1245,7 +1789,9 @@ window.PocketPaw.AiUI = {
         const id = pluginId || this.aiUI.configModalPluginId;
         if (!id) return;
         try {
-          const res = await fetch(`/api/ai-ui/plugins/${id}/gemini/auth/status`);
+          const res = await fetch(
+            `/api/ai-ui/plugins/${id}/gemini/auth/status`,
+          );
           if (!res.ok) return;
           this.aiUI.geminiAuthStatus = await res.json();
         } catch (_e) {
@@ -1256,11 +1802,18 @@ window.PocketPaw.AiUI = {
       async startGeminiOAuth() {
         const pluginId = this.aiUI.configModalPluginId;
         if (!pluginId) return;
-        this.aiUI.geminiAuthStatus = { ok: false, logged_in: false, message: "Starting OAuth..." };
+        this.aiUI.geminiAuthStatus = {
+          ok: false,
+          logged_in: false,
+          message: "Starting OAuth...",
+        };
         try {
-          const res = await fetch(`/api/ai-ui/plugins/${pluginId}/gemini/auth/start`, {
-            method: "POST",
-          });
+          const res = await fetch(
+            `/api/ai-ui/plugins/${pluginId}/gemini/auth/start`,
+            {
+              method: "POST",
+            },
+          );
           const data = await res.json();
           if (!res.ok || data.ok === false) {
             this.aiUI.geminiAuthStatus = {
@@ -1287,7 +1840,11 @@ window.PocketPaw.AiUI = {
           }
         } catch (e) {
           console.error("Gemini OAuth start error:", e);
-          this.aiUI.geminiAuthStatus = { ok: false, logged_in: false, message: "Request failed" };
+          this.aiUI.geminiAuthStatus = {
+            ok: false,
+            logged_in: false,
+            message: "Request failed",
+          };
           this.showToast("Failed to start Gemini OAuth", "error");
         }
       },
@@ -1301,10 +1858,18 @@ window.PocketPaw.AiUI = {
           this.aiUI.geminiOauthSessionId === sessionId
         ) {
           try {
-            const qs = new URLSearchParams({ session_id: sessionId }).toString();
-            const res = await fetch(`/api/ai-ui/plugins/${pluginId}/gemini/auth/poll?${qs}`);
+            const qs = new URLSearchParams({
+              session_id: sessionId,
+            }).toString();
+            const res = await fetch(
+              `/api/ai-ui/plugins/${pluginId}/gemini/auth/poll?${qs}`,
+            );
             const data = await res.json();
-            if (!res.ok || data.status === "error" || data.status === "not_found") {
+            if (
+              !res.ok ||
+              data.status === "error" ||
+              data.status === "not_found"
+            ) {
               this.aiUI.geminiAuthStatus = {
                 ok: false,
                 logged_in: false,
@@ -1314,7 +1879,8 @@ window.PocketPaw.AiUI = {
               this.showToast("Gemini OAuth failed", "error");
               return;
             }
-            if (data.verification_uri) this.aiUI.geminiVerificationUri = data.verification_uri;
+            if (data.verification_uri)
+              this.aiUI.geminiVerificationUri = data.verification_uri;
             if (data.user_code) this.aiUI.geminiUserCode = data.user_code;
             if (data.status === "completed") {
               this.aiUI.geminiAuthPolling = false;
@@ -1342,11 +1908,14 @@ window.PocketPaw.AiUI = {
           const body = {};
           if (host) body.host = host;
           if (port) body.port = parseInt(port, 10) || port;
-          const res = await fetch(`/api/ai-ui/plugins/${pluginId}/test-connection`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(body),
-          });
+          const res = await fetch(
+            `/api/ai-ui/plugins/${pluginId}/test-connection`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(body),
+            },
+          );
           const data = await res.json();
           this.aiUI.connectionTestResult = data;
           if (data.ok) {
@@ -1356,7 +1925,10 @@ window.PocketPaw.AiUI = {
           }
         } catch (e) {
           console.error("Test connection error:", e);
-          this.aiUI.connectionTestResult = { ok: false, message: "Request failed" };
+          this.aiUI.connectionTestResult = {
+            ok: false,
+            message: "Request failed",
+          };
           this.showToast("Test failed", "error");
         } finally {
           this.aiUI.testingConnection = false;
@@ -1372,11 +1944,14 @@ window.PocketPaw.AiUI = {
         this.aiUI.testingDetailConnection = true;
         this.aiUI.detailTestResult = null;
         try {
-          const res = await fetch(`/api/ai-ui/plugins/${pluginId}/test-connection`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: "{}",
-          });
+          const res = await fetch(
+            `/api/ai-ui/plugins/${pluginId}/test-connection`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: "{}",
+            },
+          );
           const data = await res.json();
           this.aiUI.detailTestResult = data;
           if (data.ok) {
@@ -1419,7 +1994,10 @@ window.PocketPaw.AiUI = {
             if (this.aiUI.selectedPlugin?.id === pluginId) {
               const p = this.aiUI.plugins.find((x) => x.id === pluginId);
               if (p) {
-                this.aiUI.selectedPlugin = { ...this.aiUI.selectedPlugin, env: data.config };
+                this.aiUI.selectedPlugin = {
+                  ...this.aiUI.selectedPlugin,
+                  env: data.config,
+                };
               }
             }
           } else {
@@ -1451,8 +2029,7 @@ window.PocketPaw.AiUI = {
           throw new Error(err.detail || `HTTP ${res.status}`);
         }
         const data = await res.json();
-        const content =
-          data?.choices?.[0]?.message?.content ?? "No response";
+        const content = data?.choices?.[0]?.message?.content ?? "No response";
         return { content };
       },
 

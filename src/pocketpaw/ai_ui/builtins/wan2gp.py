@@ -10,6 +10,8 @@ _MANIFEST = {
     ),
     "icon": "film",
     "version": "1.0.0",
+    "python_version": "3.10",
+    "cuda_version": "12.8",
     "start": "python pocketpaw_start.py",
     "install": "python pocketpaw_install.py",
     "requires": ["python", "git"],
@@ -27,6 +29,7 @@ from __future__ import annotations
 
 import os
 import platform
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -80,7 +83,10 @@ def _has_uv() -> bool:
 
 def _pip(py: Path, *args: str) -> None:
     if args and args[0] == "install" and _has_uv():
-        _run(["uv", "pip", "install", "--python", str(py), *args[1:]])
+        # --index-strategy unsafe-best-match: allow packages from any index
+        # (needed for onnxruntime-gpu which lives on a nightly CUDA index)
+        _run(["uv", "pip", "install", "--index-strategy", "unsafe-best-match",
+              "--python", str(py), *args[1:]])
         return
     _run([str(py), "-m", "pip", *args])
 
@@ -98,12 +104,21 @@ def _python_mm(py: Path) -> tuple[int, int]:
 def _ensure_venv() -> Path:
     py = _venv_python()
     if py.exists():
-        return py
-    
+        try:
+            major, minor = _python_mm(py)
+            if (major, minor) == (3, 10):
+                return py
+            print(
+                f"Existing venv uses Python {major}.{minor}; recreating with Python 3.10."
+            )
+        except Exception:
+            print("Existing venv check failed; recreating with Python 3.10.")
+        shutil.rmtree(VENV_DIR, ignore_errors=True)
+
     if _has_uv():
         print("Using uv to create isolated Python 3.10 environment (like Pinokio)...")
-        # Ask uv to fetch python 3.10 if we don't have it, and create the venv
-        _run(["uv", "venv", "--python", "3.10", str(VENV_DIR)])
+        # --seed includes pip/setuptools in venv for non-uv fallback paths
+        _run(["uv", "venv", "--python", "3.10", "--seed", str(VENV_DIR)])
     else:
         print("uv not found. Falling back to system python venv...")
         _run([sys.executable, "-m", "venv", str(VENV_DIR)])
@@ -189,17 +204,17 @@ def main() -> int:
         return 1
 
     py = _ensure_venv()
-    _pip(py, "install", "--upgrade", "pip")
+    # Only upgrade pip when uv is not available (uv pip doesn't need pip in venv)
+    if not _has_uv():
+        _pip(py, "install", "--upgrade", "pip")
 
     if os.getenv("WAN2GP_SKIP_PINOKIO_TORCH", "0") != "1":
         _install_pinokio_torch_stack(py)
 
-    auto_install = os.getenv("WAN2GP_AUTO_INSTALL", "0") == "1"
-    if auto_install:
+    if os.getenv("WAN2GP_SKIP_REQUIREMENTS", "0") != "1":
         _pip(py, "install", "-r", "requirements.txt")
     else:
-        print("Skipping heavy requirements in install phase.")
-        print("Set WAN2GP_AUTO_INSTALL=1 to install during plugin add.")
+        print("Skipping requirements install (WAN2GP_SKIP_REQUIREMENTS=1).")
         print("Dependencies will auto-bootstrap at first start if needed.")
     return 0
 
@@ -213,6 +228,7 @@ from __future__ import annotations
 
 import os
 import platform
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -266,7 +282,10 @@ def _has_uv() -> bool:
 
 def _pip(py: Path, *args: str) -> None:
     if args and args[0] == "install" and _has_uv():
-        _run(["uv", "pip", "install", "--python", str(py), *args[1:]])
+        # --index-strategy unsafe-best-match: allow packages from any index
+        # (needed for onnxruntime-gpu which lives on a nightly CUDA index)
+        _run(["uv", "pip", "install", "--index-strategy", "unsafe-best-match",
+              "--python", str(py), *args[1:]])
         return
     _run([str(py), "-m", "pip", *args])
 
@@ -284,8 +303,25 @@ def _python_mm(py: Path) -> tuple[int, int]:
 def _ensure_venv() -> Path:
     py = _venv_python()
     if py.exists():
-        return py
-    _run([sys.executable, "-m", "venv", str(VENV_DIR)])
+        try:
+            major, minor = _python_mm(py)
+            if (major, minor) == (3, 10):
+                return py
+            print(
+                f"Existing venv uses Python {major}.{minor}; recreating with Python 3.10."
+            )
+        except Exception:
+            print("Existing venv check failed; recreating with Python 3.10.")
+        shutil.rmtree(VENV_DIR, ignore_errors=True)
+
+    if _has_uv():
+        print("Using uv to create isolated Python 3.10 environment (like Pinokio)...")
+        # --seed includes pip/setuptools in venv for non-uv fallback paths
+        _run(["uv", "venv", "--python", "3.10", "--seed", str(VENV_DIR)])
+    else:
+        print("uv not found. Falling back to system python venv...")
+        _run([sys.executable, "-m", "venv", str(VENV_DIR)])
+
     return _venv_python()
 
 
@@ -403,7 +439,9 @@ def _bootstrap_deps(py: Path) -> None:
     if _deps_ready(py):
         return
     print("Installing Wan2GP dependencies (first run)...")
-    _pip(py, "install", "--upgrade", "pip")
+    # Only upgrade pip when uv is not available (uv pip doesn't need pip in venv)
+    if not _has_uv():
+        _pip(py, "install", "--upgrade", "pip")
     if os.getenv("WAN2GP_SKIP_PINOKIO_TORCH", "0") != "1":
         _install_pinokio_torch_stack(py)
     req_file = ROOT / "requirements.txt"

@@ -49,8 +49,8 @@ import queue
 import re
 import shutil
 import signal
-import stat
 import socket
+import stat
 import subprocess
 import sys
 import threading
@@ -78,7 +78,10 @@ def _safe_rmtree(path: Path) -> None:
         except Exception as e:
             # Check if this is the root path failing because of leftover files
             if str(fpath) == str(path):
-                raise RuntimeError(f"Failed to clear plugin directory (files are locked). Is the plugin still running? ({e})") from e
+                raise RuntimeError(
+                    "Failed to clear plugin directory (files are locked). "
+                    f"Is the plugin still running? ({e})"
+                ) from e
             raise RuntimeError(f"Failed to remove {fpath}: {e}") from e
 
     shutil.rmtree(path, onerror=_on_error)
@@ -149,6 +152,103 @@ _SYSTEM_PATHS = (
 )
 
 
+# ─── CUDA wheel index map ───────────────────────────────────────────────
+
+_CUDA_INDEX_MAP: dict[str, str] = {
+    "11.8": "https://download.pytorch.org/whl/cu118",
+    "12.1": "https://download.pytorch.org/whl/cu121",
+    "12.4": "https://download.pytorch.org/whl/cu124",
+    "12.8": "https://download.pytorch.org/whl/cu128",
+}
+
+
+def get_cuda_index_url(cuda_version: str | None) -> str | None:
+    """Return the PyTorch wheel index URL for the given CUDA version."""
+    if not cuda_version:
+        return None
+    return _CUDA_INDEX_MAP.get(cuda_version)
+
+
+# ─── Isolated Python provisioning ───────────────────────────────────────
+
+
+def _ensure_isolated_python(plugin_dir: Path, manifest: dict) -> Path | None:
+    """Provision an isolated Python version for this plugin using uv.
+
+    Like Pinokio, each plugin can declare a ``python_version`` in its
+    manifest.  When present, ``uv`` downloads a standalone CPython build
+    for that version and creates the venv from it — completely independent
+    from the system Python and other plugins.
+
+    Returns the path to the venv python, or None if no isolation needed.
+    """
+    py_version = manifest.get("python_version")
+    if not py_version:
+        return None
+
+    venv_dir = plugin_dir / ".venv"
+    if platform.system() == "Windows":
+        venv_py = venv_dir / "Scripts" / "python.exe"
+    else:
+        venv_py = venv_dir / "bin" / "python"
+
+    # If venv already exists with correct version, skip
+    if venv_py.exists():
+        try:
+            result = subprocess.run(
+                [str(venv_py), "-c",
+                 "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"],
+                capture_output=True, text=True, timeout=10,
+            )
+            if result.returncode == 0 and result.stdout.strip() == py_version:
+                return venv_py
+        except Exception:
+            pass
+
+    # Use uv to create venv with specific Python version
+    uv_bin = shutil.which("uv")
+    if not uv_bin:
+        logger.warning(
+            "uv not found — cannot provision isolated Python %s for plugin %s",
+            py_version, plugin_dir.name,
+        )
+        return None
+
+    logger.info(
+        "Provisioning isolated Python %s for plugin '%s' (like Pinokio)...",
+        py_version, plugin_dir.name,
+    )
+
+    try:
+        # uv venv --python <ver> fetches standalone Python if needed
+        # --seed includes pip/setuptools for install scripts that use python -m pip
+        subprocess.run(
+            [uv_bin, "venv", "--python", py_version, "--seed", str(venv_dir)],
+            check=True,
+            capture_output=True,
+            cwd=str(plugin_dir),
+        )
+        if venv_py.exists():
+            logger.info(
+                "Isolated Python %s provisioned at %s",
+                py_version, venv_py,
+            )
+            return venv_py
+    except subprocess.CalledProcessError as exc:
+        err = exc.stderr.decode(errors="replace").strip() if exc.stderr else str(exc)
+        logger.error(
+            "Failed to provision Python %s for '%s': %s",
+            py_version, plugin_dir.name, err,
+        )
+    except Exception as exc:
+        logger.error(
+            "Unexpected error provisioning Python %s for '%s': %s",
+            py_version, plugin_dir.name, exc,
+        )
+
+    return None
+
+
 # ─── Workspace sandbox ──────────────────────────────────────────────────
 
 
@@ -164,7 +264,7 @@ def _write_executable(path: Path, content: str) -> None:
 def _ensure_python_shims(plugin_dir: Path, venv_dir: Path, local_bin: Path) -> None:
     """Provide stable `python`/`python3` launch shims for sandboxed scripts."""
     local_bin.mkdir(parents=True, exist_ok=True)
-    if platform.system() == "Windows":
+    if os.name == "nt":
         venv_py = venv_dir / "Scripts" / "python.exe"
         fallback = Path(sys.executable)
         shim = (
@@ -217,11 +317,16 @@ def _sandbox_env(plugin_dir: Path, manifest: dict) -> dict[str, str]:
 
     cache_dir = plugin_dir / ".cache"
     cache_dir.mkdir(exist_ok=True)
+    appdata_dir = plugin_dir / ".appdata"
+    appdata_dir.mkdir(exist_ok=True)
+    local_appdata_dir = plugin_dir / ".localappdata"
+    local_appdata_dir.mkdir(exist_ok=True)
 
     _SHARED_UV_CACHE.mkdir(parents=True, exist_ok=True)
 
     venv_dir = plugin_dir / ".venv"
-    if platform.system() == "Windows":
+    host_is_windows = os.name == "nt"
+    if host_is_windows:
         venv_bin = venv_dir / "Scripts"
         local_bin = plugin_dir / "Scripts"
         shell_value = os.environ.get("COMSPEC", r"C:\Windows\System32\cmd.exe")
@@ -236,6 +341,16 @@ def _sandbox_env(plugin_dir: Path, manifest: dict) -> dict[str, str]:
     if venv_bin.is_dir():
         path_parts.append(str(venv_bin))
     path_parts.append(str(local_bin))
+
+    # Add uv and git directories so plugin start scripts can use them
+    # for first-run bootstrap (e.g. `uv pip install` in _bootstrap_deps).
+    for tool in ("uv", "git"):
+        tool_path = shutil.which(tool)
+        if tool_path:
+            tool_dir = str(Path(tool_path).parent)
+            if tool_dir not in path_parts:
+                path_parts.append(tool_dir)
+
     path_parts.append(_SYSTEM_PATHS)
 
     env: dict[str, str] = {
@@ -272,7 +387,14 @@ def _sandbox_env(plugin_dir: Path, manifest: dict) -> dict[str, str]:
 
     # On Windows, Python's asyncio and networking need SystemRoot for
     # Winsock initialization (_overlapped, SSL, DNS resolution).
-    if platform.system() == "Windows":
+    if host_is_windows:
+        env["USERPROFILE"] = plugin_str
+        env["APPDATA"] = str(appdata_dir)
+        env["LOCALAPPDATA"] = str(local_appdata_dir)
+        drive, tail = os.path.splitdrive(plugin_str)
+        if drive:
+            env["HOMEDRIVE"] = drive
+            env["HOMEPATH"] = tail or "\\"
         for key in ("SystemRoot", "SYSTEMROOT", "COMSPEC"):
             val = os.environ.get(key)
             if val and key not in env:
@@ -319,7 +441,7 @@ def _sandbox_install_env(plugin_dir: Path, manifest: dict) -> dict[str, str]:
             env[key] = val
 
     # On Windows, networking/SSL/DNS need these system variables
-    if platform.system() == "Windows":
+    if os.name == "nt":
         for key in ("SystemRoot", "SYSTEMROOT", "APPDATA", "USERPROFILE", "COMSPEC"):
             val = os.environ.get(key)
             if val and key not in env:
@@ -1695,6 +1817,8 @@ def list_plugins() -> list[dict[str, Any]]:
                 "openapi": openapi_file if has_openapi else None,
                 "web_view": manifest.get("web_view", "iframe"),
                 "web_view_path": manifest.get("web_view_path", "/"),
+                "python_version": manifest.get("python_version"),
+                "cuda_version": manifest.get("cuda_version"),
             }
         )
 
@@ -2008,7 +2132,7 @@ def save_chat_history(plugin_id: str, messages: list[dict]) -> None:
 # ─── Install ─────────────────────────────────────────────────────────────
 
 
-async def install_plugin(source: str) -> dict:
+async def install_plugin(source: str, log_handler=None) -> dict:
     """Install a plugin from a git URL or local path.
 
     Source can be:
@@ -2030,7 +2154,7 @@ async def install_plugin(source: str) -> dict:
         if reason:
             raise ValueError(reason)
 
-        return await install_builtin(app_id, plugins_dir)
+        return await install_builtin(app_id, plugins_dir, log_handler=log_handler)
 
     # Local path
     src_path = Path(source).expanduser()
@@ -2068,6 +2192,8 @@ async def install_plugin(source: str) -> dict:
     import tempfile
 
     with tempfile.TemporaryDirectory() as tmpdir:
+        if log_handler:
+            await log_handler(f"Cloning {git_url}...")
         proc = await _async_subprocess_exec(
             "git", "clone", "--depth=1", git_url, tmpdir,
             stdout=subprocess.PIPE,
@@ -2101,19 +2227,47 @@ async def install_plugin(source: str) -> dict:
         if git_dir.exists():
             _safe_rmtree(git_dir)
 
+    # Provision isolated Python version if declared in manifest (Pinokio-style)
+    py_version = manifest.get("python_version")
+    if py_version:
+        logger.info(
+            "Plugin '%s' requires Python %s — provisioning isolated environment...",
+            plugin_id, py_version,
+        )
+        _ensure_isolated_python(dest, manifest)
+
     # Run install in sandboxed env (with network access for deps)
     install_cmd = _resolve_phase_command(dest, manifest, "install")
     sandbox_env = _sandbox_install_env(dest, manifest)
 
     if install_cmd:
         logger.info("Running install command for '%s': %s", plugin_id, install_cmd)
-        await _async_subprocess_shell(
-            install_cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            cwd=str(dest),
-            env=sandbox_env,
-        )
+        if log_handler:
+            await log_handler(f"Running install command: {install_cmd}")
+            proc = await asyncio.create_subprocess_shell(
+                install_cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                cwd=str(dest),
+                env=sandbox_env,
+            )
+            assert proc.stdout is not None
+            while True:
+                line = await proc.stdout.readline()
+                if not line:
+                    break
+                await log_handler(line.decode(errors="replace").rstrip("\r\n"))
+            await proc.wait()
+            if proc.returncode != 0:
+                raise RuntimeError(f"Install command failed with exit code {proc.returncode}")
+        else:
+            await _async_subprocess_shell(
+                install_cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                cwd=str(dest),
+                env=sandbox_env,
+            )
 
     return {
         "status": "ok",
@@ -2122,7 +2276,7 @@ async def install_plugin(source: str) -> dict:
     }
 
 
-async def install_plugin_from_zip(zip_bytes: bytes) -> dict:
+async def install_plugin_from_zip(zip_bytes: bytes, log_handler=None) -> dict:
     """Install a plugin from an uploaded zip file.
 
     The zip must contain either:
@@ -2184,13 +2338,32 @@ async def install_plugin_from_zip(zip_bytes: bytes) -> dict:
 
     if install_cmd:
         logger.info("Running install command for '%s': %s", plugin_id, install_cmd)
-        await _async_subprocess_shell(
-            install_cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            cwd=str(dest),
-            env=sandbox_env,
-        )
+        if log_handler:
+            await log_handler(f"Running install command: {install_cmd}")
+            proc = await asyncio.create_subprocess_shell(
+                install_cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                cwd=str(dest),
+                env=sandbox_env,
+            )
+            assert proc.stdout is not None
+            while True:
+                line = await proc.stdout.readline()
+                if not line:
+                    break
+                await log_handler(line.decode(errors="replace").rstrip("\r\n"))
+            await proc.wait()
+            if proc.returncode != 0:
+                raise RuntimeError(f"Install command failed with exit code {proc.returncode}")
+        else:
+            await _async_subprocess_shell(
+                install_cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                cwd=str(dest),
+                env=sandbox_env,
+            )
 
     return {
         "status": "ok",
@@ -2243,7 +2416,7 @@ async def launch_plugin(plugin_id: str) -> dict:
         "env": env,
         "shell": True,
     }
-    if platform.system() != "Windows":
+    if os.name != "nt" and hasattr(os, "setsid"):
         spawn_kwargs["preexec_fn"] = os.setsid
     proc = subprocess.Popen(start_cmd, **spawn_kwargs)
 
