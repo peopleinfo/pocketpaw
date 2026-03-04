@@ -64,19 +64,26 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 
-def _safe_rmtree(path: Path) -> None:
-    """Remove a directory tree, handling read-only files on Windows.
+def _safe_rmtree(path: Path, retries: int = 5, delay: float = 1.0) -> None:
+    """Remove a directory tree, handling read-only and locked files on Windows.
 
     Git marks pack/object files as read-only, which causes ``shutil.rmtree``
     to raise ``[WinError 5] Access is denied`` on Windows.  This helper
     clears the read-only flag before retrying the removal.
+
+    DLL files (e.g. ``libcrypto-3-x64.dll`` from uv-provisioned Python) may
+    remain locked briefly after a process is killed.  We retry the entire
+    tree removal up to *retries* times with *delay* seconds between attempts.
     """
     def _on_error(func, fpath, exc_info):
         try:
-            os.chmod(fpath, stat.S_IWRITE)
+            os.chmod(fpath, stat.S_IWRITE | stat.S_IREAD)
             func(fpath)
+        except PermissionError:
+            # File is likely still locked by another process (e.g. DLL).
+            # Let the outer retry loop handle it.
+            raise
         except Exception as e:
-            # Check if this is the root path failing because of leftover files
             if str(fpath) == str(path):
                 raise RuntimeError(
                     "Failed to clear plugin directory (files are locked). "
@@ -84,7 +91,27 @@ def _safe_rmtree(path: Path) -> None:
                 ) from e
             raise RuntimeError(f"Failed to remove {fpath}: {e}") from e
 
-    shutil.rmtree(path, onerror=_on_error)
+    last_err: Exception | None = None
+    for attempt in range(retries):
+        try:
+            shutil.rmtree(path, onerror=_on_error)
+            return  # success
+        except (PermissionError, RuntimeError) as e:
+            last_err = e
+            if attempt < retries - 1:
+                logger.debug(
+                    "rmtree attempt %d/%d failed for %s, retrying in %.1fs: %s",
+                    attempt + 1, retries, path, delay, e,
+                )
+                time.sleep(delay)
+
+    # Final fallback: if the directory still exists, give a clear message
+    if path.exists():
+        raise RuntimeError(
+            f"Failed to remove plugin directory after {retries} attempts. "
+            f"A file is likely locked by another process. "
+            f"Last error: {last_err}"
+        )
 
 
 async def _async_subprocess_shell(
@@ -1623,6 +1650,19 @@ def _is_pid_alive(pid: int) -> bool:
         return False
 
 
+def _wait_for_pid_exit(pid: int, timeout: float = 5) -> None:
+    """Block until *pid* is no longer alive, up to *timeout* seconds.
+
+    On Windows, process termination doesn't immediately release all file
+    handles (especially DLLs).  This gives the OS time to clean up.
+    """
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        if not _is_pid_alive(pid):
+            return
+        time.sleep(0.3)
+
+
 def _is_port_listening(port: int) -> bool:
     """Check if something is listening on localhost:port (e.g. after uvicorn reload)."""
     try:
@@ -2244,30 +2284,23 @@ async def install_plugin(source: str, log_handler=None) -> dict:
         logger.info("Running install command for '%s': %s", plugin_id, install_cmd)
         if log_handler:
             await log_handler(f"Running install command: {install_cmd}")
-            proc = await asyncio.create_subprocess_shell(
-                install_cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                cwd=str(dest),
-                env=sandbox_env,
-            )
-            assert proc.stdout is not None
-            while True:
-                line = await proc.stdout.readline()
-                if not line:
-                    break
-                await log_handler(line.decode(errors="replace").rstrip("\r\n"))
-            await proc.wait()
-            if proc.returncode != 0:
-                raise RuntimeError(f"Install command failed with exit code {proc.returncode}")
-        else:
-            await _async_subprocess_shell(
-                install_cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                cwd=str(dest),
-                env=sandbox_env,
-            )
+        # Use _async_subprocess_shell (subprocess.run in a thread) — proven
+        # to work on Windows + uvicorn reloader where asyncio.create_subprocess_shell
+        # raises NotImplementedError.
+        proc = await _async_subprocess_shell(
+            install_cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            cwd=str(dest),
+            env=sandbox_env,
+        )
+        output = (proc.stdout or b"").decode(errors="replace")
+        if log_handler:
+            for line in output.splitlines():
+                if line.strip():
+                    await log_handler(line)
+        if proc.returncode != 0:
+            raise RuntimeError(f"Install command failed with exit code {proc.returncode}")
 
     return {
         "status": "ok",
@@ -2340,30 +2373,23 @@ async def install_plugin_from_zip(zip_bytes: bytes, log_handler=None) -> dict:
         logger.info("Running install command for '%s': %s", plugin_id, install_cmd)
         if log_handler:
             await log_handler(f"Running install command: {install_cmd}")
-            proc = await asyncio.create_subprocess_shell(
-                install_cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                cwd=str(dest),
-                env=sandbox_env,
-            )
-            assert proc.stdout is not None
-            while True:
-                line = await proc.stdout.readline()
-                if not line:
-                    break
-                await log_handler(line.decode(errors="replace").rstrip("\r\n"))
-            await proc.wait()
-            if proc.returncode != 0:
-                raise RuntimeError(f"Install command failed with exit code {proc.returncode}")
-        else:
-            await _async_subprocess_shell(
-                install_cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                cwd=str(dest),
-                env=sandbox_env,
-            )
+        # Use _async_subprocess_shell (subprocess.run in a thread) — proven
+        # to work on Windows + uvicorn reloader where asyncio.create_subprocess_shell
+        # raises NotImplementedError.
+        proc = await _async_subprocess_shell(
+            install_cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            cwd=str(dest),
+            env=sandbox_env,
+        )
+        output = (proc.stdout or b"").decode(errors="replace")
+        if log_handler:
+            for line in output.splitlines():
+                if line.strip():
+                    await log_handler(line)
+        if proc.returncode != 0:
+            raise RuntimeError(f"Install command failed with exit code {proc.returncode}")
 
     return {
         "status": "ok",
@@ -2555,13 +2581,28 @@ def remove_plugin(plugin_id: str) -> dict:
     if not plugin_dir.is_dir():
         raise FileNotFoundError(f"Plugin '{plugin_id}' not found")
 
+    # --- Kill any running process for this plugin ---
     proc = _running_processes.pop(plugin_id, None)
+    killed_pid: int | None = None
     if proc is not None and proc.returncode is None:
+        killed_pid = proc.pid
         _force_kill_pid(proc.pid)
+        # Wait for the process to actually exit so file handles are released
+        if isinstance(proc, subprocess.Popen):
+            try:
+                proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                pass
 
     pid = _read_pid(plugin_dir)
     if pid is not None and _is_pid_alive(pid):
+        killed_pid = pid
         _force_kill_pid(pid)
+
+    # On Windows, DLL handles are not released instantly after kill.
+    # Give the OS a moment to clean up handles before we try to delete.
+    if killed_pid is not None and platform.system() == "Windows":
+        _wait_for_pid_exit(killed_pid, timeout=5)
 
     _safe_rmtree(plugin_dir)
     return {"status": "ok", "message": f"Plugin '{plugin_id}' removed"}

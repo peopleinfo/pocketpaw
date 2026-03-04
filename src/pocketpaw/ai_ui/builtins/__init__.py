@@ -66,18 +66,25 @@ def get_install_block_reason(app_id: str) -> str | None:
     return None
 
 
-def _safe_rmtree(path: Path) -> None:
-    """Remove a directory tree, handling read-only files on Windows.
+def _safe_rmtree(path: Path, retries: int = 5, delay: float = 1.0) -> None:
+    """Remove a directory tree, handling read-only and locked files on Windows.
 
     Git marks pack/object files as read-only, which causes ``shutil.rmtree``
     to raise ``[WinError 5] Access is denied`` on Windows.  This helper
     clears the read-only flag before retrying the removal.
+
+    DLL files may remain locked briefly after a process is killed.  We retry
+    the entire tree removal up to *retries* times with *delay* seconds
+    between attempts.
     """
+    import time
 
     def _on_error(func, fpath, exc_info):
         try:
-            os.chmod(fpath, stat.S_IWRITE)
+            os.chmod(fpath, stat.S_IWRITE | stat.S_IREAD)
             func(fpath)
+        except PermissionError:
+            raise
         except Exception as e:
             if str(fpath) == str(path):
                 raise RuntimeError(
@@ -85,7 +92,26 @@ def _safe_rmtree(path: Path) -> None:
                 ) from e
             raise RuntimeError(f"Failed to remove {fpath}: {e}") from e
 
-    shutil.rmtree(path, onerror=_on_error)
+    last_err: Exception | None = None
+    for attempt in range(retries):
+        try:
+            shutil.rmtree(path, onerror=_on_error)
+            return
+        except (PermissionError, RuntimeError) as e:
+            last_err = e
+            if attempt < retries - 1:
+                logger.debug(
+                    "rmtree attempt %d/%d failed for %s, retrying in %.1fs: %s",
+                    attempt + 1, retries, path, delay, e,
+                )
+                time.sleep(delay)
+
+    if path.exists():
+        raise RuntimeError(
+            f"Failed to remove directory after {retries} attempts. "
+            f"A file is likely locked by another process. "
+            f"Last error: {last_err}"
+        )
 
 
 # ─── Install logic ───────────────────────────────────────────────────────
@@ -194,46 +220,33 @@ async def install_builtin(app_id: str, plugins_dir: Path, log_handler=None) -> d
         sandbox_env["PYTHONUNBUFFERED"] = "1"
         sandbox_env["PYTHONIOENCODING"] = "utf-8"
 
-        if log_handler:
-            # Stream output line-by-line for real-time UI updates
-            proc = await asyncio.create_subprocess_shell(
-                install_cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                cwd=str(dest),
-                env=sandbox_env,
-            )
-            assert proc.stdout is not None
-            while True:
-                line = await proc.stdout.readline()
-                if not line:
-                    break
-                await log_handler(line.decode(errors="replace").rstrip("\r\n"))
-            await proc.wait()
-            if proc.returncode != 0:
-                raise RuntimeError(
-                    f"Install failed for '{app_id}' (exit code {proc.returncode}). "
-                    "Check the log output above for details."
-                )
-        else:
-            from pocketpaw.ai_ui.plugins import _async_subprocess_shell
+        # Use _async_subprocess_shell (subprocess.run in a thread) which is
+        # proven to work on Windows + uvicorn reloader. asyncio.create_subprocess_shell
+        # raises NotImplementedError on Windows in that context.
+        from pocketpaw.ai_ui.plugins import _async_subprocess_shell
 
-            proc = await _async_subprocess_shell(
-                install_cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                cwd=str(dest),
-                env=sandbox_env,
+        proc = await _async_subprocess_shell(
+            install_cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            cwd=str(dest),
+            env=sandbox_env,
+        )
+        output = (proc.stdout or b"").decode(errors="replace")
+        if log_handler:
+            for line in output.splitlines():
+                if line.strip():
+                    await log_handler(line)
+        if proc.returncode != 0:
+            err = output.strip()
+            if not err:
+                err = f"[No output] Command '{install_cmd}' exited with code {proc.returncode}."
+            if err and len(err.splitlines()) > 50:
+                err = "...\n" + "\n".join(err.splitlines()[-50:])
+            raise RuntimeError(
+                f"Install failed for '{app_id}' (exit code {proc.returncode}). "
+                f"{err}"
             )
-            if proc.returncode != 0:
-                err = proc.stderr.decode(errors="replace").strip()
-                if not err:
-                    err = proc.stdout.decode(errors="replace").strip()
-                if not err:
-                    err = f"[No output] Command '{install_cmd}' exited with code {proc.returncode}."
-                if err and len(err.splitlines()) > 50:
-                    err = "...\n" + "\n".join(err.splitlines()[-50:])
-                raise RuntimeError(f"Failed to setup built-in '{app_id}': {err}")
 
     await _log("step:done")
     name = defn["manifest"].get("name", app_id)

@@ -406,7 +406,7 @@ async def install_plugin_endpoint(request: Request):
                     m = await q.get()
                     if m is None:
                         break
-                    yield json.dumps(m) + "\\n"
+                    yield json.dumps(m) + "\n"
 
             return StreamingResponse(upload_generator(), media_type="application/x-ndjson")
 
@@ -449,7 +449,7 @@ async def install_plugin_endpoint(request: Request):
                 m = await q.get()
                 if m is None:
                     break
-                yield json.dumps(m) + "\\n"
+                yield json.dumps(m) + "\n"
 
         return StreamingResponse(install_generator(), media_type="application/x-ndjson")
 
