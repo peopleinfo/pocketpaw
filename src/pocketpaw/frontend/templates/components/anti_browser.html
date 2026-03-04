@@ -368,17 +368,12 @@
                   >Plugin</label
                 >
                 <select
+                  x-ref="pluginSelect"
                   x-model="antiBrowser.form.plugin"
                   @change="if (antiBrowser.form.plugin === 'camoufox') antiBrowser.form.browser_type = 'firefox'"
+                  x-init="rebuildPluginOptions($el); $watch('antiBrowser.plugins', () => { $nextTick(() => rebuildPluginOptions($refs.pluginSelect)) })"
                   class="w-full px-3 py-3 bg-black/40 border border-white/10 rounded-xl text-[13px] text-white focus:border-accent focus:outline-none transition-colors appearance-none"
-                >
-                  <template x-for="p in antiBrowser.plugins" :key="p.id">
-                    <option
-                      :value="p.id"
-                      x-text="p.installed ? p.name : `${p.name} (Not Installed)`"
-                    ></option>
-                  </template>
-                </select>
+                ></select>
               </div>
             </div>
 

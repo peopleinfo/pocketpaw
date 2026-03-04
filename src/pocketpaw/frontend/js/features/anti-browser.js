@@ -47,9 +47,13 @@ window.PocketPaw.AntiBrowser = {
       // ==================== Open / Init ====================
 
       async initAntiBrowser() {
-        if (this.antiBrowser.profiles.length === 0) {
+        const needsInit = this.antiBrowser.profiles.length === 0;
+        if (needsInit) {
           await this.fetchAntiBrowserProfiles();
           await this.fetchAntiBrowserActors();
+        }
+        // Always ensure plugins are loaded (they may fail to load on first try)
+        if (this.antiBrowser.plugins.length === 0) {
           await this.fetchAntiBrowserPlugins();
         }
         this.$nextTick(() => {
@@ -57,11 +61,23 @@ window.PocketPaw.AntiBrowser = {
         });
       },
 
-      openAntiBrowserDrawer(mode = "detail") {
+      async openAntiBrowserDrawer(mode = "detail") {
         this.antiBrowser.drawerOpen = true;
         this.antiBrowser.drawerView = mode;
         if (mode === "create") {
           this.antiBrowser.selectedProfile = null;
+          // Ensure plugins are loaded before showing the create form
+          if (this.antiBrowser.plugins.length === 0) {
+            await this.fetchAntiBrowserPlugins();
+          }
+          // Ensure the default plugin value matches an available plugin
+          const currentPlugin = this.antiBrowser.form.plugin;
+          const pluginExists = this.antiBrowser.plugins.some(
+            (p) => p.id === currentPlugin,
+          );
+          if (!pluginExists && this.antiBrowser.plugins.length > 0) {
+            this.antiBrowser.form.plugin = this.antiBrowser.plugins[0].id;
+          }
         }
         this.$nextTick(() => {
           if (window.refreshIcons) window.refreshIcons();
@@ -136,7 +152,7 @@ window.PocketPaw.AntiBrowser = {
               proxy: "",
               os_type: "macos",
               browser_type: "chromium",
-              plugin: "playwright",
+              plugin: this.antiBrowser.plugins[0]?.id || "playwright",
               notes: "",
             };
             this.showToast("Profile created!", "success");
@@ -372,6 +388,38 @@ window.PocketPaw.AntiBrowser = {
       },
 
       // ==================== Plugins ====================
+
+      /**
+       * Imperatively (re-)build <option> elements for the plugin <select>.
+       * We cannot use <template x-for> inside <select> because the HTML spec
+       * forbids <template> as a child of <select> and Windows Chromium strips
+       * it out before Alpine can process it.
+       */
+      rebuildPluginOptions(sel) {
+        if (!sel) return;
+        const cur = this.antiBrowser.form.plugin;
+        sel.innerHTML = "";
+        const plugins = this.antiBrowser.plugins || [];
+        if (plugins.length === 0) {
+          const o = document.createElement("option");
+          o.value = "";
+          o.textContent = "Loading plugins…";
+          o.disabled = true;
+          sel.appendChild(o);
+          return;
+        }
+        plugins.forEach((p) => {
+          const o = document.createElement("option");
+          o.value = p.id;
+          o.textContent = p.installed ? p.name : `${p.name} (Not Installed)`;
+          if (p.id === cur) o.selected = true;
+          sel.appendChild(o);
+        });
+        // If the current form value doesn't match any plugin, pick the first
+        if (!plugins.some((p) => p.id === cur)) {
+          this.antiBrowser.form.plugin = plugins[0].id;
+        }
+      },
 
       async fetchAntiBrowserPlugins() {
         try {

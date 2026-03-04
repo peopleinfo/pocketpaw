@@ -1,4 +1,5 @@
 """PocketPaw Web Dashboard - API Server
+# reload-trigger: 2026-03-05T01:00
 
 Lightweight FastAPI server that serves the frontend and handles WebSocket communication.
 
@@ -1791,45 +1792,86 @@ async def get_actor_schema(actor_id: str):
 @app.post("/api/anti-browser/profiles/{profile_id}/run")
 async def run_actor_on_profile(profile_id: str, request: Request):
     """Run an actor template on a profile."""
-    from pocketpaw.browser.actors import get_actor
-    from pocketpaw.browser.fingerprint import generate_fingerprint
-    from pocketpaw.browser.profile import get_profile_store
-
-    store = get_profile_store()
-    profile = store.get(profile_id)
-    if not profile:
-        raise HTTPException(status_code=404, detail="Profile not found")
-    if profile.status == "RUNNING":
-        raise HTTPException(status_code=409, detail="Profile is already running")
-
-    data = await request.json()
-    actor_id = data.get("actor_id", "web-scraper")
-    inputs = data.get("inputs", {})
-
-    actor = get_actor(actor_id)
-    if not actor:
-        raise HTTPException(status_code=404, detail=f"Actor '{actor_id}' not found")
-
-    # Ensure fingerprint exists
-    fp = profile.fingerprint or generate_fingerprint(
-        browser=profile.browser_type,
-        os_type=profile.os_type,
-    )
-
-    store.set_status(profile_id, "RUNNING")
     try:
-        result = await actor.run(
-            profile_fingerprint=fp,
-            plugin=profile.plugin,
-            inputs=inputs,
-            user_data_dir=str(profile.user_data_dir),
-            proxy=profile.proxy or None,
+        from pocketpaw.browser.actors import get_actor
+        from pocketpaw.browser.fingerprint import generate_fingerprint
+        from pocketpaw.browser.profile import get_profile_store
+
+        store = get_profile_store()
+        profile = store.get(profile_id)
+        if not profile:
+            raise HTTPException(status_code=404, detail="Profile not found")
+        if profile.status == "RUNNING":
+            raise HTTPException(status_code=409, detail="Profile is already running")
+
+        data = await request.json()
+        actor_id = data.get("actor_id", "web-scraper")
+        inputs = data.get("inputs", {})
+
+        actor = get_actor(actor_id)
+        if not actor:
+            raise HTTPException(status_code=404, detail=f"Actor '{actor_id}' not found")
+
+        # Ensure fingerprint exists
+        fp = profile.fingerprint or generate_fingerprint(
+            browser=profile.browser_type,
+            os_type=profile.os_type,
+        )
+
+        import sys
+        import asyncio
+        
+        def _run_actor_in_thread(actor_instance, fp, plugin, inputs, user_data_dir, proxy):
+            if sys.platform == "win32":
+                asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+            
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                # The coroutine is created and executed in this new loop
+                return loop.run_until_complete(
+                    actor_instance.run(
+                        profile_fingerprint=fp,
+                        plugin=plugin,
+                        inputs=inputs,
+                        user_data_dir=user_data_dir,
+                        proxy=proxy,
+                    )
+                )
+            finally:
+                loop.close()
+
+        store.set_status(profile_id, "RUNNING")
+        
+        result = await asyncio.to_thread(
+            _run_actor_in_thread,
+            actor,
+            fp,
+            profile.plugin,
+            inputs,
+            str(profile.user_data_dir),
+            profile.proxy or None,
         )
         store.set_status(profile_id, "IDLE")
         return {"result": result.to_dict(), "profile": store.get(profile_id).to_dict()}
+    except HTTPException:
+        raise
     except Exception as e:
-        store.set_status(profile_id, "ERROR")
-        raise HTTPException(status_code=500, detail=str(e))
+        import traceback
+        tb = traceback.format_exc()
+        detail = f"{type(e).__name__}: {str(e) or repr(e)}\n{tb}"
+        logger.error(f"Global catch in run_actor_on_profile ({profile_id}): {detail}")
+        
+        # If it was running, put it in ERROR state
+        try:
+            from pocketpaw.browser.profile import get_profile_store
+            store = get_profile_store()
+            if store.get(profile_id):
+                store.set_status(profile_id, "ERROR")
+        except:
+            pass
+            
+        raise HTTPException(status_code=500, detail=detail)
 
 
 @app.post("/api/anti-browser/profiles/{profile_id}/stop")

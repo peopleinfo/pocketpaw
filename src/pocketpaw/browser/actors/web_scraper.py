@@ -147,8 +147,7 @@ class WebScraperActor(ActorTemplate):
     ) -> ActorResult:
         """Run with Crawlee's PlaywrightCrawler."""
         from crawlee.crawlers import PlaywrightCrawler, PlaywrightCrawlingContext
-        from crawlee.browser_pool import BrowserPool
-        from crawlee.browsers import PlaywrightBrowserPlugin
+        from crawlee.browsers import BrowserPool, PlaywrightBrowserPlugin
 
         pool_plugins = []
         if plugin == "camoufox":
