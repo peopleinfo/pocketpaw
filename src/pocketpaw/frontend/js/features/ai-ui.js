@@ -630,6 +630,23 @@ window.PocketPaw.AiUI = {
         this.aiUI.installProgress.open = false;
       },
 
+      async _cancelInstall() {
+        const ip = this.aiUI.installProgress;
+        if (!ip.appId || ip.status !== "running") return;
+        ip.status = "cancelling";
+        try {
+          await fetch(`/api/ai-ui/plugins/${ip.appId}/cancel-install`, {
+            method: "POST",
+          });
+          ip.status = "error";
+          ip.error = "Installation cancelled by user.";
+          this._syncInstallProgressPct();
+        } catch (e) {
+          ip.status = "error";
+          ip.error = "Cancel failed: " + (e.message || e);
+        }
+      },
+
       async _handleInstallStream(res, nameOrSource) {
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));

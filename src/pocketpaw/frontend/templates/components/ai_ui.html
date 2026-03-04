@@ -2496,10 +2496,20 @@
                 Close
               </button>
             </template>
-            <template x-if="aiUI.installProgress.status === 'running'">
-              <div class="flex items-center gap-2 text-[11px] text-white/30">
-                <div class="w-3 h-3 border-2 border-accent/30 border-t-accent rounded-full animate-spin"></div>
-                <span x-text="'Working... ' + Math.max(0, Math.min(100, aiUI.installProgress.progressPct || 0)) + '%'"></span>
+            <template x-if="aiUI.installProgress.status === 'running' || aiUI.installProgress.status === 'cancelling'">
+              <div class="flex items-center gap-3">
+                <button
+                  class="px-3 py-1.5 text-[11px] font-medium text-red-400 hover:text-red-300 bg-red-500/10 hover:bg-red-500/20 rounded-lg transition-colors"
+                  :class="aiUI.installProgress.status === 'cancelling' ? 'opacity-50 cursor-not-allowed' : ''"
+                  :disabled="aiUI.installProgress.status === 'cancelling'"
+                  @click="_cancelInstall()"
+                >
+                  <span x-text="aiUI.installProgress.status === 'cancelling' ? 'Cancelling...' : 'Cancel'"></span>
+                </button>
+                <div class="flex items-center gap-2 text-[11px] text-white/30">
+                  <div class="w-3 h-3 border-2 border-accent/30 border-t-accent rounded-full animate-spin"></div>
+                  <span x-text="'Working... ' + Math.max(0, Math.min(100, aiUI.installProgress.progressPct || 0)) + '%'"></span>
+                </div>
               </div>
             </template>
           </div>

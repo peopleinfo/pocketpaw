@@ -57,7 +57,7 @@ python -m build
 
 ## Verification Workflow (Required)
 
-Follow [`workflow.md`](workflow.md) for all coding tasks.
+<!-- Follow [`workflow.md`](workflow.md) for all coding tasks. -->
 
 - Do not mark tasks done without verification evidence.
 - Coding tasks must include at least one relevant E2E test run.

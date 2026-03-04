@@ -45,6 +45,25 @@ async def install_requirement_endpoint(req_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ─── GPU Info ─────────────────────────────────────────────────────────────
+
+
+@router.get("/gpu")
+async def get_gpu_info():
+    """Detect and return GPU information (vendor, model, VRAM, CUDA version).
+
+    Result is cached after the first call — safe to poll from the frontend.
+    Returns ``vendor='none'`` when no supported GPU is found.
+    """
+    import asyncio
+
+    from pocketpaw.ai_ui.gpu import detect_gpu
+
+    loop = asyncio.get_running_loop()
+    gpu_info = await loop.run_in_executor(None, detect_gpu)
+    return {"gpu": gpu_info.as_dict()}
+
+
 # ─── Plugins ──────────────────────────────────────────────────────────────
 
 
@@ -464,6 +483,18 @@ async def install_plugin_endpoint(request: Request):
     except Exception as e:
         logger.exception("Plugin install failed for source=%s", source)
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/plugins/{plugin_id}/cancel-install")
+@router.post("/plugins/cancel-install/{plugin_id}", include_in_schema=False)
+async def cancel_install_endpoint(plugin_id: str):
+    """Cancel a running plugin install by killing its subprocess."""
+    from pocketpaw.ai_ui.plugins import cancel_install
+
+    killed = cancel_install(plugin_id)
+    if killed:
+        return {"status": "ok", "message": f"Install for '{plugin_id}' cancelled."}
+    return {"status": "ok", "message": "No running install found (may have already finished)."}
 
 
 @router.post("/plugins/{plugin_id}/launch")

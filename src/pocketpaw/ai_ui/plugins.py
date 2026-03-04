@@ -61,6 +61,16 @@ import zipfile
 from pathlib import Path
 from typing import Any
 
+from pocketpaw.ai_ui.gpu import (
+    _CUDA_INDEX_MAP as _CUDA_INDEX_MAP,  # noqa: F401 — re-export
+)
+from pocketpaw.ai_ui.gpu import (
+    detect_gpu,
+)
+from pocketpaw.ai_ui.gpu import (
+    get_cuda_index_url as get_cuda_index_url,  # noqa: F401 — re-export
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -153,6 +163,73 @@ async def _async_subprocess_exec(
     return await loop.run_in_executor(None, _run)
 
 
+async def _async_subprocess_shell_cancellable(
+    cmd: str,
+    plugin_id: str,
+    *,
+    timeout: float = 1800,
+    **kwargs: Any,
+) -> subprocess.CompletedProcess[bytes]:
+    """Run a shell command with cancel support via ``_installing_processes``.
+
+    Uses ``Popen`` instead of ``subprocess.run`` so the process can be killed
+    from ``cancel_install()`` while it is still running.
+    """
+    loop = asyncio.get_running_loop()
+
+    def _run() -> subprocess.CompletedProcess[bytes]:
+        popen_kwargs = dict(kwargs)
+        if os.name == "nt":
+            # Spawn a dedicated process group so taskkill can terminate
+            # the whole installer tree (cmd + child python/pip/etc).
+            flags = int(popen_kwargs.get("creationflags", 0))
+            flags |= int(getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0))
+            popen_kwargs["creationflags"] = flags
+        else:
+            # Required so cancel_install() can signal only this install tree.
+            popen_kwargs["start_new_session"] = True
+
+        proc = subprocess.Popen(cmd, shell=True, **popen_kwargs)
+        _installing_processes[plugin_id] = proc
+        try:
+            stdout, stderr = proc.communicate(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            stdout, stderr = proc.communicate()
+            raise
+        finally:
+            _installing_processes.pop(plugin_id, None)
+        return subprocess.CompletedProcess(
+            cmd, proc.returncode, stdout or b"", stderr or b""
+        )
+
+    return await loop.run_in_executor(None, _run)
+
+
+def cancel_install(plugin_id: str) -> bool:
+    """Kill a running install process.  Returns True if a process was killed."""
+    proc = _installing_processes.pop(plugin_id, None)
+    if proc is None:
+        return False
+    try:
+        if os.name == "nt":
+            # /T = kill child processes too, /F = force.
+            subprocess.run(
+                ["taskkill", "/PID", str(proc.pid), "/T", "/F"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                check=False,
+            )
+        else:
+            os.killpg(proc.pid, signal.SIGTERM)
+    except (OSError, ProcessLookupError):
+        try:
+            proc.kill()
+        except OSError:
+            pass
+    return True
+
+
 _PID_FILENAME = ".pocketpaw.pid"
 _LOG_FILENAME = ".pocketpaw.log"
 
@@ -160,6 +237,7 @@ _PROJECT_ROOT = Path(__file__).resolve().parents[3]
 PLUGINS_DIR = _PROJECT_ROOT / "plugins"
 
 _running_processes: dict[str, subprocess.Popen | asyncio.subprocess.Process] = {}
+_installing_processes: dict[str, subprocess.Popen] = {}  # install cancel support
 _codex_auth_sessions: dict[str, dict[str, Any]] = {}
 _codex_auth_lock = threading.Lock()
 _qwen_auth_sessions: dict[str, dict[str, Any]] = {}
@@ -179,21 +257,8 @@ _SYSTEM_PATHS = (
 )
 
 
-# ─── CUDA wheel index map ───────────────────────────────────────────────
-
-_CUDA_INDEX_MAP: dict[str, str] = {
-    "11.8": "https://download.pytorch.org/whl/cu118",
-    "12.1": "https://download.pytorch.org/whl/cu121",
-    "12.4": "https://download.pytorch.org/whl/cu124",
-    "12.8": "https://download.pytorch.org/whl/cu128",
-}
-
-
-def get_cuda_index_url(cuda_version: str | None) -> str | None:
-    """Return the PyTorch wheel index URL for the given CUDA version."""
-    if not cuda_version:
-        return None
-    return _CUDA_INDEX_MAP.get(cuda_version)
+# ─── GPU detection & CUDA wheel index (delegated to gpu.py) ─────────────
+# Imports at top of file: detect_gpu, _CUDA_INDEX_MAP, get_cuda_index_url
 
 
 # ─── Isolated Python provisioning ───────────────────────────────────────
@@ -436,6 +501,17 @@ def _sandbox_env(plugin_dir: Path, manifest: dict) -> dict[str, str]:
     # Layer manifest "env" on top (explicit config from pocketpaw.json)
     for key, val in (manifest.get("env") or {}).items():
         env[key] = str(val)
+
+    # Inject GPU detection results so plugin scripts can read them.
+    # detect_gpu() runs once and caches — no repeated subprocess calls.
+    # setdefault lets manifest "env" block take precedence over detection.
+    try:
+        gpu_info = detect_gpu()
+        for k, v in gpu_info.as_env().items():
+            if v:  # skip empty values
+                env.setdefault(k, v)
+    except Exception:
+        logger.debug("GPU detection failed in _sandbox_env", exc_info=True)
 
     # Port override
     port = manifest.get("port")
@@ -2284,11 +2360,9 @@ async def install_plugin(source: str, log_handler=None) -> dict:
         logger.info("Running install command for '%s': %s", plugin_id, install_cmd)
         if log_handler:
             await log_handler(f"Running install command: {install_cmd}")
-        # Use _async_subprocess_shell (subprocess.run in a thread) — proven
-        # to work on Windows + uvicorn reloader where asyncio.create_subprocess_shell
-        # raises NotImplementedError.
-        proc = await _async_subprocess_shell(
+        proc = await _async_subprocess_shell_cancellable(
             install_cmd,
+            plugin_id,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             cwd=str(dest),
@@ -2373,11 +2447,9 @@ async def install_plugin_from_zip(zip_bytes: bytes, log_handler=None) -> dict:
         logger.info("Running install command for '%s': %s", plugin_id, install_cmd)
         if log_handler:
             await log_handler(f"Running install command: {install_cmd}")
-        # Use _async_subprocess_shell (subprocess.run in a thread) — proven
-        # to work on Windows + uvicorn reloader where asyncio.create_subprocess_shell
-        # raises NotImplementedError.
-        proc = await _async_subprocess_shell(
+        proc = await _async_subprocess_shell_cancellable(
             install_cmd,
+            plugin_id,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             cwd=str(dest),

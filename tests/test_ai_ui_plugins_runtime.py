@@ -2,6 +2,7 @@ import asyncio
 import json
 import os
 import subprocess
+import sys
 import time
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -41,6 +42,7 @@ async def _wait_for_log_contains(log_path, needle: str, timeout: float = 3.0) ->
 @pytest.fixture(autouse=True)
 def _clear_running_processes():
     plugins._running_processes.clear()
+    plugins._installing_processes.clear()
     with plugins._codex_auth_lock:
         plugins._codex_auth_sessions.clear()
     with plugins._qwen_auth_lock:
@@ -49,6 +51,7 @@ def _clear_running_processes():
         plugins._gemini_auth_sessions.clear()
     yield
     plugins._running_processes.clear()
+    plugins._installing_processes.clear()
     with plugins._codex_auth_lock:
         plugins._codex_auth_sessions.clear()
     with plugins._qwen_auth_lock:
@@ -887,3 +890,35 @@ async def test_setup_local_ollama_for_ai_fast_api_noop_when_running():
     assert result["started"] is False
     install_mock.assert_not_called()
     launch_mock.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_cancel_install_terminates_running_subprocess(tmp_path):
+    plugin_id = "cancel-me"
+    cmd = f'"{sys.executable}" -c "import time; time.sleep(30)"'
+
+    task = asyncio.create_task(
+        plugins._async_subprocess_shell_cancellable(
+            cmd,
+            plugin_id,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            cwd=str(tmp_path),
+        )
+    )
+
+    for _ in range(100):
+        if plugin_id in plugins._installing_processes:
+            break
+        await asyncio.sleep(0.05)
+    assert plugin_id in plugins._installing_processes
+
+    assert plugins.cancel_install(plugin_id) is True
+    completed = await asyncio.wait_for(task, timeout=10)
+
+    assert completed.returncode != 0
+    assert plugin_id not in plugins._installing_processes
+
+
+def test_cancel_install_returns_false_when_missing():
+    assert plugins.cancel_install("missing-plugin") is False

@@ -140,9 +140,39 @@ def _has_nvidia_gpu() -> bool:
         return False
 
 
+# ── GPU env vars injected by PocketPaw (fallback to hardcoded defaults) ──
+
+def _is_nvidia() -> bool:
+    vendor = os.getenv("POCKETPAW_GPU_VENDOR", "")
+    if vendor:
+        return vendor == "nvidia"
+    return _has_nvidia_gpu()
+
+
+def _get_torch_index_url() -> str:
+    return os.getenv("POCKETPAW_TORCH_INDEX_URL", "") or "https://download.pytorch.org/whl/cu128"
+
+
+def _cuda_ver_tuple(v: str) -> tuple[int, ...]:
+    try:
+        return tuple(int(x) for x in v.split(".")[:2])
+    except (ValueError, AttributeError):
+        return (0, 0)
+
+
+def _can_use_cu128_wheels() -> bool:
+    cuda_ver = os.getenv("POCKETPAW_CUDA_VERSION", "12.8")
+    return _cuda_ver_tuple(cuda_ver) >= (12, 8)
+
+
 def _install_pinokio_torch_stack(py: Path) -> None:
     system = platform.system().lower()
     major, minor = _python_mm(py)
+    torch_index = _get_torch_index_url()
+    cu128_ok = _can_use_cu128_wheels()
+
+    print(f"Torch index URL: {torch_index}")
+    print(f"CUDA >= 12.8 wheels: {'yes' if cu128_ok else 'no'}")
 
     if system == "windows":
         _pip(
@@ -153,14 +183,17 @@ def _install_pinokio_torch_stack(py: Path) -> None:
             "torchaudio==2.7.1",
             "xformers==0.0.30",
             "--index-url",
-            "https://download.pytorch.org/whl/cu128",
+            torch_index,
             "--force-reinstall",
             "--no-deps",
         )
         _pip(py, "install", "triton-windows==3.3.1.post19")
-        if (major, minor) == (3, 10):
+        if (major, minor) == (3, 10) and cu128_ok:
             _pip(py, "install", _SAGE_WIN)
             _pip(py, "install", _FLASH_WIN)
+        elif (major, minor) == (3, 10):
+            cuda_ver = os.getenv("POCKETPAW_CUDA_VERSION", "?")
+            print(f"Skipping cu128 Sage/Flash wheels: CUDA {cuda_ver} < 12.8.")
         else:
             print("Skipping Sage/Flash prebuilt wheels: they are pinned to Python 3.10.")
         return
@@ -174,12 +207,15 @@ def _install_pinokio_torch_stack(py: Path) -> None:
             "torchaudio==2.7.0",
             "xformers==0.0.30",
             "--index-url",
-            "https://download.pytorch.org/whl/cu128",
+            torch_index,
             "--force-reinstall",
         )
-        if (major, minor) == (3, 10):
+        if (major, minor) == (3, 10) and cu128_ok:
             _pip(py, "install", _SAGE_LINUX)
             _pip(py, "install", _FLASH_LINUX)
+        elif (major, minor) == (3, 10):
+            cuda_ver = os.getenv("POCKETPAW_CUDA_VERSION", "?")
+            print(f"Skipping cu128 Sage/Flash wheels: CUDA {cuda_ver} < 12.8.")
         else:
             print("Skipping Sage/Flash prebuilt wheels: they are pinned to Python 3.10.")
         _pip(py, "install", "numpy==2.1.2")
@@ -190,16 +226,22 @@ def _install_pinokio_torch_stack(py: Path) -> None:
 
 def main() -> int:
     system = platform.system().lower()
+    gpu_vendor = os.getenv("POCKETPAW_GPU_VENDOR", "unknown")
+    gpu_model = os.getenv("POCKETPAW_GPU_MODEL", "")
+    cuda_ver = os.getenv("POCKETPAW_CUDA_VERSION", "")
     print("Wan2GP PocketPaw install bootstrap")
     print(f"Platform: {system}")
+    print(f"GPU: {gpu_vendor} {gpu_model}".strip())
+    if cuda_ver:
+        print(f"CUDA: {cuda_ver}")
 
     if system == "darwin":
         print("Detected macOS. Skipping heavy install during add.")
         print("Wan2GP start will auto-enable optional macOS mode.")
         return 0
 
-    if not _has_nvidia_gpu() and os.getenv("WAN2GP_ALLOW_NO_NVIDIA", "0") != "1":
-        print("Wan2GP requires an NVIDIA GPU for this preset install flow.")
+    if not _is_nvidia() and os.getenv("WAN2GP_ALLOW_NO_NVIDIA", "0") != "1":
+        print(f"Wan2GP requires an NVIDIA GPU (detected: {gpu_vendor}).")
         print("Set WAN2GP_ALLOW_NO_NVIDIA=1 to force install anyway.")
         return 1
 
@@ -387,9 +429,27 @@ def _macos_preflight(py: Path) -> tuple[bool, str]:
     return True, ""
 
 
+def _get_torch_index_url() -> str:
+    return os.getenv("POCKETPAW_TORCH_INDEX_URL", "") or "https://download.pytorch.org/whl/cu128"
+
+
+def _cuda_ver_tuple(v: str) -> tuple[int, ...]:
+    try:
+        return tuple(int(x) for x in v.split(".")[:2])
+    except (ValueError, AttributeError):
+        return (0, 0)
+
+
+def _can_use_cu128_wheels() -> bool:
+    cuda_ver = os.getenv("POCKETPAW_CUDA_VERSION", "12.8")
+    return _cuda_ver_tuple(cuda_ver) >= (12, 8)
+
+
 def _install_pinokio_torch_stack(py: Path) -> None:
     system = platform.system().lower()
     major, minor = _python_mm(py)
+    torch_index = _get_torch_index_url()
+    cu128_ok = _can_use_cu128_wheels()
 
     if system == "windows":
         _pip(
@@ -400,14 +460,17 @@ def _install_pinokio_torch_stack(py: Path) -> None:
             "torchaudio==2.7.1",
             "xformers==0.0.30",
             "--index-url",
-            "https://download.pytorch.org/whl/cu128",
+            torch_index,
             "--force-reinstall",
             "--no-deps",
         )
         _pip(py, "install", "triton-windows==3.3.1.post19")
-        if (major, minor) == (3, 10):
+        if (major, minor) == (3, 10) and cu128_ok:
             _pip(py, "install", _SAGE_WIN)
             _pip(py, "install", _FLASH_WIN)
+        elif (major, minor) == (3, 10):
+            cuda_ver = os.getenv("POCKETPAW_CUDA_VERSION", "?")
+            print(f"Skipping cu128 Sage/Flash wheels: CUDA {cuda_ver} < 12.8.")
         else:
             print("Skipping Sage/Flash prebuilt wheels: they are pinned to Python 3.10.")
         return
@@ -421,12 +484,15 @@ def _install_pinokio_torch_stack(py: Path) -> None:
             "torchaudio==2.7.0",
             "xformers==0.0.30",
             "--index-url",
-            "https://download.pytorch.org/whl/cu128",
+            torch_index,
             "--force-reinstall",
         )
-        if (major, minor) == (3, 10):
+        if (major, minor) == (3, 10) and cu128_ok:
             _pip(py, "install", _SAGE_LINUX)
             _pip(py, "install", _FLASH_LINUX)
+        elif (major, minor) == (3, 10):
+            cuda_ver = os.getenv("POCKETPAW_CUDA_VERSION", "?")
+            print(f"Skipping cu128 Sage/Flash wheels: CUDA {cuda_ver} < 12.8.")
         else:
             print("Skipping Sage/Flash prebuilt wheels: they are pinned to Python 3.10.")
         _pip(py, "install", "numpy==2.1.2")

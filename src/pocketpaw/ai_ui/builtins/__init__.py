@@ -132,10 +132,25 @@ def get_install_steps(app_id: str) -> list[dict[str, str]]:
     py_version = manifest.get("python_version")
     if py_version:
         steps.append({"id": "python", "label": f"Setting up Python {py_version}"})
+    if manifest.get("cuda_version") or manifest.get("install"):
+        steps.append({"id": "gpu", "label": "Detecting GPU"})
     if manifest.get("install"):
         cuda = manifest.get("cuda_version")
         if cuda:
-            steps.append({"id": "install", "label": f"Installing dependencies (CUDA {cuda})"})
+            try:
+                from pocketpaw.ai_ui.gpu import detect_gpu
+
+                gpu = detect_gpu()
+                if gpu.cuda_version and gpu.cuda_version != cuda:
+                    label = (
+                        f"Installing dependencies "
+                        f"(CUDA {cuda} wheels, driver {gpu.cuda_version})"
+                    )
+                else:
+                    label = f"Installing dependencies (CUDA {cuda})"
+            except Exception:
+                label = f"Installing dependencies (CUDA {cuda})"
+            steps.append({"id": "install", "label": label})
         else:
             steps.append({"id": "install", "label": "Installing dependencies"})
     steps.append({"id": "done", "label": "Ready to launch"})
@@ -210,6 +225,29 @@ async def install_builtin(app_id: str, plugins_dir: Path, log_handler=None) -> d
         _ensure_isolated_python(dest, defn["manifest"])
         await _log(f"Python {py_version} environment ready.")
 
+    # --- Step: GPU detection ---
+    if defn["manifest"].get("cuda_version") or defn["manifest"].get("install"):
+        await _log("step:gpu")
+        await _log("Detecting GPU hardware...")
+        try:
+            from pocketpaw.ai_ui.gpu import detect_gpu
+
+            gpu = detect_gpu()
+            await _log(f"GPU vendor:     {gpu.vendor}")
+            await _log(f"GPU model:      {gpu.model or 'N/A'}")
+            if gpu.vram_mb:
+                vram_gb = round(gpu.vram_mb / 1024, 1)
+                await _log(f"VRAM:           {vram_gb} GB ({gpu.vram_mb} MB)")
+            if gpu.cuda_version:
+                await _log(f"CUDA driver:    {gpu.cuda_version}")
+            if gpu.torch_index_url:
+                await _log(f"Torch index:    {gpu.torch_index_url}")
+            if not gpu.model:
+                await _log("No supported GPU detected.")
+            await _log("GPU detection complete.")
+        except Exception as exc:
+            await _log(f"GPU detection failed: {exc}")
+
     # --- Step: install deps ---
     install_cmd = _resolve_phase_command(dest, defn["manifest"], "install")
     if install_cmd:
@@ -220,13 +258,13 @@ async def install_builtin(app_id: str, plugins_dir: Path, log_handler=None) -> d
         sandbox_env["PYTHONUNBUFFERED"] = "1"
         sandbox_env["PYTHONIOENCODING"] = "utf-8"
 
-        # Use _async_subprocess_shell (subprocess.run in a thread) which is
-        # proven to work on Windows + uvicorn reloader. asyncio.create_subprocess_shell
-        # raises NotImplementedError on Windows in that context.
-        from pocketpaw.ai_ui.plugins import _async_subprocess_shell
+        # Use cancellable subprocess (Popen in a thread) so users can abort
+        # long installs.  Falls back to blocking subprocess.run if needed.
+        from pocketpaw.ai_ui.plugins import _async_subprocess_shell_cancellable
 
-        proc = await _async_subprocess_shell(
+        proc = await _async_subprocess_shell_cancellable(
             install_cmd,
+            app_id,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             cwd=str(dest),
