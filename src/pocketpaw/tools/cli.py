@@ -19,6 +19,7 @@ import sys
 
 from pocketpaw.tools.builtin import (
     AIUIPluginsTool,
+    AntiDetectBrowserTool,
     CalendarCreateTool,
     CalendarListTool,
     CalendarPrepTool,
@@ -88,6 +89,7 @@ _TOOLS = {
         CalendarPrepTool(),
         WebSearchTool(),
         UrlExtractTool(),
+        AntiDetectBrowserTool(),
         ImageGenerateTool(),
         TextToSpeechTool(),
         ResearchTool(),

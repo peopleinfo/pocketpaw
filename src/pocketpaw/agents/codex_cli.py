@@ -174,7 +174,8 @@ class CodexCLIBackend:
                 if text:
                     return AgentEvent(type="message", content=text)
             elif item_type == "command_execution":
-                output = item.get("output", "")
+                logger.info("Codex CLI command_execution item completed: %s", item)
+                output = item.get("output") or item.get("result") or ""
                 return AgentEvent(
                     type="tool_result",
                     content=str(output)[:200],
