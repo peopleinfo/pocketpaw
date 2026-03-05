@@ -242,8 +242,6 @@ class TestLLMClientOpenAICompatibleErrors:
         assert "Authentication" in msg
 
 
-
-
 # ---------------------------------------------------------------------------
 # Claude SDK + OpenAI-compatible (logic tests via LLMClient)
 # ---------------------------------------------------------------------------
@@ -282,8 +280,6 @@ class TestClaudeSDKOpenAICompatibleLogic:
             settings.smart_routing_enabled and not llm.is_ollama and not llm.is_openai_compatible
         )
         assert should_route is True
-
-
 
 
 # ---------------------------------------------------------------------------

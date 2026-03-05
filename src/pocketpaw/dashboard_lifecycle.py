@@ -10,6 +10,7 @@ Extracted from dashboard.py — contains:
 import asyncio
 import logging
 import os
+from datetime import UTC
 from pathlib import Path
 from time import monotonic
 
@@ -250,7 +251,7 @@ async def startup_event(
                 logger.warning("Health heartbeat error: %s", e)
 
         # Reuse the daemon's APScheduler
-        from datetime import UTC, datetime, timedelta
+        from datetime import datetime, timedelta
         daemon.trigger_engine.scheduler.add_job(
             _health_heartbeat,
             "interval",
