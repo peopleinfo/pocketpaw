@@ -19,9 +19,32 @@ import yaml
 
 logger = logging.getLogger(__name__)
 
+# Project-local skills/ directory — walk up from this file to find repo root
+def _find_project_skills_dir() -> Path | None:
+    """Walk up from src/ to find a top-level skills/ directory at the repo root.
+
+    Only accepts a skills/ dir that sits alongside a known repo-root marker
+    (pyproject.toml, setup.py, setup.cfg, .git) to avoid matching the
+    internal src/pocketpaw/skills/ package directory.
+    """
+    _ROOT_MARKERS = {"pyproject.toml", "setup.py", "setup.cfg", ".git"}
+    candidate = Path(__file__).resolve()
+    for _ in range(8):  # max 8 levels up
+        candidate = candidate.parent
+        if any((candidate / m).exists() for m in _ROOT_MARKERS):
+            skills_dir = candidate / "skills"
+            if skills_dir.is_dir():
+                return skills_dir
+            break  # found a repo root but no skills/ — stop searching
+    return None
+
+
+_PROJECT_SKILLS = _find_project_skills_dir()
+
 # Skill search paths in priority order (later overrides earlier)
 SKILL_PATHS = [
     Path(__file__).resolve().parent / "builtin",  # Package-shipped built-ins
+    *([_PROJECT_SKILLS] if _PROJECT_SKILLS else []),  # Repo-local skills/
     Path.home() / ".agents" / "skills",  # From skills.sh (central)
     Path.home() / ".claude" / "skills",  # Claude Code / SDK standard
     Path.home() / ".pocketpaw" / "skills",  # PocketPaw-specific
