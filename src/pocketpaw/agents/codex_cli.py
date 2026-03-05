@@ -224,8 +224,8 @@ class CodexCLIBackend:
         message: str,
         system_prompt: str | None = None,
         history: list[dict] | None = None,
-    ) -> list[str]:
-        """Build the full command line for the Codex CLI."""
+    ) -> tuple[list[str], str]:
+        """Build the full command line and the payload to send via stdin."""
         prompt_parts = []
         if system_prompt:
             prompt_parts.append(f"[System Instructions]\n{system_prompt}\n")
@@ -236,15 +236,15 @@ class CodexCLIBackend:
 
         model = self.settings.codex_cli_model or "gpt-5.3-codex"
 
-        return self._resolve_cmd([
+        cmd = self._resolve_cmd([
             "codex",
             "exec",
             "--json",
             "--full-auto",
             "--model",
             model,
-            full_prompt,
         ])
+        return cmd, full_prompt
 
     async def run(
         self,
@@ -264,21 +264,25 @@ class CodexCLIBackend:
             return
 
         self._stop_flag = False
-        cmd = self._build_cmd(message, system_prompt=system_prompt, history=history)
+        cmd, input_payload = self._build_cmd(message, system_prompt=system_prompt, history=history)
 
         try:
             # Try native async subprocess first
             self._process = await asyncio.create_subprocess_exec(
                 *cmd,
-                stdin=asyncio.subprocess.DEVNULL,
+                stdin=asyncio.subprocess.PIPE,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
+            # Write the large payload directly to stdin safely, avoiding command length limits
+            assert self._process.stdin is not None
+            self._process.stdin.write(input_payload.encode("utf-8"))
+            self._process.stdin.close()
         except NotImplementedError:
             # Windows SelectorEventLoop (e.g. uvicorn reload mode) does not
             # support subprocess_exec. Fall back to synchronous Popen + thread.
             logger.info("asyncio subprocess not available, using Popen fallback")
-            async for event in self._run_popen_fallback(cmd):
+            async for event in self._run_popen_fallback(cmd, input_payload):
                 yield event
             return
 
@@ -329,7 +333,7 @@ class CodexCLIBackend:
                 content=f"Codex CLI error ({type(e).__name__}): {e}",
             )
 
-    async def _run_popen_fallback(self, cmd: list[str]) -> AsyncIterator[AgentEvent]:
+    async def _run_popen_fallback(self, cmd: list[str], input_payload: str) -> AsyncIterator[AgentEvent]:
         """Run Codex CLI via subprocess.Popen when asyncio subprocess is unavailable.
 
         This is used on Windows when the event loop is a SelectorEventLoop
@@ -347,11 +351,16 @@ class CodexCLIBackend:
             try:
                 proc = subprocess.Popen(
                     cmd,
-                    stdin=subprocess.DEVNULL,
+                    stdin=subprocess.PIPE,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                 )
                 self._sync_process = proc
+
+                # Write payload and close stdin so CLI processes it immediately
+                assert proc.stdin is not None
+                proc.stdin.write(input_payload.encode("utf-8"))
+                proc.stdin.close()
 
                 assert proc.stdout is not None
                 for raw_line in proc.stdout:
