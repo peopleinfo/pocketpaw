@@ -2834,7 +2834,7 @@ wheels = [
 
 [[package]]
 name = "pocketpaw"
-version = "0.4.5.1"
+version = "0.4.6"
 source = { editable = "." }
 dependencies = [
     { name = "anthropic" },
@@ -2994,9 +2994,6 @@ ocr = [
 openai-agents = [
     { name = "openai-agents" },
 ]
-paw = [
-    { name = "click" },
-]
 recommended = [
     { name = "mem0ai" },
     { name = "ollama" },
@@ -3031,6 +3028,7 @@ dev = [
     { name = "pocketpaw", extra = ["all"] },
     { name = "pytest" },
     { name = "pytest-asyncio" },
+    { name = "pytest-playwright" },
     { name = "ruff" },
 ]
 
@@ -3043,7 +3041,6 @@ requires-dist = [
     { name = "camoufox", specifier = ">=0.4.11" },
     { name = "claude-agent-sdk", specifier = ">=0.1.30" },
     { name = "click", specifier = ">=8.0" },
-    { name = "click", marker = "extra == 'paw'", specifier = ">=8.0" },
     { name = "crawlee", extras = ["playwright"], specifier = ">=1.4.0" },
     { name = "cryptography", specifier = ">=42.0" },
     { name = "discord-py", marker = "extra == 'discord'", specifier = ">=2.3.0" },
@@ -3073,7 +3070,6 @@ requires-dist = [
     { name = "pocketpaw", extras = ["discord", "slack", "telegram"], marker = "extra == 'channels'" },
     { name = "pocketpaw", extras = ["openai-agents", "google-adk", "copilot-sdk"], marker = "extra == 'all-backends'" },
     { name = "pocketpaw", extras = ["recommended", "all-channels", "all-tools", "all-backends"], marker = "extra == 'all'" },
-    { name = "pocketpaw", extras = ["soul"], marker = "extra == 'paw'" },
     { name = "pocketpaw", extras = ["telegram", "discord", "slack", "whatsapp-personal", "matrix", "teams", "gchat"], marker = "extra == 'all-channels'" },
     { name = "psutil", marker = "extra == 'desktop'", specifier = ">=5.9.0" },
     { name = "pyautogui", marker = "extra == 'desktop'", specifier = ">=0.9.54" },
@@ -3094,7 +3090,7 @@ requires-dist = [
     { name = "slack-bolt", marker = "extra == 'slack'", specifier = ">=1.20.0" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.31.1" },
 ]
-provides-extras = ["dashboard", "telegram", "browser", "desktop", "openai-agents", "google-adk", "copilot-sdk", "memory", "discord", "slack", "whatsapp-personal", "matrix", "teams", "gchat", "image", "extract", "voice", "ocr", "sarvam", "mcp", "soul", "recommended", "channels", "all-channels", "all-tools", "all-backends", "paw", "all", "dev"]
+provides-extras = ["dashboard", "telegram", "browser", "desktop", "openai-agents", "google-adk", "copilot-sdk", "memory", "discord", "slack", "whatsapp-personal", "matrix", "teams", "gchat", "image", "extract", "voice", "ocr", "sarvam", "mcp", "soul", "recommended", "channels", "all-channels", "all-tools", "all-backends", "all", "dev"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -3102,6 +3098,7 @@ dev = [
     { name = "pocketpaw", extras = ["all"] },
     { name = "pytest", specifier = ">=8.0.0" },
     { name = "pytest-asyncio", specifier = ">=0.23.0" },
+    { name = "pytest-playwright", specifier = ">=0.7.2" },
     { name = "ruff", specifier = ">=0.4.0" },
 ]
 
