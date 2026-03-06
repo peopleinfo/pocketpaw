@@ -65,3 +65,4 @@ temp
 plugins/
 storage/key_value_stores
 storage/request_queues/
+screenshot.png

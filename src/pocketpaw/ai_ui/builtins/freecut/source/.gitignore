@@ -1,0 +1,56 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Build outputs
+build
+out
+
+# Testing
+coverage
+
+# Misc
+.cache
+.temp
+
+*.mp4
+# TanStack Router auto-generated files
+# Note: Some teams commit this, uncomment if you prefer to commit
+# src/routeTree.gen.ts
+.claude/
+
+.vercel
+.env*.local
+CLAUDE.md
+crates/*/target/
+crates/*/Cargo.lock
+.knip-report.json
+release
+dist-electron
+__pycache__
