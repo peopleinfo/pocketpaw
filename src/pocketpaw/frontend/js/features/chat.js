@@ -462,7 +462,74 @@ window.PocketPaw.Chat = {
 
                 if (!ctx.requiresArgs) return true;
                 return ctx.hasArgs;
-            }
+            },
+
+            // ---- Quick Shortcuts: MCP & Skills helpers ----
+
+            /**
+             * Return all MCP servers as an array (connected first) for the shortcuts MCP tab.
+             */
+            getShortcutsMCPServers() {
+                const servers = this.mcpServers || {};
+                return Object.entries(servers)
+                    .map(([name, info]) => ({ name, ...info }))
+                    .sort((a, b) => (b.connected ? 1 : 0) - (a.connected ? 1 : 0));
+            },
+
+            /**
+             * Return a short comma-joined preview of tool names for an MCP server.
+             * Shows up to 3 names then "+N more".
+             */
+            getMCPServerToolNames(srv) {
+                const tools = srv.tools || [];
+                if (!tools.length) return srv.connected ? 'Connected · no tools listed' : 'Not connected';
+                const preview = tools.slice(0, 3).map(t => t.name || t).join(', ');
+                return tools.length > 3 ? `${preview} +${tools.length - 3} more` : preview;
+            },
+
+            /**
+             * Insert a contextual MCP-server prompt into the chat input.
+             * e.g. "Use the filesystem MCP server to "
+             */
+            insertMCPServerPrompt(serverName) {
+                this.inputText = `Use the ${serverName} MCP server to `;
+                this.showComposerHelp = false;
+                this.$nextTick(() => {
+                    if (this.$refs.chatInput) {
+                        this.$refs.chatInput.focus();
+                        const len = this.inputText.length;
+                        this.$refs.chatInput.setSelectionRange(len, len);
+                    }
+                });
+            },
+
+            /**
+             * Insert a skill's slash command into the chat input.
+             */
+            insertQuickSkill(skill) {
+                const usage = this.getSkillUsageText(skill);
+                this.inputText = usage + (skill.argument_hint ? ' ' : '');
+                this.showComposerHelp = false;
+                this.$nextTick(() => {
+                    if (this.$refs.chatInput) {
+                        this.$refs.chatInput.focus();
+                        const len = this.inputText.length;
+                        this.$refs.chatInput.setSelectionRange(len, len);
+                    }
+                });
+            },
+
+            /**
+             * Re-fetch MCP status when the MCP tab is opened in Quick Shortcuts.
+             */
+            async refreshShortcutsMCP() {
+                if (this.getMCPStatus) {
+                    await this.getMCPStatus();
+                }
+                this.$nextTick(() => {
+                    if (window.refreshIcons) window.refreshIcons();
+                });
+            },
         };
     }
 };
